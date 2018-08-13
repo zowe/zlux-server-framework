@@ -1,0 +1,50 @@
+{
+  "identifier": "com.rs.terminalproxy",
+  "baseURI": "terminalproxy",
+  "apiVersion": "1.0.0",
+  "pluginVersion": "0.0.0-zlux.version.replacement",
+  "pluginType": "application",
+  "configurationData": {
+    "resources": {
+      "preferences": {
+        "locationType": "relative",
+        "aggregationPolicy": "override"
+      },
+      "sessions": {
+        "aggregationPolicy": "none",
+        "subResources": {
+          "sessionName": {
+            "variable": true,
+            "aggregationPolicy": "none"
+          }
+        }
+      }
+    }
+  },
+  "dataServices": [
+    {
+      "type": "router",
+      "name": "tn3270data",
+      "initializerLookupMethod": "external",
+      "fileName": "terminalProxy.js",
+      "routerFactory": "tn3270WebsocketRouter",
+      "dependenciesIncluded": true
+    },
+    {
+      "type": "router",
+      "name": "tn5250data",
+      "initializerLookupMethod": "external",
+      "fileName": "terminalProxy.js",
+      "routerFactory": "tn5250WebsocketRouter",
+      "dependenciesIncluded": true
+    },
+    {
+      "type": "router",
+      "name": "vtdata",
+      "initializerLookupMethod": "external",
+      "fileName": "terminalProxy.js",
+      "routerFactory": "vtWebsocketRouter",
+      "dependenciesIncluded": true
+    }
+  ]
+}
