@@ -384,7 +384,7 @@ const commonMiddleware = {
 
 function makeSubloggerFromDefinitions(pluginDefinition, serviceDefinition, name) {
   return global.COM_RS_COMMON_LOGGER.makeComponentLogger(pluginDefinition.identifier
-      + "." + serviceDefinition.name + '.' + name);
+      + "." + serviceDefinition.name + ':' + name);
 }
 
 const defaultOptions = {
