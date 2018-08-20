@@ -124,7 +124,7 @@ function Server(appConfig, userConfig, startUpConfig) {
   util.deepFreeze(userConfig);
   this.startUpConfig = startUpConfig;
   util.deepFreeze(startUpConfig);
-  this.processManager = new ProcessManager();
+  this.processManager = new ProcessManager(true);
   this.authManager = new AuthManager({
     config: userConfig.dataserviceAuthentication,
     productCode:  appConfig.productCode
