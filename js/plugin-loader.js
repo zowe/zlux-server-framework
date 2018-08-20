@@ -490,6 +490,15 @@ PluginLoader.prototype = {
   plugins: null,
   pluginMap: null,
   unresolvedImports: null,
+
+  _emitPluginEurekaInfo(pluginDef) {
+    this.emit('updateEurekaMetadata', {
+      id: pluginDef.identifier,
+      pluginVersion: pluginDef.pluginVersion,
+      webContent: pluginDef.webContent,
+      dataServices: pluginDef.dataServices
+    });
+  },
   
   _readPluginDef(pluginDescriptorFilename) {
     bootstrapLogger.info(`Processing plugin reference ${pluginDescriptorFilename}...`);
@@ -519,6 +528,7 @@ PluginLoader.prototype = {
       throw new Error(`No plugin type found for ${pluginDef.identifier} `
       + `found at ${pluginBasePath}, skipping`)
     }
+    this._emitPluginEurekaInfo(pluginDef); // Emit Eureka info
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
       this.options.productCode);
@@ -612,6 +622,7 @@ PluginLoader.prototype = {
         bootstrapLogger.log(bootstrapLogger.INFO,
           `Plugin ${plugin.identifier} at path=${plugin.location} loaded\n`);
         bootstrapLogger.debug(' Content:\n' + plugin.toString());
+        console.log('PLUGIN LOCATION: ' + plugin.location);
       } catch (e) {
         console.log(e);
         bootstrapLogger.warn(e)
@@ -644,7 +655,12 @@ PluginLoader.prototype = {
     }
     this.plugins = this._toposortPlugins(pluginContext.plugins, this.pluginMap);
 //    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
-//        + JSON.stringify(this.pluginMap));    
+//        + JSON.stringify(this.pluginMap));  
+    
+    // Share with index.js the amount of plugins that should load
+    this.emit('givePluginAmount', {
+      data: this.plugins.length
+    });  
     for (const plugin of this.plugins) {
       this.emit('pluginAdded', {
         data: plugin
