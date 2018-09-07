@@ -109,6 +109,27 @@ module.exports.readFilesToArray = function(fileList) {
   }
 };
 
+const errorProto = {
+    "_objectType": "com.zoeproject.error",
+    "_metaDataVersion": "1.0.0",
+    "returnCode": "1",
+    "messageID": "ZOE000E",
+    "messageTemplate": "An error occurred",
+    "messageParameters": {},
+    "messageDetails": "An error occurred when processing the request"
+  };
+
+module.exports.makeErrorObject = function makeError(details) {
+  if ((details._objectType !== undefined) 
+      || (details._metaDataVersion !== undefined)) {
+    throw new Error("can't specify error metadata");
+  }
+  const err = {};
+  Object.assign(err, errorProto);
+  Object.assign(err, details);
+  return err;
+}
+
 
 /*
   This program and the accompanying materials are
