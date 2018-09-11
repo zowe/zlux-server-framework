@@ -501,8 +501,9 @@ PluginLoader.prototype = {
   },
   
   _readPluginDef(pluginDescriptorFilename) {
-    bootstrapLogger.info(`Processing plugin reference ${pluginDescriptorFilename}...`);
-    const pluginPtrPath = path.join(this.options.pluginsDir, pluginDescriptorFilename);
+    const pluginPtrPath = path.join(this.options.pluginsDir, 
+        pluginDescriptorFilename);
+    bootstrapLogger.info(`Processing plugin reference ${pluginPtrPath}...`);
     if (!fs.existsSync(pluginPtrPath)) {
       throw new Error(`${pluginPtrPath} is missing`);
     }
@@ -528,6 +529,8 @@ PluginLoader.prototype = {
       throw new Error(`No plugin type found for ${pluginDef.identifier} `
       + `found at ${pluginBasePath}, skipping`)
     }
+    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin type `
+        + `'${pluginDef.pluginType}'`);
     this._emitPluginEurekaInfo(pluginDef); // Emit Eureka info
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
@@ -620,9 +623,8 @@ PluginLoader.prototype = {
         plugin.init(pluginContext);
         pluginContext.plugins.push(plugin);
         bootstrapLogger.log(bootstrapLogger.INFO,
-          `Plugin ${plugin.identifier} at path=${plugin.location} loaded\n`);
+          `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
         bootstrapLogger.debug(' Content:\n' + plugin.toString());
-        console.log('PLUGIN LOCATION: ' + plugin.location);
       } catch (e) {
         console.log(e);
         bootstrapLogger.warn(e)

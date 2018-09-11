@@ -39,6 +39,7 @@ WebServer.prototype = {
     if (this.config.https.pfx) {
       try {
         this.httpsOptions.pfx = fs.readFileSync(this.config.https.pfx);
+        bootstrapLogger.info('Using PFX: '+ this.config.https.pfx);
       } catch (e) {
         bootstrapLogger.warn('Error when reading PFX. Server cannot continue. Error='+e.message);
         //        process.exit(UNP_EXIT_PFX_READ_ERROR);
@@ -46,7 +47,10 @@ WebServer.prototype = {
       }
     } else {
       if (this.config.https.certificates) {
-        this.httpsOptions.cert = util.readFilesToArray(this.config.https.certificates);
+        this.httpsOptions.cert = util.readFilesToArray(
+            this.config.https.certificates);
+        bootstrapLogger.info('Using Certificate: '
+            + this.config.https.certificates);
       }
       if (this.config.https.keys) {
         this.httpsOptions.key = util.readFilesToArray(this.config.https.keys);
