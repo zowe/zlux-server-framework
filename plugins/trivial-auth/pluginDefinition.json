@@ -1,0 +1,9 @@
+{
+  "identifier": "com.rs.auth.trivialAuth",
+  "pluginType": "nodeAuthentication",
+  "authenticationCategory": "fallback",
+  "apiVersion": "1.0.0",
+  "pluginVersion": "1.0.0",
+  "filename": "trivialAuth.js",
+  "authenticationInstaller": "trivialAuthInstaller"
+}

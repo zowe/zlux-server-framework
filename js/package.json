@@ -1,0 +1,28 @@
+{
+  "name": "zlux-proxy-server",
+  "version": "0.0.0-zlux.version.replacement",
+  "description": "A Server for zLUX Plugins, Dataservices, and Proxying to other Servers.",
+  "license": "private",
+  "author": {
+    "name": "Fyodor Kovin",
+    "email": "fkovin@rocketsoftware.com"
+  },
+  "contributors": [
+    {
+      "name": "Sean Grady",
+      "email": "sgrady@rocketsoftware.com"
+    }
+  ],
+  "dependencies": {
+    "ajv": "^6.5.2",
+    "ajv-errors": "^1.0.0",
+    "bluebird": "^3.5.1",
+    "body-parser": "^1.18.2",
+    "express": "^4.16.2",
+    "express-session": "^1.15.6",
+    "express-ws": "^3.0.0",
+    "require-from-string": "^2.0.1",
+    "toposort": "^1.0.6",
+    "ws": "^3.3.2"
+  }
+}
