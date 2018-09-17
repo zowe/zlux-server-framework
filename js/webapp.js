@@ -783,6 +783,37 @@ WebApp.prototype = {
     }
   },
 
+  resolveAllImports(pluginDefs) {
+    let unresolvedPlugins = [];
+    installLog.info(`Resolving imports for ${pluginDefs.length} remaining plugins`);
+    pluginDefs.forEach((plugin) => {
+      installLog.debug(
+        `${plugin.identifier}: ${plugin.dataServicesGrouped? 'has' : 'does not have'}`
+          + ' services')
+      const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
+                                            plugin.identifier);
+      try {
+        this._resolveImports(plugin, urlBase);
+      } catch (e) {
+        unresolvedPlugins.push(plugin);
+        //keep in array and retry
+      }
+    });
+    if (unresolvedPlugins.length === 0) {
+      installLog.info(`All imports resolved for all plugins.`);
+      return true;
+    } else if (unresolvedPlugins.length !== pluginDefs.length) {
+      installLog.info(`Retrying import resolution for ${unresolvedPlugins.length} plugins.`);
+      return this.resolveAllImports(unresolvedPlugins);
+    } else {
+      installLog.info(`Unable to resolve imports for ${unresolvedPlugins.length} plugins.`);
+      unresolvedPlugins.forEach((plugin)=> {
+        installLog.info(`${plugin.identifier} has unresolved imports.`);
+      });
+      return false;
+    }
+  },
+
   _resolveImports(plugin, urlBase) {
     if (plugin.dataServicesGrouped  
         && plugin.dataServicesGrouped.import.length > 0) {
@@ -843,7 +874,7 @@ WebApp.prototype = {
     } catch (e) {
       installLog.warn(e.stack);
     }
-    this._resolveImports(plugin, urlBase);
+    //import resolution will be postponed until all non-import plugins are loaded
     this.plugins.push(plugin);
   }),
 

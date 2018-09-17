@@ -9,7 +9,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-
 'use strict';
 const Promise = require('bluebird');
 const util = require('./util');
@@ -237,7 +236,6 @@ Server.prototype = {
     };
     this.webApp = makeWebApp(webAppOptions);
     this.webServer.startListening(this.webApp.expressApp);
-    const eurekaJSON = this.userConfig.node.mediationLayer;
 
     // Add to eureka metadata info
 
@@ -246,30 +244,29 @@ Server.prototype = {
     
     // Get number of plugins that should load
     this.pluginLoader.on('givePluginAmount', event => totalPlugins = event.data);
-    
+
+    let pluginsLoaded = [];
     // Add the plugin and add it to the count
     this.pluginLoader.on('pluginAdded', event => {
-      this.pluginLoaded(event.data);
-      addedPlugins++;            // Make sure total plugins did not get overwritten to null
-
-      if (totalPlugins != null && totalPlugins == addedPlugins) {   // If all the plugins have attempted to load
-        if(eurekaJSON && (eurekaJSON.enabled === true)){
-          var eCopy = JSON.parse(JSON.stringify(eurekaJSON))
-          eCopy.instance = getMediationLayerInstanceObject(webAppOptions, eCopy.instance);
-          eCopy.eureka = getMediationLayerEurekaObject(webAppOptions, eCopy.eureka, eCopy.server);
-          bootstrapLogger.info(`Mediation Layer Configuration = ${JSON.stringify(eCopy,null,2)}`);
-          const client = new eureka(eCopy);
-          delete eCopy.eureka.serviceUrls.default;
-          bootstrapLogger.info('Eureka Instance Id:' + eCopy.instance.instanceId);
-          bootstrapLogger.info("Total Plugins: " + totalPlugins + " Added Plugins: " + addedPlugins);
-          bootstrapLogger.info("############# Connect to Eureka #############");
-          
-          client.logger.level('debug');
-          client.start(function (error) {     // Connect to Eureka Server
-            bootstrapLogger.warn(error || 'complete');
-          });
+      pluginsLoaded.push(event.data);
+      this.pluginLoaded(event.data).then(() => {
+        addedPlugins++;            // Make sure total plugins did not get overwritten to null
+        installLogger.info('Installed plugin: ' + event.data.identifier);
+        if (totalPlugins != null && totalPlugins == addedPlugins) {   // If all the plugins have attempted to load
+          this.finishPluginInitialization(pluginsLoaded, webAppOptions);
         }
-      }
+      }, err => {
+        addedPlugins++;
+        installLogger.warn('Failed to install plugin: ' 
+                           + event.data.identifier);
+        console.log(err);
+        if (totalPlugins != null && totalPlugins == addedPlugins) {   // If all the plugins have attempted to load
+          this.finishPluginInitialization(pluginsLoaded, webAppOptions);
+        }
+      });
+
+
+      
     });
     this.pluginLoader.loadPlugins();
     yield this.authManager.loadAuthenticators(this.userConfig);
@@ -278,6 +275,27 @@ Server.prototype = {
       this.webServer.close();
     }.bind(this));
   }),
+
+  finishPluginInitialization(pluginsLoaded, webAppOptions) {
+    this.webApp.resolveAllImports(pluginsLoaded);
+    const eurekaJSON = this.userConfig.node.mediationLayer;
+    if(eurekaJSON && (eurekaJSON.enabled === true)){
+      var eCopy = JSON.parse(JSON.stringify(eurekaJSON))
+      eCopy.instance = getMediationLayerInstanceObject(webAppOptions, eCopy.instance);
+      eCopy.eureka = getMediationLayerEurekaObject(webAppOptions, eCopy.eureka, eCopy.server);
+      bootstrapLogger.info(`Mediation Layer Configuration = ${JSON.stringify(eCopy,null,2)}`);
+      const client = new eureka(eCopy);
+      delete eCopy.eureka.serviceUrls.default;
+      bootstrapLogger.info('Eureka Instance Id:' + eCopy.instance.instanceId);
+      bootstrapLogger.info("############# Connect to Eureka #############");
+      
+      client.logger.level('debug');
+      client.start(function (error) {     // Connect to Eureka Server
+        bootstrapLogger.warn(error || 'complete');
+      });
+    }
+  },
+  
   newPluginSubmitted(pluginDef) {
     installLogger.debug("Adding plugin ", pluginDef);
     this.pluginLoader.addDynamicPlugin(pluginDef);
@@ -300,13 +318,7 @@ Server.prototype = {
         }
       }
     };
-    this.webApp.installPlugin(pluginContext).then(() => {
-      installLogger.info('Installed plugin: ' + pluginDef.identifier);
-    }, err => {
-      installLogger.warn('Failed to install plugin: ' 
-          + pluginDef.identifier);
-      console.log(err)
-    });
+    return this.webApp.installPlugin(pluginContext);
   }
 };
 
