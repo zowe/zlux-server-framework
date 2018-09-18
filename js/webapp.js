@@ -783,6 +783,36 @@ WebApp.prototype = {
     }
   },
 
+  /*
+    Order of plugins given is expected to be in order of dependency, so a loop is not run on import resolution
+   */
+  resolveAllImports(pluginDefs) {
+    let unresolvedPlugins = [];
+    installLog.info(`Resolving imports for ${pluginDefs.length} remaining plugins`);
+    pluginDefs.forEach((plugin) => {
+      installLog.debug(
+        `${plugin.identifier}: ${plugin.dataServicesGrouped? 'has' : 'does not have'}`
+          + ' services')
+      const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
+                                            plugin.identifier);
+      try {
+        this._resolveImports(plugin, urlBase);
+      } catch (e) {
+        unresolvedPlugins.push(plugin);
+      }
+    });
+    if (unresolvedPlugins.length === 0) {
+      installLog.info(`All imports resolved for all plugins.`);
+      return true;
+    } else {
+      installLog.info(`Unable to resolve imports for ${unresolvedPlugins.length} plugins.`);
+      unresolvedPlugins.forEach((plugin)=> {
+        installLog.info(`${plugin.identifier} has unresolved imports.`);
+      });
+      return false;
+    }
+  },
+
   _resolveImports(plugin, urlBase) {
     if (plugin.dataServicesGrouped  
         && plugin.dataServicesGrouped.import.length > 0) {
@@ -799,6 +829,11 @@ WebApp.prototype = {
         installLog.info(`${plugin.identifier}: installing import`
            + ` ${importedService.sourcePlugin}:${importedService.sourceName} at ${subUrl}`);
         this.pluginRouter.use(subUrl, importedRouter);
+        let pluginRouters = this.routers[plugin.identifier];
+        if (!pluginRouters) {
+          pluginRouters = this.routers[plugin.identifier] = {};
+        }
+        pluginRouters[importedService.sourceName] = importedRouter;
       }
     }
   },
@@ -843,7 +878,7 @@ WebApp.prototype = {
     } catch (e) {
       installLog.warn(e.stack);
     }
-    this._resolveImports(plugin, urlBase);
+    //import resolution will be postponed until all non-import plugins are loaded
     this.plugins.push(plugin);
   }),
 
