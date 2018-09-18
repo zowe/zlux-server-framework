@@ -240,7 +240,7 @@ Server.prototype = {
     // Add to eureka metadata info
 
     var totalPlugins = -1;    // Stores the number of plugins that should load
-    var addedPlugins = 0;     // Stores the number of plugins that have attempted to load
+    var visitedPlugins = 0;     // Stores the number of plugins that have attempted to load
     
     // Get number of plugins that should load
     this.pluginLoader.on('givePluginAmount', event => totalPlugins = event.data);
@@ -250,17 +250,17 @@ Server.prototype = {
     this.pluginLoader.on('pluginAdded', event => {
       pluginsLoaded.push(event.data);
       this.pluginLoaded(event.data).then(() => {
-        addedPlugins++;            // Make sure total plugins did not get overwritten to null
+        visitedPlugins++;            // Make sure total plugins did not get overwritten to null
         installLogger.info('Installed plugin: ' + event.data.identifier);
-        if (totalPlugins != null && totalPlugins == addedPlugins) {   // If all the plugins have attempted to load
+        if (totalPlugins != null && totalPlugins == visitedPlugins) {   // If all the plugins have attempted to load
           this.finishPluginInitialization(pluginsLoaded, webAppOptions);
         }
       }, err => {
-        addedPlugins++;
+        visitedPlugins++;
         installLogger.warn('Failed to install plugin: ' 
                            + event.data.identifier);
         console.log(err);
-        if (totalPlugins != null && totalPlugins == addedPlugins) {   // If all the plugins have attempted to load
+        if (totalPlugins != null && totalPlugins == visitedPlugins) {   // If all the plugins have attempted to load
           this.finishPluginInitialization(pluginsLoaded, webAppOptions);
         }
       });
