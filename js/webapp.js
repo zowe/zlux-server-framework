@@ -783,6 +783,9 @@ WebApp.prototype = {
     }
   },
 
+  /*
+    Order of plugins given is expected to be in order of dependency, so a loop is not run on import resolution
+   */
   resolveAllImports(pluginDefs) {
     let unresolvedPlugins = [];
     installLog.info(`Resolving imports for ${pluginDefs.length} remaining plugins`);
@@ -796,15 +799,11 @@ WebApp.prototype = {
         this._resolveImports(plugin, urlBase);
       } catch (e) {
         unresolvedPlugins.push(plugin);
-        //keep in array and retry
       }
     });
     if (unresolvedPlugins.length === 0) {
       installLog.info(`All imports resolved for all plugins.`);
       return true;
-    } else if (unresolvedPlugins.length !== pluginDefs.length) {
-      installLog.info(`Retrying import resolution for ${unresolvedPlugins.length} plugins.`);
-      return this.resolveAllImports(unresolvedPlugins);
     } else {
       installLog.info(`Unable to resolve imports for ${unresolvedPlugins.length} plugins.`);
       unresolvedPlugins.forEach((plugin)=> {
@@ -830,6 +829,11 @@ WebApp.prototype = {
         installLog.info(`${plugin.identifier}: installing import`
            + ` ${importedService.sourcePlugin}:${importedService.sourceName} at ${subUrl}`);
         this.pluginRouter.use(subUrl, importedRouter);
+        let pluginRouters = this.routers[plugin.identifier];
+        if (!pluginRouters) {
+          pluginRouters = this.routers[plugin.identifier] = {};
+        }
+        pluginRouters[importedService.sourceName] = importedRouter;
       }
     }
   },
