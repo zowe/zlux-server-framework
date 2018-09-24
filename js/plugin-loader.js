@@ -18,12 +18,12 @@ const url = require('url');
 const path = require('path');
 const os = require('os');
 const assert = require('assert');
-const toposort = require('toposort');
 const requireFromString = require('require-from-string');
 const EventEmitter = require('events');
 const zluxUtil = require('./util');
 const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
+const DependencyGraph = require('./depgraph');
 
 /**
  * Plugin loader: reads the entire plugin configuration tree
@@ -43,113 +43,14 @@ const defaultOptions = {
   serverConfig: null
 }
 
-function ExternalImports() {
-  this.map = {};
-}
-
-ExternalImports.prototype = {
-  constructor: ExternalImports,
-  /**
-   * A plugin import table in the opposite direction. 
-   * Shows who imports us, rather than whom we import.
-   *   
-   *   <plugin id>: {
-   *     <service name>: [
-   *       ...,
-   *       {
-   *         "toPlugin": the id of a plugin that imports the service from the plugin
-   *         "alias": the target alias of the service
-   *       },
-   *       ...
-   *     ]
-   *   }
-   */
-  map: null, 
-  
-  /**
-   * Register a newly obtained plugin definition's dependencies to the table
-   */
-  registerAsImporterOfAs(destPlugin, sourcePlugin, sourceName, localName) {
-    let sourcePluginEntry = this.map[sourcePlugin];
-    if (!sourcePluginEntry) {
-      sourcePluginEntry = this.map[sourcePlugin] = {};
-    }
-    let sourceServiceRefs = sourcePluginEntry[sourceName];
-    if (!sourceServiceRefs) {
-      sourceServiceRefs = sourcePluginEntry[sourceName] = [];
-    }
-    sourceServiceRefs.push({
-      toPlugin: destPlugin.identifier,
-      alias: localName
-    });
-  },
-  
-  /**
-   * Ensure that none of the `plugins` contains unsatisfied imports.
-   * 
-   * Every service of every plugin from `plugins` cancels out the corresponding
-   * records from the table.
-   * 
-   * Updates every imported data service's externalRefs
-   * 
-   * Returns true if the table ends up being empty, false otherwise
-   */
-  allImportsResolved(plugins) {
-    let success = true;
-    for (const plugin of plugins) {
-      const externalImports = this.map[plugin.identifier];
-      if (externalImports) {
-        if (plugin.dataServices) {
-          for (const dataservice of plugin.dataServices) {
-            dataservice.externalRefs = externalImports[dataservice.name];
-            delete externalImports[dataservice.name];
-          }
-        }
-        const missingServices = Object.keys(externalImports);
-        if (missingServices.length > 0) {
-          success = false;
-        }
-        delete this.map[plugin.identifier];
-      }
-    }
-    const missingPlugins = Object.keys(this.map);
-    if (missingPlugins.length > 0) {
-      success = false;
-    }
-    return success;
-  },
-   
-  /*
-   * TODO recursively mark broken the dependents of a broken plugin
-   */
-  getBrokenPlugins() {
-    let report = {};
-    for (const plugin of Object.keys(this.map)) {
-      const serviceMap = this.map[plugin]
-      for (const service of Object.keys(serviceMap)) {
-        const imports = serviceMap[service];
-        for (const im of imports) {
-          let p = report[im.toPlugin];
-          if (!p) {
-            p = report[im.toPlugin] = {};
-          }
-          p[im.alias] = true;
-        }
-      }
-    }
-    return report;
-  },
-  
-  reset() {
-    this.map = {};
-  }
-};
-
 function Service(def, configuration, plugin) {
   this.configuration = configuration;
   //don't do this here: avoid circular structures:
   //this.plugin = plugin; 
   Object.assign(this, def);
+}
+Service.prototype = {
+  constructor: Service,
 }
 
 //first checks if the parent plugin has a host and port 
@@ -189,10 +90,9 @@ function makeDataService(def, plugin, context) {
   return dataservice;
 }
 
-function Plugin(def, configuration, location) {
+function Plugin(def, configuration) {
   Object.assign(this, def);
   this.configuration = configuration;
-  this.location = location;
 }
 Plugin.prototype = {
   constructor: Plugin,
@@ -254,7 +154,7 @@ Plugin.prototype = {
     }
   },
   
-  initWebServiceDependencies(unresolvedImports, context) {
+  initWebServiceDependencies(context) {
     if (this.dataServices) {
       this.dataServicesGrouped = {
         router: [],
@@ -263,27 +163,45 @@ Plugin.prototype = {
         proxy: [],
         external: []
       };
+      const filteredDataServices = [];
       for (const dataServiceDef of this.dataServices) {
         const dataservice = makeDataService(dataServiceDef, this, context);
         if (dataservice.type == "service") {          
           this.dataServicesGrouped.proxy.push(dataservice);
           bootstrapLogger.info(`${this.identifier}: `
               + `found proxied service '${dataservice.name}'`);
+          filteredDataServices.push(dataservice);
         } else   if (dataservice.type === 'import') {
           this.dataServicesGrouped.import.push(dataservice);
-          unresolvedImports.registerAsImporterOfAs(this, dataservice.sourcePlugin,
-              dataservice.sourceName, dataservice.localName);
           bootstrapLogger.info(`${this.identifier}:`
               + ` importing service '${dataservice.sourceName}'`
               + ` from ${dataservice.sourcePlugin}`
               + ` as '${dataservice.localName}'`);
+          filteredDataServices.push(dataservice);
         } else if ((dataservice.type == 'nodeService')
             || (dataservice.type === 'router')) {
-          if ((dataservice.serviceLookupMethod == 'internal')
-              || !dataservice.dependenciesIncluded) {
-            bootstrapLogger.warn(`${this.identifier}:`
-                + ` loading dataservice ${dataservice.name} failed, declaration invalid`);
-            continue;
+           //TODO what is this? Why do we need it?
+//          if ((dataservice.serviceLookupMethod == 'internal')
+//              || !dataservice.dependenciesIncluded) {
+//            bootstrapLogger.warn(`${this.identifier}:`
+//                + ` loading dataservice ${dataservice.name} failed, declaration invalid`);
+//            continue;
+//          }
+          if (this.dynamicallyCreated) {
+            const nodeModule = requireFromString(dataservice.source);
+            dataservice.nodeModule = nodeModule;
+          } else {
+            // Quick fix before MVD-947 is merged
+            var fileLocation = ""
+            if (dataservice.filename) {
+              fileLocation = path.join(this.location, 'lib', dataservice.filename);
+            } else if (dataservice.fileName) {
+              fileLocation = path.join(this.location, 'lib', dataservice.fileName);
+            } else {
+              throw new Error(`No file name for data service`)
+            }
+            const nodeModule = require(fileLocation);
+            dataservice.nodeModule = nodeModule;
           }
           if (dataservice.type === 'router') {
             bootstrapLogger.info(`${this.identifier}: `
@@ -294,39 +212,24 @@ Plugin.prototype = {
                 + `found legacy node service '${dataservice.name}'`);
             this.dataServicesGrouped.node.push(dataservice);
           }
-          if (this.dynamicallyCreated) {
-            const nodeModule = requireFromString(dataservice.source);
-            dataservice.nodeModule = nodeModule;
-          } else {
-            // Quick fix before MVD-947 is merged
-            var fileLocation = ""
-            if (dataservice.filename) {
-              fileLocation = path.join(this.location, 'lib', dataservice.filename);
-            }
-            else if (dataservice.fileName) {
-              fileLocation = path.join(this.location, 'lib', dataservice.fileName);
-            }
-            else {
-              throw new Error (`No file name for data service`)
-            }
-            const nodeModule = require(fileLocation);
-            dataservice.nodeModule = nodeModule;
-          }
+          filteredDataServices.push(dataservice);
         } else if (dataservice.type == 'external') {
           this.dataServicesGrouped.external.push(dataservice);
           bootstrapLogger.info(`${this.identifier}: `
               + `found external service '${dataservice.name}'`);
+          filteredDataServices.push(dataservice);
         } else {
           bootstrapLogger.warn(`${this.identifier}: `
               + `invalid service type '${dataservice.name}'`);
         }
       }
+      this.dataServices = filteredDataServices;
     }
   }
 };
 
-function LibraryPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function LibraryPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 LibraryPlugIn.prototype = {
   __proto__: Plugin.prototype,
@@ -344,40 +247,40 @@ LibraryPlugIn.prototype = {
   }
 };
 
-function ApplicationPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function ApplicationPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 ApplicationPlugIn.prototype = {
   __proto__: Plugin.prototype,
   constructor: ApplicationPlugIn,
 };
 
-function WindowManagerPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function WindowManagerPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 WindowManagerPlugIn.prototype = {
   constructor: WindowManagerPlugIn,
   __proto__: Plugin.prototype,
 };
 
-function BootstrapPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function BootstrapPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 BootstrapPlugIn.prototype = {
   constructor: BootstrapPlugIn,
   __proto__: Plugin.prototype,
 };
 
-function DesktopPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function DesktopPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 DesktopPlugIn.prototype = {
   constructor: DesktopPlugIn,
   __proto__: Plugin.prototype,
 };
 
-function NodeAuthenticationPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function NodeAuthenticationPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 NodeAuthenticationPlugIn.prototype = {
   constructor: NodeAuthenticationPlugIn,
@@ -418,8 +321,8 @@ NodeAuthenticationPlugIn.prototype = {
   }
 };
 
-function ProxyConnectorPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function ProxyConnectorPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
   const remoteConfig = configuration.getContents(["remote.json"]);
   if (remoteConfig) {
     if (!this.host) {
@@ -461,7 +364,7 @@ const plugInConstructorsByType = {
   "proxyConnector": ProxyConnectorPlugIn
 };
 
-function makePlugin(def, pluginConfiguration, basePath) {
+function makePlugin(def, pluginConfiguration) {
   const pluginConstr = plugInConstructorsByType[def.pluginType];
   if (!pluginConstr) {
     throw new Error(`${def.identifier}: pluginType ${def.pluginType} is unknown`); 
@@ -470,7 +373,7 @@ function makePlugin(def, pluginConfiguration, basePath) {
   // "class" referred to by `proto`. Create an instance and inject the
   // de-serialized instance data there.
   // (We don't need an extra indirection level, e.g. self.definition = def)
-  const self = new pluginConstr(def, pluginConfiguration, basePath);
+  const self = new pluginConstr(def, pluginConfiguration);
   return self;
 };
 
@@ -480,7 +383,6 @@ function PluginLoader(options) {
   this.ng2 = null;
   this.plugins = null;
   this.pluginMap = {};
-  this.unresolvedImports = new ExternalImports();
 };
 PluginLoader.prototype = {
   constructor: PluginLoader,
@@ -489,17 +391,7 @@ PluginLoader.prototype = {
   ng2: null,
   plugins: null,
   pluginMap: null,
-  unresolvedImports: null,
 
-  _emitPluginEurekaInfo(pluginDef) {
-    this.emit('updateEurekaMetadata', {
-      id: pluginDef.identifier,
-      pluginVersion: pluginDef.pluginVersion,
-      webContent: pluginDef.webContent,
-      dataServices: pluginDef.dataServices
-    });
-  },
-  
   _readPluginDef(pluginDescriptorFilename) {
     const pluginPtrPath = path.join(this.options.pluginsDir, 
         pluginDescriptorFilename);
@@ -531,14 +423,8 @@ PluginLoader.prototype = {
     }
     bootstrapLogger.info(`Read ${pluginBasePath}: found plugin type `
         + `'${pluginDef.pluginType}'`);
-    this._emitPluginEurekaInfo(pluginDef); // Emit Eureka info
-    const pluginConfiguration = configService.getPluginConfiguration(
-      pluginDef.identifier, this.options.serverConfig,
-      this.options.productCode);
-    bootstrapLogger.debug(`For plugin with id=${pluginDef.identifier}, internal config` 
-                          + ` found=\n${JSON.stringify(pluginConfiguration)}`);
-    return makePlugin(pluginDef, pluginConfiguration, pluginBasePath, 
-      this.options.productCode);
+    pluginDef.location = pluginBasePath;
+    return pluginDef;
   },
 
   _generateNg2ModuleTs(plugins) {
@@ -572,90 +458,84 @@ PluginLoader.prototype = {
     return ng2;
   },
   
-  _toposortPlugins(plugins, pluginMap) {
-    const edges = [];
-    for (const plugin of plugins) {
-      if (!plugin.dataServicesGrouped) {
-        continue;
-      }
-      for (const service of plugin.dataServicesGrouped.import || []) {
-        const prereq = pluginMap[service.sourcePlugin];
-        //console.log("pushing [", prereq.identifier, ", ", plugin.identifier, "]")
-        edges.push([prereq, plugin]);
-      }
-    }
-    const sorted = toposort.array(plugins, edges);
-    //console.log("before sort: ", JSON.stringify(plugins, null, 2));
-    //console.log("after sort: ", JSON.stringify(sorted, null, 2));
-    return sorted;
-  },
-
-  loadPlugins() {
-    const pluginContext = {
-      productCode: this.options.productCode,
-      config: this.options.serverConfig,
-      plugins: [],
-      authManager: this.options.authManager
-    };
+  readPluginDefs() {
+    const defs = [];
     bootstrapLogger.log(bootstrapLogger.INFO,
       `Reading plugins dir ${this.options.pluginsDir}`);
     const pluginLocationJSONs = fs.readdirSync(this.options.pluginsDir)
-        .filter(function(value){
-          return value.match(/.*\.json/);
-        });
+      .filter(function(value){
+        return value.match(/.*\.json/);
+      });
     bootstrapLogger.log(bootstrapLogger.FINER, util.inspect(pluginLocationJSONs));
     for (const pluginDescriptorFilename of pluginLocationJSONs) {
       try {
         const plugin = this._readPluginDef(pluginDescriptorFilename);
-        if (!plugin.isValid(pluginContext)) {
-          bootstrapLogger.warn(`${pluginDescriptorFilename} points to an`
-              + " invalid plugin definition, skipping");
-          continue;
-        }
-        /*
-         * FIXME don't yet do the steps below! Toposort and find broken deps 
-         * first! If there's a broken dependency somewhere, the entire subtree of 
-         * plugins who indirectly depend on the broken plugin may need to be 
-         * skipped, we don't even want to load their stuff.
-         */
-        plugin.initStaticWebDependencies();
-        plugin.initWebServiceDependencies(this.unresolvedImports, pluginContext);
-        plugin.init(pluginContext);
-        pluginContext.plugins.push(plugin);
-        bootstrapLogger.log(bootstrapLogger.INFO,
-          `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
-        bootstrapLogger.debug(' Content:\n' + plugin.toString());
+        defs.push(plugin);
       } catch (e) {
         console.log(e);
         bootstrapLogger.warn(e)
         bootstrapLogger.log(bootstrapLogger.INFO,
           `Failed to load ${pluginDescriptorFilename}\n`);
       }
+    } 
+    return defs;
+  },
+  
+  loadPlugins() {
+    const defs = this.readPluginDefs();
+    this.installPlugins(defs);
+  },
+  
+  installPlugins(pluginDefs) {
+    const pluginContext = {
+      productCode: this.options.productCode,
+      config: this.options.serverConfig,
+      plugins: [],
+      authManager: this.options.authManager
+    };
+    const depgraph = new DependencyGraph();
+    for (const pluginDef of pluginDefs) {
+      try {
+        const pluginConfiguration = configService.getPluginConfiguration(
+            pluginDef.identifier, this.options.serverConfig,
+            this.options.productCode);
+        bootstrapLogger.debug(`For plugin with id=${pluginDef.identifier}, internal config` 
+                                + ` found=\n${JSON.stringify(pluginConfiguration)}`);
+        const plugin = makePlugin(pluginDef, pluginConfiguration);
+        if (!plugin.isValid(pluginContext)) {
+          bootstrapLogger.warn(`${pluginDef.location} points to an`
+              + " invalid plugin definition, skipping");
+          continue;
+        }
+        plugin.initWebServiceDependencies(pluginContext);
+        depgraph.addPlugin(plugin);
+      } catch (e) {
+        console.log(e);
+        bootstrapLogger.warn(e)
+        bootstrapLogger.log(bootstrapLogger.INFO,
+          `Failed to load ${pluginDef.identifier}\n`);
+      }
     }
-    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
-      //TODO what do we want to do here?
-      // stop the server? 
-      // chug along with some plugins broken?
-      // leave only working plugins and not load the broken ones? 
-      const broken = this.unresolvedImports.getBrokenPlugins();
-      pluginContext.plugins = pluginContext.plugins.filter(
-        (p) => {
-          if (broken[p.identifier]) {
-            bootstrapLogger.warn(`Could not initialize plugin ${p.identifier}:`
-              + " unresolved imports: "
-              + Object.keys(broken[p.identifier]).join(', '));
-            return false;
-          }
-          return true;
-        });
-      this.unresolvedImports.reset();
+    const sortedAndRejectedPlugins = depgraph.processImports();
+    for (const rejectedPlugin of sortedAndRejectedPlugins.rejects) {
+      bootstrapLogger.warn(`Could not initialize plugin` 
+          + ` ${rejectedPlugin.pluginId}: `  
+          + rejectedPlugin.validationError.status);
+    }
+    this.plugins = sortedAndRejectedPlugins.plugins;
+    for (const plugin of this.plugins) { 
+      plugin.initStaticWebDependencies();
+      plugin.init(pluginContext);
+      pluginContext.plugins.push(plugin);
+      bootstrapLogger.log(bootstrapLogger.INFO,
+          `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
+      bootstrapLogger.debug(' Content:\n' + plugin.toString());
     }
     this.ng2 = this._generateNg2ModuleTs(pluginContext.plugins);
     for (const plugin of pluginContext.plugins) {
       zluxUtil.deepFreeze(plugin);
       this.pluginMap[plugin.identifier] = plugin;
     }
-    this.plugins = this._toposortPlugins(pluginContext.plugins, this.pluginMap);
 //    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
 //        + JSON.stringify(this.pluginMap));  
     
@@ -684,14 +564,14 @@ PluginLoader.prototype = {
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
       this.options.productCode);
-    const plugin = makePlugin(pluginDef, pluginConfiguration, '/dev/null' /*TODO*/);
+    const plugin = makePlugin(pluginDef, pluginConfiguration);
     plugin.dynamicallyCreated = true; /* TODO extra security */
-    plugin.initWebServiceDependencies(this.unresolvedImports, pluginContext);
+    plugin.initWebServiceDependencies(pluginContext);
     plugin.init(pluginContext);
-    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
-      throw new Error('unresolved dependencies');
-      this.unresolvedImports.reset();
-    }
+//    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
+//      throw new Error('unresolved dependencies');
+//      this.unresolvedImports.reset();
+//    }
     zluxUtil.deepFreeze(plugin);
     this.plugins.push(plugin);
     this.pluginMap[plugin.identifier] = plugin;
