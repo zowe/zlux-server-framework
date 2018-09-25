@@ -62,7 +62,11 @@ TrivialAuthenticator.prototype = {
       authorized: false,
       message: "Missing username or password"
     });
-  }, 
+  },
+
+  addProxyAuthorizations(req1, req2Options, sessionState) {
+    return; //trivially, adds no new authorization
+  }
 };
 
 module.exports = function(pluginDef, pluginConf, serverConf) {
