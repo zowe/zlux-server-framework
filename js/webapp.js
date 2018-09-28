@@ -462,13 +462,8 @@ WebApp.prototype = {
   },
   
   makeExternalProxy(host, port, urlPrefix, isHttps, noAuth, pluginID, serviceName) {
-    installLog.info("----------------------------------");
-    installLog.info("PluginID: " + pluginID);
-    installLog.info("ServiceName: " + serviceName);
-    installLog.info("----------------------------------");
     const r = express.Router();
     installLog.info(`Setting up proxy to ${host}:${port}/${urlPrefix}`);
-    installLog.info('----------------------PROXY---------------------');
     let myProxy = proxy.makeSimpleProxy(host, port, {
       urlPrefix, 
       isHttps, 
