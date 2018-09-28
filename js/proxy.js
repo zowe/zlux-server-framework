@@ -66,7 +66,7 @@ function makeSimpleProxy(host, port, options, pluginID, serviceName) {
     if (isHttps) {
       requestOptions.rejectUnauthorized = !allowInvalidTLSProxy;
     }
-    proxyLog.info(`proxy request to ${requestOptions.host}:${requestOptions.port}`
+    proxyLog.debug(`proxy request to ${requestOptions.host}:${requestOptions.port}`
         +`${requestOptions.path}`);
     if (addProxyAuthorizations) {
       proxyLog.debug('Callservice: given auth helper ');
