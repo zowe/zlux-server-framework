@@ -13,8 +13,11 @@ const logger = {
  * Checks if all plugin dependencies are met, including versions.
  * Sorts the plugins so that they can be installed in that order.
  */
-function DependencyGraph() {
+function DependencyGraph(initialPlugins) {
   this.pluginsById = {};
+  for (const p of initialPlugins) {
+    this.addPlugin(p);
+  }
 }
 
 DependencyGraph.prototype = {
@@ -39,43 +42,40 @@ DependencyGraph.prototype = {
     for (const plugin of Object.values(this.pluginsById)) {
       logger.debug("processing plugin ", plugin, "\n")
       const importerId = plugin.identifier;
-      if (!(plugin.dataServicesGrouped && plugin.dataServicesGrouped.import 
-          && plugin.dataServicesGrouped.import.length)) {
-        const notAnImporter = { 
-          pluginId: importerId,
-          deps: []
-        };
-        logger.debug('registering non-importer: ', importerId)
-        g[importerId] = notAnImporter;
-        continue;
-      }
-      for (const serviceImport of plugin.dataServicesGrouped.import) {
-        const providerId = serviceImport.sourcePlugin;
-        let providerNode = g[providerId];
-        if (!providerNode) {
-          providerNode = g[providerId] = { 
-            pluginId: providerId,
-            deps: []
-          };
-        }
-        if (!g[importerId]) {
-          g[importerId] = { 
+      if (!g[importerId]) {
+        g[importerId] = { 
             pluginId: importerId,
             deps: []
-          };
-        }
-        const depNode = {
-          provider: providerId,
-          service: serviceImport.sourceName,
-          importer: importerId,
-          alias: serviceImport.localName,
-          requiredVersionRange: serviceImport.version,
         };
-        validateDep(depNode, this.pluginsById[providerId]);
-        logger.debug('Found dependency: ', providerId, depNode)
-        providerNode.deps.push(Object.freeze(depNode));
-        if (depNode.valid) {
-          serviceImport.targetService = depNode.targetService;
+      }
+      if (!plugin.dataServices) {
+        continue;
+      }
+      for (const service of plugin.dataServices) {
+        if (service.type == 'import') {
+          const serviceImport = service;
+          const providerId = serviceImport.sourcePlugin;
+          let providerNode = g[providerId];
+          if (!providerNode) {
+            providerNode = g[providerId] = { 
+              pluginId: providerId,
+              deps: []
+            };
+          }
+          const depNode = {
+            provider: providerId,
+            service: serviceImport.sourceName,
+            importer: importerId,
+            alias: serviceImport.localName,
+            requiredVersionRange: serviceImport.versionRange,
+          };
+          validateDep(depNode, this.pluginsById[providerId]);
+          logger.debug('Found dependency: ', providerId, depNode)
+          providerNode.deps.push(Object.freeze(depNode));
+          if (depNode.valid) {
+            serviceImport.version = depNode.actualVersion;
+            logger.debug("resolved actual version for import ", serviceImport)
+          }
         }
       }
     }
@@ -213,7 +213,7 @@ function validateDep(dep, providerPlugin) {
         } else {
           valid = true;
           found = true;
-          dep.targetService = service;
+          dep.actualVersion = service.version;
           break;
         }
       }

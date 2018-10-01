@@ -387,6 +387,16 @@ function makeSubloggerFromDefinitions(pluginDefinition, serviceDefinition, name)
       + "." + serviceDefinition.name + ':' + name);
 }
 
+function ImportManager() {
+  this.routers = {};
+}
+ImportManager.prototype = {
+  constructor: ImportManager,
+  
+  routers: null
+  
+}
+
 const defaultOptions = {
   httpPort: 0,
   productCode: null,
@@ -500,14 +510,14 @@ WebApp.prototype = {
       //note that it has to be explicitly false. other falsy values like undefined
       //are treated as default, which is true
       if (proxiedRootService.requiresAuth === false) {
-        const proxyRouter = this.makeProxy(proxiedRootService.url, true);
+        const _router = this.makeProxy(proxiedRootService.url, true);
         this.expressApp.use(proxiedRootService.url,
-            proxyRouter);
+            _router);
       } else {
-        const proxyRouter = this.makeProxy(proxiedRootService.url);
+        const _router = this.makeProxy(proxiedRootService.url);
         this.expressApp.use(proxiedRootService.url,
             this.auth.middleware,
-            proxyRouter);
+            _router);
       }
       serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
           this.options.httpPort);
@@ -675,13 +685,66 @@ WebApp.prototype = {
     return router;
   },
 
+  _makeRouter: function *(service, subUrl, plugin, pluginContext, pluginChain) {
+    const serviceRouterWithMiddleware = pluginChain.slice();
+    serviceRouterWithMiddleware.push((req, res, next) => {
+      console.log(`invoked router at ${subUrl}`)
+      next();
+    });
+    serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
+        service));
+    serviceRouterWithMiddleware.push(this.auth.middleware);
+    let router;
+    switch (service.type) {
+    case "service":
+      installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
+      router = this.makeProxy(subUrl);
+      break;
+    case "nodeService":
+      installLog.info(
+          `${plugin.identifier}: installing legacy service router at ${subUrl}`);
+      router = this._makeRouterForLegacyService(pluginContext, service);
+      break;
+    case "router": {
+        installLog.info(`${plugin.identifier}: installing node router at ${subUrl}`);
+        const serviceConfiguration = configService.getServiceConfiguration(
+            plugin.identifier,  service.name, 
+            pluginContext.server.config.app, this.options.productCode);
+        const dataserviceContext = new DataserviceContext(service, 
+            serviceConfiguration, pluginContext);
+        if (typeof  service.nodeModule === "function") {
+          router = yield service.nodeModule(dataserviceContext);
+          installLog.info("Loaded Router for plugin=" + plugin.identifier 
+              + ", service="+service.name + ". Router="+router);          
+        } else {
+          router = 
+            yield service.nodeModule[service.routerFactory](
+              dataserviceContext);
+          installLog.info("Loaded Router from factory for plugin=" 
+                          + plugin.identifier + ", service=" + service.name
+                          + ". Factory="+service.routerFactory);
+        }
+      }
+      break;
+    case "external":
+      installLog.info(`${plugin.identifier}: installing external proxy at ${subUrl}`);
+      router = this.makeExternalProxy(service.host, service.port,
+          service.urlPrefix, service.isHttps);
+      break;
+    }
+    serviceRouterWithMiddleware.push(router);
+    return serviceRouterWithMiddleware;
+  },
+  
   _installDataServices: function*(pluginContext, urlBase) {
     const plugin = pluginContext.pluginDef;
     if (!plugin.dataServicesGrouped) {
       return;
     }
+    installLog.info(`${plugin.identifier}: installing data services`)
     const serviceHandleMap = {};
     for (const service of plugin.dataServices) {
+      //TODO version
       const name = (service.type === "import")? service.localName : service.name;
       const handle = new WebServiceHandle(urlBase + "/services/" + name,
         this.options.httpPort);
@@ -699,108 +762,47 @@ WebApp.prototype = {
     if (!pluginRouters) {
       pluginRouters = this.routers[plugin.identifier] = {};
     }
-    if (plugin.dataServicesGrouped.proxy.length > 0) {
-      for (const proxiedService of plugin.dataServicesGrouped.proxy) {
-        const subUrl = urlBase + zLuxUrl.makeServiceSubURL(proxiedService);
-        const proxyRouter = this.makeProxy(subUrl);
-        const serviceRouterWithMiddleware = pluginChain.slice();
-        serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
-            proxiedService));
-        serviceRouterWithMiddleware.push(this.auth.middleware);
-        serviceRouterWithMiddleware.push(proxyRouter);
-        installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
-        this.pluginRouter.use(subUrl, serviceRouterWithMiddleware);
-        pluginRouters[proxiedService.name] = serviceRouterWithMiddleware;
-        //console.log(`service: ${plugin.identifier}[${proxiedService.name}]`);
+    for (const serviceName of Object.keys(plugin.dataServicesGrouped)) {
+      installLog.info(`${plugin.identifier}: installing service ${serviceName}`)
+      let serviceRouters = pluginRouters[serviceName];
+      if (!serviceRouters) {
+        serviceRouters = pluginRouters[serviceName] = {};
       }
-    }
-    if (plugin.dataServicesGrouped.router.length > 0) {
-      for (const routerService of plugin.dataServicesGrouped.router) {
-        const subUrl = urlBase + zLuxUrl.makeServiceSubURL(routerService);
-        const serviceConfiguration = configService.getServiceConfiguration(
-          plugin.identifier,  routerService.name, 
-          pluginContext.server.config.app, this.options.productCode);
-        let router;
-        let dataserviceContext = new DataserviceContext(routerService, 
-            serviceConfiguration, pluginContext);
-        if (typeof  routerService.nodeModule === "function") {
-          router = yield routerService.nodeModule(dataserviceContext);
-          installLog.info("Loaded Router for plugin=" + plugin.identifier 
-              + ", service="+routerService.name + ". Router="+router);          
-        } else {
-          router = 
-            yield routerService.nodeModule[routerService.routerFactory](
-              dataserviceContext);
-          installLog.info("Loaded Router from factory for plugin=" 
-                          + plugin.identifier + ", service=" + routerService.name
-                          + ". Factory="+routerService.routerFactory);
+      const group = plugin.dataServicesGrouped[serviceName];
+      for (const version of Object.keys(group.versions)) {
+        const service = group.versions[version];
+        const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
+        const router = yield* this._makeRouter(service, subUrl, plugin, 
+            pluginContext, pluginChain); 
+        this.pluginRouter.use(subUrl, router);
+        serviceRouters[version] = router;
+        if (version === group.highestVersion) {
+          const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
+          this.pluginRouter.use(defaultSubUrl, router);
+          serviceRouters['*'] = router;
         }
-        const serviceRouterWithMiddleware = pluginChain.slice();
-        serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
-            routerService));
-        serviceRouterWithMiddleware.push(this.auth.middleware);
-        serviceRouterWithMiddleware.push(router);
-        installLog.info(`${plugin.identifier}: installing node router at ${subUrl}`);
-        this.pluginRouter.use(subUrl, serviceRouterWithMiddleware);
-        pluginRouters[routerService.name] = serviceRouterWithMiddleware;
-        //console.log(`service: ${plugin.identifier}[${routerService.name}]`);
       }
-    }
-    if (plugin.dataServicesGrouped.node.length > 0) {
-      for (const legacyService of plugin.dataServicesGrouped.node) {
-        const subUrl = urlBase + zLuxUrl.makeServiceSubURL(legacyService);
-        const serviceConfiguration = configService.getServiceConfiguration(
-          plugin.identifier,  legacyService.name, 
-          pluginContext.server.config.app, this.options.productCode);
-        const serviceRouterWithMiddleware = pluginChain.slice();
-        serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
-            legacyService));
-        serviceRouterWithMiddleware.push(this.auth.middleware);
-        serviceRouterWithMiddleware.push(this._makeRouterForLegacyService(
-            pluginContext, legacyService));
-        installLog.info(
-          `${plugin.identifier}: installing legacy service router at ${subUrl}`);
-        this.pluginRouter.use(subUrl, serviceRouterWithMiddleware);
-        pluginRouters[legacyService.name] = serviceRouterWithMiddleware;
-       // console.log(`service: ${plugin.identifier}[${legacyService.name}]`);
-      }
-    }
-    if (plugin.dataServicesGrouped.external.length > 0) {
-      for (const externalService of plugin.dataServicesGrouped.external) {
-        const subUrl = urlBase + zLuxUrl.makeServiceSubURL(externalService);
-        const serviceRouterWithMiddleware = pluginChain.slice();
-        serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
-            externalService));
-        serviceRouterWithMiddleware.push(this.auth.middleware);
-        serviceRouterWithMiddleware.push(this.makeExternalProxy(
-            externalService.host, externalService.port,
-            externalService.urlPrefix, externalService.isHttps));
-        installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
-        this.pluginRouter.use(subUrl, serviceRouterWithMiddleware);
-        pluginRouters[externalService.name] = serviceRouterWithMiddleware;
-        //console.log(`service: ${plugin.identifier}[${externalService.name}]`);
-      }
-    }
+    } 
   },
 
   _resolveImports(plugin, urlBase) {
-    if (plugin.dataServicesGrouped  
-        && plugin.dataServicesGrouped.import.length > 0) {
-      for (const importedService of plugin.dataServicesGrouped.import) {
-        const subUrl = urlBase 
-          + zLuxUrl.makeServiceSubURL(importedService);
-        const importedRouter = this.routers[importedService.sourcePlugin]
-          [importedService.sourceName];
-        if (!importedRouter) {
-          throw new Error(
-            `Import ${importedService.sourcePlugin}:${importedService.sourceName}`
-            + " can't be satisfied");
-        }
-        installLog.info(`${plugin.identifier}: installing import`
-           + ` ${importedService.sourcePlugin}:${importedService.sourceName} at ${subUrl}`);
-        this.pluginRouter.use(subUrl, importedRouter);
-      }
-    }
+//    if (plugin.dataServicesGrouped  
+//        && plugin.dataServicesGrouped.import.length > 0) {
+//      for (const importedService of plugin.dataServicesGrouped.import) {
+//        const subUrl = urlBase 
+//          + zLuxUrl.makeServiceSubURL(importedService);
+//        const importedRouter = this.routers[importedService.sourcePlugin]
+//          [importedService.sourceName];
+//        if (!importedRouter) {
+//          throw new Error(
+//            `Import ${importedService.sourcePlugin}:${implortedService.sourceName}`
+//            + " can't be satisfied");
+//        }
+//        installLog.info(`${plugin.identifier}: installing import`
+//           + ` ${importedService.sourcePlugin}:${importedService.sourceName} at ${subUrl}`);
+//        this.pluginRouter.use(subUrl, importedRouter);
+//      }
+//    }
   },
 
   _installPluginStaticHandlers(plugin, urlBase) {
@@ -831,9 +833,6 @@ WebApp.prototype = {
   
   installPlugin: Promise.coroutine(function*(pluginContext) {
     const plugin = pluginContext.pluginDef;
-    installLog.debug(
-      `${plugin.identifier}: ${plugin.dataServicesGrouped? 'has' : 'does not have'}`
-      + ' services')
     const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
         plugin.identifier);
     this._installSwaggerCatalog(plugin, urlBase);

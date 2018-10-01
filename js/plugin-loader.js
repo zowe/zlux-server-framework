@@ -20,6 +20,7 @@ const os = require('os');
 const assert = require('assert');
 const requireFromString = require('require-from-string');
 const EventEmitter = require('events');
+const semver = require('semver');
 const zluxUtil = require('./util');
 const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
@@ -48,9 +49,62 @@ function Service(def, configuration, plugin) {
   //don't do this here: avoid circular structures:
   //this.plugin = plugin; 
   Object.assign(this, def);
+  if (this.version === undefined) {
+    //FIXME temporary hack until everyone has fixed their plugin defs.
+    bootstrapLogger.warn(`Service ${plugin.identifier}::${this.name} doesn't` 
+      + ` specify a version. Resorting to the plugin's API version ${plugin.apiVersion}`);
+    this.version = plugin.apiVersion;
+  }
 }
 Service.prototype = {
   constructor: Service,
+  
+  validate() {
+    if (!semver.valid(this.version)) {
+      throw new Error(`${this.name}: invalid version "${this.version}"`)
+    }
+  }
+}
+
+function Import(def, configuration, plugin) {
+  Service.call(this, def, configuration, plugin);
+}
+Import.prototype = {
+  constructor: Import,
+  __proto__:  Service.prototype,
+  
+  validate() {
+    if (!semver.validRange(this.versionRange)) {
+      throw new Error(`${this.localName}: invalid version range "${this.versionRange}"`)
+    }
+  }
+}
+
+function NodeService(def, configuration, plugin) {
+  Service.call(this, def, configuration, plugin);
+}
+NodeService.prototype = {
+  constructor: NodeService,
+  __proto__:  Service.prototype,
+  
+  loadImplementation(dynamicallyCreated, location) {
+    if (dynamicallyCreated) {
+      const nodeModule = requireFromString(this.source);
+      this.nodeModule = nodeModule;
+    } else {
+      // Quick fix before MVD-947 is merged
+      var fileLocation = ""
+      if (this.filename) {
+        fileLocation = path.join(location, 'lib', this.filename);
+      } else if (this.fileName) {
+        fileLocation = path.join(location, 'lib', this.fileName);
+      } else {
+        throw new Error(`No file name for data service`)
+      }
+      const nodeModule = require(fileLocation);
+      this.nodeModule = nodeModule;
+    }
+  }
 }
 
 //first checks if the parent plugin has a host and port 
@@ -84,15 +138,24 @@ function makeDataService(def, plugin, context) {
   let dataservice;
   if (def.type == "external") {
     dataservice = new ExternalService(def, configuration, plugin);
+  } else if (def.type == "import") {
+    dataservice = new Import(def, configuration, plugin);
+  } else if ((def.type == 'nodeService')
+        || (def.type === 'router')) {
+    dataservice = new NodeService(def, configuration, plugin);
   } else {
     dataservice = new Service(def, configuration, plugin);
   }
+  dataservice.validate();
   return dataservice;
 }
 
 function Plugin(def, configuration) {
   Object.assign(this, def);
   this.configuration = configuration;
+  if (!this.location) {
+    this.location = process.cwd();
+  }
 }
 Plugin.prototype = {
   constructor: Plugin,
@@ -154,67 +217,62 @@ Plugin.prototype = {
     }
   },
   
-  initWebServiceDependencies(context) {
+  initDataServices(context) {
+    function addService(service, name, container) {
+      let group = container[name];
+      if (!group) {
+        group = container[name] = {
+          highestVersion: null,
+          versions: {},
+        };
+      }
+      if (!group.highestVersion 
+          || semver.gt(service.version, group.highestVersion)) {
+        group.highestVersion = service.version;
+      }
+      group.versions[service.version] = service;
+    }
+    
     if (this.dataServices) {
-      this.dataServicesGrouped = {
-        router: [],
-        import: [],
-        node: [],
-        proxy: [],
-        external: []
-      };
+      this.dataServicesGrouped = {};
+      this.importsGrouped = {};
       const filteredDataServices = [];
       for (const dataServiceDef of this.dataServices) {
         const dataservice = makeDataService(dataServiceDef, this, context);
         if (dataservice.type == "service") {          
-          this.dataServicesGrouped.proxy.push(dataservice);
+          addService(dataservice, dataservice.name, this.dataServicesGrouped);
           bootstrapLogger.info(`${this.identifier}: `
               + `found proxied service '${dataservice.name}'`);
           filteredDataServices.push(dataservice);
         } else   if (dataservice.type === 'import') {
-          this.dataServicesGrouped.import.push(dataservice);
           bootstrapLogger.info(`${this.identifier}:`
               + ` importing service '${dataservice.sourceName}'`
               + ` from ${dataservice.sourcePlugin}`
               + ` as '${dataservice.localName}'`);
+          addService(dataservice, dataservice.localName, this.importsGrouped);
           filteredDataServices.push(dataservice);
         } else if ((dataservice.type == 'nodeService')
             || (dataservice.type === 'router')) {
-           //TODO what is this? Why do we need it?
-//          if ((dataservice.serviceLookupMethod == 'internal')
-//              || !dataservice.dependenciesIncluded) {
-//            bootstrapLogger.warn(`${this.identifier}:`
-//                + ` loading dataservice ${dataservice.name} failed, declaration invalid`);
-//            continue;
-//          }
-          if (this.dynamicallyCreated) {
-            const nodeModule = requireFromString(dataservice.source);
-            dataservice.nodeModule = nodeModule;
-          } else {
-            // Quick fix before MVD-947 is merged
-            var fileLocation = ""
-            if (dataservice.filename) {
-              fileLocation = path.join(this.location, 'lib', dataservice.filename);
-            } else if (dataservice.fileName) {
-              fileLocation = path.join(this.location, 'lib', dataservice.fileName);
-            } else {
-              throw new Error(`No file name for data service`)
-            }
-            const nodeModule = require(fileLocation);
-            dataservice.nodeModule = nodeModule;
-          }
+          //TODO what is this? Why do we need it?
+//        if ((dataservice.serviceLookupMethod == 'internal')
+//            || !dataservice.dependenciesIncluded) {
+//          bootstrapLogger.warn(`${this.identifier}:`
+//              + ` loading dataservice ${dataservice.name} failed, declaration invalid`);
+//          continue;
+//        }
+          dataservice.loadImplementation(this.dynamicallyCreated, this.location);
           if (dataservice.type === 'router') {
             bootstrapLogger.info(`${this.identifier}: `
                 + `found router '${dataservice.name}'`);
-            this.dataServicesGrouped.router.push(dataservice);
+            addService(dataservice, dataservice.name, this.dataServicesGrouped);
           } else {
             bootstrapLogger.info(`${this.identifier}: `
                 + `found legacy node service '${dataservice.name}'`);
-            this.dataServicesGrouped.node.push(dataservice);
+            addService(dataservice, dataservice.name, this.dataServicesGrouped);
           }
           filteredDataServices.push(dataservice);
         } else if (dataservice.type == 'external') {
-          this.dataServicesGrouped.external.push(dataservice);
+          addService(dataservice, dataservice.name, this.dataServicesGrouped);
           bootstrapLogger.info(`${this.identifier}: `
               + `found external service '${dataservice.name}'`);
           filteredDataServices.push(dataservice);
@@ -381,7 +439,7 @@ function PluginLoader(options) {
   EventEmitter.call(this);
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
   this.ng2 = null;
-  this.plugins = null;
+  this.plugins = [];
   this.pluginMap = {};
 };
 PluginLoader.prototype = {
@@ -490,11 +548,20 @@ PluginLoader.prototype = {
     const pluginContext = {
       productCode: this.options.productCode,
       config: this.options.serverConfig,
-      plugins: [],
       authManager: this.options.authManager
     };
-    const depgraph = new DependencyGraph();
+    let successCount = 0;
+    const depgraph = new DependencyGraph(this.plugins);
     for (const pluginDef of pluginDefs) {
+      depgraph.addPlugin(pluginDef);
+    }
+    const sortedAndRejectedPlugins = depgraph.processImports();
+    for (const rejectedPlugin of sortedAndRejectedPlugins.rejects) {
+      bootstrapLogger.warn(`Could not initialize plugin` 
+          + ` ${rejectedPlugin.pluginId}: `  
+          + rejectedPlugin.validationError.status);
+    }
+    for (const pluginDef of sortedAndRejectedPlugins.plugins) { 
       try {
         const pluginConfiguration = configService.getPluginConfiguration(
             pluginDef.identifier, this.options.serverConfig,
@@ -507,39 +574,32 @@ PluginLoader.prototype = {
               + " invalid plugin definition, skipping");
           continue;
         }
-        plugin.initWebServiceDependencies(pluginContext);
-        depgraph.addPlugin(plugin);
+        plugin.initDataServices(pluginContext);
+        plugin.initStaticWebDependencies();
+        plugin.init(pluginContext);
+        bootstrapLogger.log(bootstrapLogger.INFO,
+            `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
+        bootstrapLogger.debug(' Content:\n' + plugin.toString());
+        this.plugins.push(zluxUtil.deepFreeze(plugin));
+        this.pluginMap[plugin.identifier] = plugin;
+        successCount++;
       } catch (e) {
         console.log(e);
-        bootstrapLogger.warn(e)
+        //bootstrapLogger.warn(e)
         bootstrapLogger.log(bootstrapLogger.INFO,
-          `Failed to load ${pluginDef.identifier}\n`);
+          `Failed to load ${pluginDef.identifier}: ${e}`);
       }
     }
-    const sortedAndRejectedPlugins = depgraph.processImports();
-    for (const rejectedPlugin of sortedAndRejectedPlugins.rejects) {
-      bootstrapLogger.warn(`Could not initialize plugin` 
-          + ` ${rejectedPlugin.pluginId}: `  
-          + rejectedPlugin.validationError.status);
-    }
-    this.plugins = sortedAndRejectedPlugins.plugins;
-    for (const plugin of this.plugins) { 
-      plugin.initStaticWebDependencies();
-      plugin.init(pluginContext);
-      pluginContext.plugins.push(plugin);
-      bootstrapLogger.log(bootstrapLogger.INFO,
-          `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
-      bootstrapLogger.debug(' Content:\n' + plugin.toString());
-    }
-    this.ng2 = this._generateNg2ModuleTs(pluginContext.plugins);
-    for (const plugin of pluginContext.plugins) {
-      zluxUtil.deepFreeze(plugin);
-      this.pluginMap[plugin.identifier] = plugin;
-    }
-//    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
-//        + JSON.stringify(this.pluginMap));  
-    
-    // Share with index.js the amount of plugins that should load
+    bootstrapLogger.info(`Plugin batch processed. Loaded ${successCount} out of`
+        + ` ${pluginDefs.length}`);
+    // FIXME (1) 'give plugin amount' is not an event -- not something that _happens_
+    // (2) this idea is incompatible with dynamic plugins, they're broken now. 
+    // Need to come up with another event scheme, e.g. 'pluginAdded' + 
+    // 'fileSystemPluginsLoaded', or maybe 'pluginAdded' + 'processingPluginBatchCompeleted',
+    // or 'startedProcessingPluginBatch' + 'pluginAdded', etc, if we want to 
+    // distinguish between filesystem and dynamic plugins or if we just need to 
+    // have a reference point in time, when a subscriber can know it can call 
+    // e.g. Eureka
     this.emit('givePluginAmount', {
       data: this.plugins.length
     });  
@@ -560,13 +620,17 @@ PluginLoader.prototype = {
       plugins: this.plugins,
       authManager: this.options.authManager
     };
+    //
+    //TODO resolving dependencies correctly
+    //see also: the FIXME note at the end of installPlugins()
+    //
     bootstrapLogger.info("Adding dynamic plugin " + pluginDef.identifier);
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
       this.options.productCode);
     const plugin = makePlugin(pluginDef, pluginConfiguration);
     plugin.dynamicallyCreated = true; /* TODO extra security */
-    plugin.initWebServiceDependencies(pluginContext);
+    plugin.initDataServices(pluginContext);
     plugin.init(pluginContext);
 //    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
 //      throw new Error('unresolved dependencies');
