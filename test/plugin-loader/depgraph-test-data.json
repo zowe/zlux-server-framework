@@ -1,0 +1,343 @@
+{
+  "goodCase": [
+        {
+          "identifier": "com.rs.consumer",
+          "baseURI": "consumer",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "~1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "^2.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.intermediary",
+              "sourceName": "something",
+              "versionRange": "1.0.0",
+              "localName": "something"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.loner",
+          "baseURI": "loner",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "blah",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.provider",
+          "baseURI": "provider",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.10"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "2.20.30"
+            },  
+            {
+              "type": "router",
+              "name": "bar",
+              "version": "1.2.3",
+              "fileName": "nop-router.js"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.intermediary",
+          "baseURI": "intermediary",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+             {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "^1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "something",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+  ],
+    "brokenProvider": [
+        {
+          "identifier": "com.rs.consumer",
+          "baseURI": "consumer",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.intermediary",
+              "sourceName": "something",
+              "versionRange": "1.0.0",
+              "localName": "something"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.loner",
+          "baseURI": "loner",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "blah",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.provider",
+          "baseURI": "provider",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "2.0.0"
+            },  
+            {
+              "type": "router",
+              "name": "bar",
+              "version": "1.2.3",
+              "fileName": "nop-router.js"
+            },
+             {
+              "type": "import",
+              "sourcePlugin": "nonexistent",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.intermediary",
+          "baseURI": "intermediary",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+             {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "something",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+  ],
+  "versionMismatch": [
+        {
+          "identifier": "com.rs.consumer",
+          "baseURI": "consumer",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "2.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.intermediary",
+              "sourceName": "something",
+              "versionRange": "1.0.0",
+              "localName": "something"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.loner",
+          "baseURI": "loner",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "blah",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.provider",
+          "baseURI": "provider",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "2.0.0"
+            },  
+            {
+              "type": "router",
+              "name": "bar",
+              "version": "1.2.3",
+              "fileName": "nop-router.js"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.intermediary",
+          "baseURI": "intermediary",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+             {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "3.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "something",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+  ],
+  "cycle": [
+        {
+          "identifier": "com.rs.a",
+          "baseURI": "a",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.b",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "bar",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "com.rs.b",
+          "baseURI": "b",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.a",
+              "sourceName": "bar",
+              "versionRange": "1.0.0",
+              "localName": "bar"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+      ]
+}
