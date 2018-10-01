@@ -14,14 +14,15 @@ function makePluginURL(productCode, pluginID) {
   return `/${productCode}/plugins/${pluginID}`;
 }
 
-function makeServiceSubURL(service) {
+function makeServiceSubURL(service, latest) {
   let nameForURL;
   if (service.type === 'import') {
     nameForURL = service.localName;
   } else {
     nameForURL = service.name;
   }
-  return `/services/${nameForURL}`;
+  const version = latest? '_current' : service.version;
+  return `/services/${nameForURL}/${version}`;
 }
 
 function join(baseUrl, relativePath) {
