@@ -8,29 +8,8 @@
   Copyright Contributors to the Zowe Project.
 */
 
-function extractBasicAuthCredentials(request) {
-  const headers = request.headers;
-  const authorizationHeader = headers['authorization'];
-  console.log('Login request handler saw request on url: '
-      + request.originalUrl);
-  if (!authorizationHeader) {
-    console.log('Bad request for url: ' + request.originalUrl
-        + ', headers: ' + JSON.stringify(headers, null, 2));
-    return null;
-  }
-  // the original auth looks like "Basic Y2hhcmxlczoxMjM0NQ==" 
-  const tmp = authorizationHeader.split(' ');  
-  const buf = new Buffer(tmp[1], 'base64');  
-  const plain_auth = buf.toString();         
-  const creds = plain_auth.split(':');       
-  if (creds.length <= 1) {
-    return null;
-  } 
-  return creds;
-}
-
 function TrivialAuthenticator(pluginDef, pluginConf, serverConf) {
-  this.authPluginID = 'com.rs.auth.trivialAuth'
+  this.authPluginID = pluginDef.identifier;
 }
 
 TrivialAuthenticator.prototype = {
@@ -57,7 +36,6 @@ TrivialAuthenticator.prototype = {
   authenticate(request, sessionState) {
     sessionState.username = request.body.username;
     sessionState.authenticated = true;
-    console.log('sessionState.username: ', sessionState.username);
     return Promise.resolve({ success: true });
   },
 
@@ -75,29 +53,20 @@ TrivialAuthenticator.prototype = {
    * { authorized: true } if everything is fine. Should not reject the promise.
    */
   authorized(request, sessionState) {
-    console.log('sessionState.username: ', sessionState.username);
     if (sessionState.username) {
+      request.username = sessionState.username;
       return Promise.resolve({  authenticated: true, authorized: true });
     }
-    const creds = extractBasicAuthCredentials(request);
-    if (!creds) {
-      return Promise.resolve({
-        authenticated: false,
-        authorized: false,
-        message: "Missing username or password"
-      });
-    }
-    const username = creds[0];
-    const password = creds[1];
-    if (!(username && password)) {
-      return Promise.resolve({
-        authenticated: !!username,
-        authorized: false,
-        message: "Missing username or password"
-      });
-    }
-    return Promise.resolve({  authenticated: true, authorized: true });
-  }, 
+    return Promise.resolve({
+      authenticated: false,
+      authorized: false,
+      message: "Missing username or password"
+    });
+  },
+
+  addProxyAuthorizations(req1, req2Options, sessionState) {
+    return; //trivially, adds no new authorization
+  }
 };
 
 module.exports = function(pluginDef, pluginConf, serverConf) {
