@@ -233,56 +233,57 @@ Plugin.prototype = {
       group.versions[service.version] = service;
     }
     
-    if (this.dataServices) {
-      this.dataServicesGrouped = {};
-      this.importsGrouped = {};
-      const filteredDataServices = [];
-      for (const dataServiceDef of this.dataServices) {
-        const dataservice = makeDataService(dataServiceDef, this, context);
-        if (dataservice.type == "service") {          
-          addService(dataservice, dataservice.name, this.dataServicesGrouped);
-          bootstrapLogger.info(`${this.identifier}: `
-              + `found proxied service '${dataservice.name}'`);
-          filteredDataServices.push(dataservice);
-        } else   if (dataservice.type === 'import') {
-          bootstrapLogger.info(`${this.identifier}:`
-              + ` importing service '${dataservice.sourceName}'`
-              + ` from ${dataservice.sourcePlugin}`
-              + ` as '${dataservice.localName}'`);
-          addService(dataservice, dataservice.localName, this.importsGrouped);
-          filteredDataServices.push(dataservice);
-        } else if ((dataservice.type == 'nodeService')
-            || (dataservice.type === 'router')) {
-          //TODO what is this? Why do we need it?
+    if (!this.dataServices) {
+      return;
+    }
+    this.dataServicesGrouped = {};
+    this.importsGrouped = {};
+    const filteredDataServices = [];
+    for (const dataServiceDef of this.dataServices) {
+      const dataservice = makeDataService(dataServiceDef, this, context);
+      if (dataservice.type == "service") {          
+        addService(dataservice, dataservice.name, this.dataServicesGrouped);
+        bootstrapLogger.info(`${this.identifier}: `
+            + `found proxied service '${dataservice.name}'`);
+        filteredDataServices.push(dataservice);
+      } else   if (dataservice.type === 'import') {
+        bootstrapLogger.info(`${this.identifier}:`
+            + ` importing service '${dataservice.sourceName}'`
+            + ` from ${dataservice.sourcePlugin}`
+            + ` as '${dataservice.localName}'`);
+        addService(dataservice, dataservice.localName, this.importsGrouped);
+        filteredDataServices.push(dataservice);
+      } else if ((dataservice.type == 'nodeService')
+          || (dataservice.type === 'router')) {
+        //TODO what is this? Why do we need it?
 //        if ((dataservice.serviceLookupMethod == 'internal')
 //            || !dataservice.dependenciesIncluded) {
 //          bootstrapLogger.warn(`${this.identifier}:`
 //              + ` loading dataservice ${dataservice.name} failed, declaration invalid`);
 //          continue;
 //        }
-          dataservice.loadImplementation(this.dynamicallyCreated, this.location);
-          if (dataservice.type === 'router') {
-            bootstrapLogger.info(`${this.identifier}: `
-                + `found router '${dataservice.name}'`);
-            addService(dataservice, dataservice.name, this.dataServicesGrouped);
-          } else {
-            bootstrapLogger.info(`${this.identifier}: `
-                + `found legacy node service '${dataservice.name}'`);
-            addService(dataservice, dataservice.name, this.dataServicesGrouped);
-          }
-          filteredDataServices.push(dataservice);
-        } else if (dataservice.type == 'external') {
-          addService(dataservice, dataservice.name, this.dataServicesGrouped);
+        dataservice.loadImplementation(this.dynamicallyCreated, this.location);
+        if (dataservice.type === 'router') {
           bootstrapLogger.info(`${this.identifier}: `
-              + `found external service '${dataservice.name}'`);
-          filteredDataServices.push(dataservice);
+              + `found router '${dataservice.name}'`);
+          addService(dataservice, dataservice.name, this.dataServicesGrouped);
         } else {
-          bootstrapLogger.warn(`${this.identifier}: `
-              + `invalid service type '${dataservice.name}'`);
+          bootstrapLogger.info(`${this.identifier}: `
+              + `found legacy node service '${dataservice.name}'`);
+          addService(dataservice, dataservice.name, this.dataServicesGrouped);
         }
+        filteredDataServices.push(dataservice);
+      } else if (dataservice.type == 'external') {
+        addService(dataservice, dataservice.name, this.dataServicesGrouped);
+        bootstrapLogger.info(`${this.identifier}: `
+            + `found external service '${dataservice.name}'`);
+        filteredDataServices.push(dataservice);
+      } else {
+        bootstrapLogger.warn(`${this.identifier}: `
+            + `invalid service type '${dataservice.name}'`);
       }
-      this.dataServices = filteredDataServices;
     }
+    this.dataServices = filteredDataServices;
   }
 };
 
