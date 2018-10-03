@@ -1,12 +1,13 @@
 "use strict";
 
 const semver = require('semver');
+const assert = require('assert');
 
 module.exports = DependencyGraph;
 
 const logger = {
   debug() {
-    
+   //console.log.apply(console, arguments)
   }
 }
 /**
@@ -31,7 +32,8 @@ DependencyGraph.prototype = {
   },
   
   /**
-   * "n -> m" means "m depends on n". Note that this is the opposite of an import. 
+   * "n -> m" means "n is a dependency of m". Note that this is the direct 
+   * opposite of an import. 
    * 
    * This is the graph of the plugins' desires based on imports in the defs:
    * if there's an edge "n -> m" here then we know that plugin m actually 
@@ -39,6 +41,7 @@ DependencyGraph.prototype = {
    */
   _buildGraph() {
     const g = {};
+    const brokenDeps = [];
     for (const plugin of Object.values(this.pluginsById)) {
       logger.debug("processing plugin ", plugin, "\n")
       const importerId = plugin.identifier;
@@ -62,121 +65,156 @@ DependencyGraph.prototype = {
               deps: []
             };
           }
-          const depNode = {
+          const depLink = {
             provider: providerId,
             service: serviceImport.sourceName,
             importer: importerId,
             alias: serviceImport.localName,
             requiredVersionRange: serviceImport.versionRange,
           };
-          validateDep(depNode, this.pluginsById[providerId]);
-          logger.debug('Found dependency: ', providerId, depNode)
-          providerNode.deps.push(Object.freeze(depNode));
-          if (depNode.valid) {
-            serviceImport.version = depNode.actualVersion;
+          validateDep(depLink, this.pluginsById[providerId]);
+          logger.debug('Found dependency: ', providerId, depLink)
+          providerNode.deps.push(Object.freeze(depLink));
+          if (depLink.valid) {
+            serviceImport.version = depLink.actualVersion;
             logger.debug("resolved actual version for import ", serviceImport)
+          } else {
+            brokenDeps.push(depLink)
           }
         }
       }
     }
-    return g;
+    return { 
+      graph: g,
+      brokenDeps
+    }
+  },
+  
+  /**
+   * If m imports a service from n and it turns out to be impossible for some
+   * reason (plugin/service n doesn't exist, wrong version) then m and the
+   * entire subgraph reachable from m needs to be removed. It's not only m's
+   * wish that cannot be fulfilled, but also everyone who depends on m cannot be
+   * properly instantiated.
+   */
+  _removeBrokenPlugins(graphWithBrokenDeps) {
+    logger.debug('graph: ', graphWithBrokenDeps)
+    const rejects = {};
+    const graph = graphWithBrokenDeps.graph;
+    for (let brokenDep of graphWithBrokenDeps.brokenDeps) {
+      visit(graph[brokenDep.importer], brokenDep.validationError);
+    }
+    function visit(pluginNode, validationError) {
+      logger.debug('visiting broken node ', pluginNode)
+      if (pluginNode.visited) {
+        return;
+      } 
+      if (pluginNode.visiting) {
+        //TODO deal with a circular dependency. Not really clear what to do,
+        //perhaps, reject the entire cycle but leave the unaffected nodes there.
+        //Implementing a cycle detection algorithm is a different story.
+        //TODO good diagnostics
+        throw new Error("circular dependency: " + pluginNode.pluginId);
+      }
+      pluginNode.valid = false;
+      pluginNode.validationError = validationError;
+      pluginNode.visiting = true;
+      for (const dep of pluginNode.deps) {
+        const importer = graph[dep.importer];
+        logger.debug("following link: ", dep, ": ", importer)
+        let error;
+        if (!dep.valid) {
+          error = dep.validationError;
+        } else {
+          error = {
+            status: "REQUIRED_PLUGIN_FAILED_TO_LOAD",
+            pluginId: dep.provider
+          }
+        }
+        visit(importer, error);
+      }
+      rejects[pluginNode.pluginId] = pluginNode;
+      pluginNode.visiting = false;
+      pluginNode.visited = true;
+    }
+    for (const reject of Object.keys(rejects)) {
+      delete graphWithBrokenDeps.graph[reject.pluginId];
+    }
+    return rejects;
   },
   
   /**
    * Produces a topologically sorted array of plugins. Separates all invalid 
    * imports into a separate object.
    * 
-   * If there's an edge "n -> m" and it turns out to be invalid for some reason
-   * (plugin/service n doesn't exist, wrong version) then m and the entire subgraph 
-   * reachable from m needs to be removed. It's not only m's wish that cannot
-   * be fulfilled, but also everyone who depends on m cannot be properly 
-   * instantiated.
    * 
    * Note that the sorted list returned can contain "dream" plugins - those that 
    * were required but don't exist. The caller needs to filter them out (the
    * importers will of course be correctly rejected)
    * 
    */
-  _traverse(graph) {
+  _toposort(graph) {
     logger.debug('graph: ', graph)
-    const rejects = {};
     const pluginsSorted = [];
-    const importedPlugins = Object.values(graph);
-    for (let importedPlugin of importedPlugins) {
+    let time = 0;
+    for (let importedPlugin of Object.values(graph)) {
       visit(importedPlugin, true);
     }
-    function visit(pluginNode, prefixValid, validationError) {
-      logger.debug('visiting node ', pluginNode, ', prefixValid: ', prefixValid)
-      const invalidating = pluginNode.valid && !prefixValid;
-      if (pluginNode.visited && !invalidating) {
+    return pluginsSorted;
+    
+    function visit(pluginNode) {
+      logger.debug('visiting node ', pluginNode)
+      if (pluginNode.visited) {
         return;
       } 
       if (pluginNode.visiting) {
-        //TODO deal with a cyclic dependency. Not really clear what to do,
+        //TODO deal with a circular dependency. Not really clear what to do,
         //perhaps, reject the entire cycle but leave the unaffected nodes there.
         //Implementing a cycle detection algorithm is a different story.
         //TODO good diagnostics
-        throw new Error("cyclic dependency: " + pluginNode.pluginId);
+        throw new Error("circular dependency: " + pluginNode.pluginId);
       }
-      pluginNode.valid = prefixValid;
-      pluginNode.validationError = validationError;
+      pluginNode.discoveryTime = ++time;
       pluginNode.visiting = true;
       for (const dep of pluginNode.deps) {
-        const importer = graph[dep.importer];
-        logger.debug("following link: ", dep)
-        const linkValid = pluginNode.valid && dep.valid;
-        logger.debug("linkValid: ", linkValid)
-        let error;
-        if (!dep.valid) {
-          error = dep.validationError;
-        } else if (!pluginNode.valid) {
-          error = dep.validationError;
-          error = {
-            status: "REQUIRED_PLUGIN_FAILED_TO_LOAD",
-            pluginId: dep.provider
-          }
-        }
-        visit(importer, linkValid, error);
+        visit(graph[dep.importer]);
       }
       pluginNode.visiting = false;
       pluginNode.visited = true;
-      if (pluginNode.valid) {
-        pluginsSorted.unshift(pluginNode);
-      } else {
-        /**
-         * TODO good diagnostics: what service is missing, etc
-         */
-        logger.debug('Rejecting ', pluginNode);
-        rejects[pluginNode.pluginId] = pluginNode;
-      }
+      pluginNode.finishingTime = ++time;
+      logger.debug(`${pluginNode.pluginId}: `
+          + `${pluginNode.discoveryTime}/${pluginNode.finishingTime}`);
+      //See the proof at the end of Cormen et al. (2001), 
+      // "Section 22.4: Topological sort"
+      assert((pluginsSorted.length === 0) 
+          || (pluginNode.finishingTime > pluginsSorted[0].finishingTime));
+      pluginsSorted.unshift(pluginNode);
     } 
-    return {
-      pluginsSorted,
-      rejects
-    }
   },
   
   processImports() {
-    const listAndRejects = this._traverse(this._buildGraph());
-    const pluginsSorted = [];
+    const graphWithBrokenDeps = this._buildGraph();
+    const rejects = this._removeBrokenPlugins(graphWithBrokenDeps);
+    const pluginsSorted = this._toposort(graphWithBrokenDeps.graph);
+    const pluginsSortedAndFiltered = [];
     const nonRejectedPlugins = {};
     for (const plugin of Object.values(this.pluginsById)) {
-      if (!listAndRejects.rejects[plugin.identifier]) {
+      if (!rejects[plugin.identifier]) {
         nonRejectedPlugins[plugin.identifier] = plugin;
       }
     }
-    for (const node of listAndRejects.pluginsSorted) {
+    for (const node of pluginsSorted) {
       const plugin = nonRejectedPlugins[node.pluginId];
       if (plugin) {
-        pluginsSorted.push(plugin);
+        pluginsSortedAndFiltered.push(plugin);
       }
       delete nonRejectedPlugins[node.pluginId];
     }
-    logger.debug("*** pluginsSorted: ", pluginsSorted)
-    logger.debug("*** rejects: ", listAndRejects.rejects)
+    logger.debug("*** pluginsSorted: ", pluginsSortedAndFiltered)
+    logger.debug("*** rejects: ", rejects)
     return {
-      plugins: pluginsSorted,
-      rejects: Object.values(listAndRejects.rejects)
+      plugins: pluginsSortedAndFiltered,
+      rejects: Object.values(rejects)
     }
   }
 }
@@ -221,8 +259,9 @@ function validateDep(dep, providerPlugin) {
     if (!found) {
       if (foundAtDifferentVersion) {
         validationError = {
-          status: "REQUIRED_SERVICE_VERSION_MISMATCH",
+          status: "REQUIRED_SERVICE_VERSION_NOT_FOUND",
           pluginId: providerPlugin.identifier,
+          service: dep.service,
           requiredVersion: dep.requiredVersionRange
         }
       } else {

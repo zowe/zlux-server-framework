@@ -1,23 +1,33 @@
 const assert = require('assert')
 const Pl = require('plugin-loader')
-const data = require('./depgraph-test-data')
+const depTestData = require('./depgraph-test-data')
 const pd = "..\..\..\\zlux-example-server\\deploy\\product"
   
-function test(_case, pnum) {
-  console.log(' ***')
-  const pl = new Pl({serverConfig: {productDir: pd}})
-  try {
-    pl.installPlugins(_case);
-  } catch (e) {
-    console.log("caught exception ", e)
-  }
-  console.log(' *** installed plugins: ', pl.plugins);
-  console.log(' ***\n\n')
-  assert((pnum === 0) || pl.plugins.length == pnum)
-} 
-
-test(data.goodCase, 4)
-test(data.brokenProvider, 1)
-test(data.versionMismatch, 2)
-test(data.cycle, 0)
-console.log('*** ok')
+describe('PluginLoader', function() {
+  let pl;
+  
+  beforeEach(function () {
+    pl = new Pl({serverConfig: {productDir: pd}})
+  });
+  
+  describe('#installPlugins()', function() {
+    it('should correctly install plugins with valid deps', function() {
+      pl.installPlugins(depTestData.goodCase);
+      assert.equal(pl.plugins.length, 4) 
+    });
+    
+    it('should reject all dependents of an invalid plugin', function() {
+      pl.installPlugins(depTestData.brokenProvider);
+      assert.equal(pl.plugins.length, 1) 
+    });
+    
+    it('should detect a version mismtach', function() {
+      pl.installPlugins(depTestData.versionMismatch);
+      assert.equal(pl.plugins.length, 2) 
+    });
+    
+    it('should fail on a circular dependency', function() {
+      assert.throws(() => { pl.installPlugins(depTestData.cycle) }); 
+    });
+  });
+});
