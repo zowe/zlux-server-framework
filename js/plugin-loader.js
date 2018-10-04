@@ -400,15 +400,15 @@ ProxyConnectorPlugIn.prototype = {
     if (!(super.isValid(context) && this.host && this.port)) {
       return false;
     }
-    //we should not load authentication types that are 
-    //not requested by the administrator
-    if (!context.authManager.authPluginRequested(this.identifier,
-      this.authenticationCategory)) {
-      bootstrapLogger.warn("Authentication plugin was found which was not requested in "
-          + "the server configuration file's dataserviceAuthentication object. "
-          + "Skipping load of this plugin");
-      return false;
-    }
+//    //we should not load authentication types that are 
+//    //not requested by the administrator
+//    if (!context.authManager.authPluginRequested(this.identifier,
+//      this.authenticationCategory)) {
+//      bootstrapLogger.warn("Authentication plugin was found which was not requested in "
+//          + "the server configuration file's dataserviceAuthentication object. "
+//          + "Skipping load of this plugin");
+//      return false;
+//    }
     return true;
   },
 };
@@ -423,7 +423,7 @@ const plugInConstructorsByType = {
   "proxyConnector": ProxyConnectorPlugIn
 };
 
-function makePlugin(def, pluginConfiguration) {
+function makePlugin(def, pluginConfiguration, pluginContext, dynamicallyCreated) {
   const pluginConstr = plugInConstructorsByType[def.pluginType];
   if (!pluginConstr) {
     throw new Error(`${def.identifier}: pluginType ${def.pluginType} is unknown`); 
@@ -433,6 +433,17 @@ function makePlugin(def, pluginConfiguration) {
   // de-serialized instance data there.
   // (We don't need an extra indirection level, e.g. self.definition = def)
   const self = new pluginConstr(def, pluginConfiguration);
+  self.dynamicallyCreated = dynamicallyCreated;
+  if (!self.isValid(pluginContext)) {
+    bootstrapLogger.warn(`${def.location} points to an`
+        + " invalid plugin definition, skipping");
+    throw new Error(`Plugin ${def.identifier} invalid`)
+  }
+  self.initDataServices(pluginContext);
+  if (!dynamicallyCreated) {
+    self.initStaticWebDependencies();
+  }
+  self.init(pluginContext);
   return self;
 };
 
@@ -569,15 +580,7 @@ PluginLoader.prototype = {
             this.options.productCode);
         bootstrapLogger.debug(`For plugin with id=${pluginDef.identifier}, internal config` 
                                 + ` found=\n${JSON.stringify(pluginConfiguration)}`);
-        const plugin = makePlugin(pluginDef, pluginConfiguration);
-        if (!plugin.isValid(pluginContext)) {
-          bootstrapLogger.warn(`${pluginDef.location} points to an`
-              + " invalid plugin definition, skipping");
-          continue;
-        }
-        plugin.initDataServices(pluginContext);
-        plugin.initStaticWebDependencies();
-        plugin.init(pluginContext);
+        const plugin = makePlugin(pluginDef, pluginConfiguration, pluginContext);
         bootstrapLogger.log(bootstrapLogger.INFO,
             `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
         bootstrapLogger.debug(' Content:\n' + plugin.toString());
@@ -618,7 +621,6 @@ PluginLoader.prototype = {
     const pluginContext = {
       productCode: this.options.productCode,
       config: this.options.serverConfig,
-      plugins: this.plugins,
       authManager: this.options.authManager
     };
     //
@@ -629,10 +631,8 @@ PluginLoader.prototype = {
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
       this.options.productCode);
-    const plugin = makePlugin(pluginDef, pluginConfiguration);
-    plugin.dynamicallyCreated = true; /* TODO extra security */
-    plugin.initDataServices(pluginContext);
-    plugin.init(pluginContext);
+    const plugin = makePlugin(pluginDef, pluginConfiguration, pluginContext,
+        true);
 //    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
 //      throw new Error('unresolved dependencies');
 //      this.unresolvedImports.reset();
@@ -647,45 +647,7 @@ PluginLoader.prototype = {
 };
 
 module.exports = PluginLoader;
-
-const _unitTest = false;
-function unitTest() {
-  var configData = {
-  "zssPort":31338,
-// All paths relative to ZLUX/node or ZLUX/bin
-// In real installations, these values will be configured during the install.
-  "rootDir":"../deploy",
-  "productDir":"../deploy/product",
-  "siteDir":"../deploy/site",
-  "instanceDir":"../deploy/instance",
-  "groupsDir":"../deploy/instance/groups",
-  "usersDir":"../deploy/instance/users",
-  "pluginsDir":"../deploy/instance/ZLUX/plugins",
-
-  "productCode": 'ZLUX',
-  "dataserviceAuthentication": {
-    //this specifies the default authentication type for dataservices that didn't specify which type to use. These dataservices therefore should not expect a particular type of authentication to be used.
-    "defaultAuthentication": "fallback",
-    
-    //each authentication type may have more than one implementing plugin. define defaults and fallbacks below as well
-    //any types that have no implementers are ignored, and any implementations specified here that are not known to the server are also ignored.
-    "implementationDefaults": {
-      //each type has an object which describes which implementation to use based on some criteria to find which is best for the task. For now, just "plugins" will
-      //be used to state that you want a particular plugin.
-      "fallback": {
-        "plugins": ["com.rs.auth.trivialAuth"]
-      }
-    }
-  }  
-  };
-  var pm = new PluginLoader(configData, process.cwd());
-  var pl = pm.loadPlugins();
-  console.log("plugins: ", pl);
-  //console.log(pl.ng2)
-}
-if (_unitTest) {
-  unitTest()
-}
+PluginLoader.makePlugin = makePlugin;
 
 /*
   This program and the accompanying materials are
