@@ -105,7 +105,7 @@ describe('WebApp', function() {
           })
       })
     
-      it('should the _current version of test-service to v2.1.0', function()  {
+      it('should point the _current version of test-service to v2.1.0', function()  {
         const url = '/XXX/plugins/com.rs.testplugin'
             + '/services/test-service/_current'
         return chai.request(webApp.expressApp)
