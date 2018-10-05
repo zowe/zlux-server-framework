@@ -1,5 +1,6 @@
 const assert = require('assert')
-const makePlugin = require('plugin-loader').makePlugin
+const PluginLoader = require('plugin-loader')
+const makePlugin = PluginLoader.makePlugin
   
 describe('Plugin', function() {
   const pluginContext = {
