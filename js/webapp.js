@@ -154,6 +154,7 @@ const staticHandlers = {
     const r = express.Router();
     r.post('/plugins', jsonParser, function api(req, res) {
       const pluginDef = req.body;
+      //TODO rewrite to EvenEmitter
       Promise.resolve().then(() => webApp.options.newPluginHandler(pluginDef))
         .then(() => {
           res.status(200).send('plugin added');
@@ -688,7 +689,7 @@ WebApp.prototype = {
   _makeRouter: function *(service, subUrl, plugin, pluginContext, pluginChain) {
     const serviceRouterWithMiddleware = pluginChain.slice();
     serviceRouterWithMiddleware.push((req, res, next) => {
-      console.log(`invoked router at ${subUrl}`)
+      installLog.debug(`invoked router at ${subUrl}`)
       next();
     });
     serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
@@ -712,13 +713,12 @@ WebApp.prototype = {
             pluginContext.server.config.app, this.options.productCode);
         const dataserviceContext = new DataserviceContext(service, 
             serviceConfiguration, pluginContext);
-        if (typeof  service.nodeModule === "function") {
+        if (!service.routerFactory) {
           router = yield service.nodeModule(dataserviceContext);
           installLog.info("Loaded Router for plugin=" + plugin.identifier 
               + ", service="+service.name + ". Router="+router);          
         } else {
-          router = 
-            yield service.nodeModule[service.routerFactory](
+          router = yield service.nodeModule[service.routerFactory](
               dataserviceContext);
           installLog.info("Loaded Router from factory for plugin=" 
                           + plugin.identifier + ", service=" + service.name
@@ -786,23 +786,34 @@ WebApp.prototype = {
   },
 
   _resolveImports(plugin, urlBase) {
-//    if (plugin.dataServicesGrouped  
-//        && plugin.dataServicesGrouped.import.length > 0) {
-//      for (const importedService of plugin.dataServicesGrouped.import) {
-//        const subUrl = urlBase 
-//          + zLuxUrl.makeServiceSubURL(importedService);
-//        const importedRouter = this.routers[importedService.sourcePlugin]
-//          [importedService.sourceName];
-//        if (!importedRouter) {
-//          throw new Error(
-//            `Import ${importedService.sourcePlugin}:${implortedService.sourceName}`
-//            + " can't be satisfied");
-//        }
-//        installLog.info(`${plugin.identifier}: installing import`
-//           + ` ${importedService.sourcePlugin}:${importedService.sourceName} at ${subUrl}`);
-//        this.pluginRouter.use(subUrl, importedRouter);
-//      }
-//    }
+    if (!plugin.importsGrouped) {
+      return;
+    }
+    for (const localName of Object.keys(plugin.importsGrouped)) {
+      installLog.info(`${plugin.identifier}: importing service ${localName}`)
+      const group = plugin.importsGrouped[localName];
+      for (const version of Object.keys(group.versions)) {
+        const importedService = group.versions[version];
+        const subUrl = urlBase 
+          + zLuxUrl.makeServiceSubURL(importedService);
+        const importedRouter = this.routers[importedService.sourcePlugin]
+          [importedService.sourceName][importedService.version];
+        if (!importedRouter) {
+          throw new Error(
+            `Import ${importedService.sourcePlugin}:${implortedService.sourceName}`
+            + " can't be satisfied");
+        }
+        installLog.info(`${plugin.identifier}: installing import`
+           + ` ${importedService.sourcePlugin}:${importedService.sourceName}`
+           ` at ${subUrl}`);
+        this.pluginRouter.use(subUrl, importedRouter);
+        if (version === group.highestVersion) {
+          const defaultSubUrl = urlBase 
+              + zLuxUrl.makeServiceSubURL(importedService, true);
+          this.pluginRouter.use(defaultSubUrl, router);
+        }
+      }
+    }
   },
 
   _installPluginStaticHandlers(plugin, urlBase) {
@@ -840,7 +851,9 @@ WebApp.prototype = {
     try {
       yield *this._installDataServices(pluginContext, urlBase);
     } catch (e) {
-      installLog.warn(e.stack);
+      installLog.warn("Error installing plugin " + plugin.identifier 
+          + ": " + e.stack);
+      throw e
     }
     this._resolveImports(plugin, urlBase);
     this.plugins.push(plugin);
