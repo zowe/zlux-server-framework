@@ -33,7 +33,7 @@ DependencyGraph.prototype = {
   
   /**
    * "n -> m" means "n is a dependency of m". Note that this is the direct 
-   * opposite of an import. 
+   * opposite of an import, i.e. "m imports n".
    * 
    * This is the graph of the plugins' desires based on imports in the defs:
    * if there's an edge "n -> m" here then we know that plugin m actually 
@@ -91,6 +91,8 @@ DependencyGraph.prototype = {
   },
   
   /**
+   * Separates all invalid imports into a separate object.
+   * 
    * If m imports a service from n and it turns out to be impossible for some
    * reason (plugin/service n doesn't exist, wrong version) then m and the
    * entire subgraph reachable from m needs to be removed. It's not only m's
@@ -144,9 +146,7 @@ DependencyGraph.prototype = {
   },
   
   /**
-   * Produces a topologically sorted array of plugins. Separates all invalid 
-   * imports into a separate object.
-   * 
+   * Produces a topologically sorted array of plugins. 
    * 
    * Note that the sorted list returned can contain "dream" plugins - those that 
    * were required but don't exist. The caller needs to filter them out (the
@@ -186,6 +186,7 @@ DependencyGraph.prototype = {
           + `${pluginNode.discoveryTime}/${pluginNode.finishingTime}`);
       //See the proof at the end of Cormen et al. (2001), 
       // "Section 22.4: Topological sort"
+      //loop invariant derived from the proof
       assert((pluginsSorted.length === 0) 
           || (pluginNode.finishingTime > pluginsSorted[0].finishingTime));
       pluginsSorted.unshift(pluginNode);
