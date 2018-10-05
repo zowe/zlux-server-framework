@@ -472,6 +472,9 @@ PluginLoader.prototype = {
     const pluginPtrDef = jsonUtils.parseJSONWithComments(pluginPtrPath);
     bootstrapLogger.log(bootstrapLogger.FINER, util.inspect(pluginPtrDef));
     let pluginBasePath = pluginPtrDef.pluginLocation;
+    if (!path.isAbsolute(pluginBasePath)) {
+      pluginBasePath = path.join(process.cwd(), pluginBasePath);
+    }
     if (!fs.existsSync(pluginBasePath)) {
       throw new Error(`${pluginDescriptorFilename}: No plugin directory found at`
         + `${pluginPtrDef.pluginLocation}`);
