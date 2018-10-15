@@ -53,7 +53,7 @@ function convertOptions(request, realHost, realPort, urlPrefix) {
   return options;
 }
 
-function makeSimpleProxy(host, port, options) {
+function makeSimpleProxy(host, port, options, pluginID, serviceName) {
   if (!(host && port)) {
     throw new Error("Proxy: need a host and port");
   }
@@ -61,6 +61,7 @@ function makeSimpleProxy(host, port, options) {
     options;
   const httpApi = isHttps? https : http;
   return function(req1, res1) {
+    proxyLog.debug("Request: " + req1.protocol + '://' + req1.get('host') + req1.url);
     const requestOptions = convertOptions(req1, host, port, urlPrefix);
     if (isHttps) {
       requestOptions.rejectUnauthorized = !allowInvalidTLSProxy;
@@ -73,14 +74,28 @@ function makeSimpleProxy(host, port, options) {
     } else {
       proxyLog.debug('Callservice: no auth helper');
     }
-    //utilLog.debug(requestOptions);
     const req2 = httpApi.request(requestOptions, (res2) => {
-      proxyLog.debug("status code", res2.statusCode);
+      proxyLog.debug("status code" + res2.statusCode);
       res1.status(res2.statusCode);
       const headers = res2.headers;
       for (const header of Object.keys(headers)) {
-        //proxyLog.debug(header, headers[header]);
-        res1.set(header, headers[header])
+        if (header == 'location') {
+          var pattern = /^http.+\/ZLUX\/plugins\/.+/;
+          if (!pattern.test(headers[header])) {
+            /* Find :{port} and take all that is after */
+            var x = headers[header];
+            var y = x.split(":");
+            var z = y[2];
+            var t = z.indexOf('/');
+            var newEnd = z.substring(t);
+            var newRedirect = req1.protocol + '://' + req1.get('host') + "/ZLUX/plugins/" + pluginID + "/services/" + serviceName + newEnd; 
+            proxyLog.debug('Redirecting to: ' + newRedirect);
+            res1.set(header, newRedirect);
+          }
+        }
+        else {
+          res1.set(header, headers[header])
+        }
       }
       res2.pipe(res1);
     });

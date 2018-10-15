@@ -50,6 +50,8 @@ var utilLog = zluxUtil.loggers.utilLogger;
 const jsonParser = bodyParser.json()
 const urlencodedParser = bodyParser.urlencoded({ extended: false })
 
+const proxyMap = new Map();
+
 function DataserviceContext(serviceDefinition, serviceConfiguration, 
     pluginContext) {
   this.serviceDefinition = serviceDefinition;
@@ -459,15 +461,17 @@ WebApp.prototype = {
     return r;
   },
   
-  makeExternalProxy(host, port, urlPrefix, isHttps, noAuth) {
+  makeExternalProxy(host, port, urlPrefix, isHttps, noAuth, pluginID, serviceName) {
     const r = express.Router();
     installLog.info(`Setting up proxy to ${host}:${port}/${urlPrefix}`);
-    r.use(proxy.makeSimpleProxy(host, port, {
+    let myProxy = proxy.makeSimpleProxy(host, port, {
       urlPrefix, 
       isHttps, 
       addProxyAuthorizations: (noAuth? null : this.auth.addProxyAuthorizations),
       allowInvalidTLSProxy: this.options.allowInvalidTLSProxy
-    }));
+    }, pluginID, serviceName);
+    proxyMap.set(pluginID + ":" + serviceName, myProxy);
+    r.use(myProxy);
     return r;
   },
   
@@ -774,7 +778,8 @@ WebApp.prototype = {
         serviceRouterWithMiddleware.push(this.auth.middleware);
         serviceRouterWithMiddleware.push(this.makeExternalProxy(
             externalService.host, externalService.port,
-            externalService.urlPrefix, externalService.isHttps));
+            externalService.urlPrefix, externalService.isHttps,
+            undefined, plugin.identifier, externalService.name));
         installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
         this.pluginRouter.use(subUrl, serviceRouterWithMiddleware);
         pluginRouters[externalService.name] = serviceRouterWithMiddleware;
@@ -884,8 +889,37 @@ WebApp.prototype = {
 
   installErrorHanders() {
     this.expressApp.use((req, res, next) => {
-      do404(req.url, res, this.options.productCode
-          + ": unknown resource requested");
+      const headers = req.headers
+      for (const header of Object.keys(headers)) {
+        /* Try to find a referer header and try to
+         * redirect to our server,
+         */
+        if (header == 'referer') {
+          var pattern = /^http.+\/ZLUX\/plugins\/.+/;
+          if (pattern.test(headers[header])) {
+            var parts = headers[header].split("/");
+            var zluxIndex = parts.indexOf("ZLUX");
+            var pluginID = parts[zluxIndex + 2];
+            var serviceName = parts[zluxIndex + 4];
+            var myProxy = proxyMap.get(pluginID + ":" + serviceName);
+            var fullUrl = req.originalUrl;
+            req.url = fullUrl;
+            if (myProxy != undefined) {
+              utilLog.debug("About to call myProxy");
+              myProxy(req, res);
+              utilLog.debug("After myProxy call");
+            }
+            else {
+              do404(req.url, res, this.options.productCode
+              + ": unknown resource requested");
+            }
+          }
+          else {
+            do404(req.url, res, this.options.productCode
+            + ": unknown resource requested");
+          }
+        }
+      }
     });
 //      if (!next) {
 //        // TODO how was this tested? I'd say it never happens: `next` is always 
