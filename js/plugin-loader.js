@@ -24,6 +24,7 @@ const EventEmitter = require('events');
 const zluxUtil = require('./util');
 const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
+const translationUtils = require('./translation-utils.js');
 
 /**
  * Plugin loader: reads the entire plugin configuration tree
@@ -193,6 +194,7 @@ function Plugin(def, configuration, location) {
   Object.assign(this, def);
   this.configuration = configuration;
   this.location = location;
+  this.translationMaps = {};
 }
 Plugin.prototype = {
   constructor: Plugin,
@@ -238,6 +240,15 @@ Plugin.prototype = {
       configurationData: this.configurationData,
       dataServices: this.dataServices
     };
+  },
+
+  exportTranslatedDef(acceptLanguage) {
+    const def = this.exportDef();
+    return translationUtils.translate(def, this.translationMaps, acceptLanguage);
+  },
+
+  loadTranslations() {
+    this.translationMaps = translationUtils.loadTranslations(this.location);
   },
   
   initStaticWebDependencies() {
@@ -621,6 +632,7 @@ PluginLoader.prototype = {
         plugin.initStaticWebDependencies();
         plugin.initWebServiceDependencies(this.unresolvedImports, pluginContext);
         plugin.init(pluginContext);
+        plugin.loadTranslations();
         pluginContext.plugins.push(plugin);
         bootstrapLogger.log(bootstrapLogger.INFO,
           `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);

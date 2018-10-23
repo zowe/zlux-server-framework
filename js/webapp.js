@@ -19,6 +19,7 @@ const path = require('path');
 const Promise = require('bluebird');
 const http = require('http');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser')
 const session = require('express-session');
 const zluxUtil = require('./util');
 const configService = require('../plugins/config/lib/configService.js');
@@ -26,6 +27,7 @@ const proxy = require('./proxy');
 const zLuxUrl = require('./url');
 const makeSwaggerCatalog = require('./swagger-catalog');
 const UNP = require('./unp-constants');
+const translationUtils = require('./translation-utils');
 
 /**
  * Sets up an Express application to serve plugin data files and services  
@@ -124,7 +126,9 @@ const staticHandlers = {
         do404(req.url, res, "A plugin type must be specified");
         return;
       }
-      const pluginDefs = plugins.map(p => p.exportDef());
+      const acceptLanguage = 
+        translationUtils.getAcceptLanguageFromCookies(req.cookies) || req.headers['accept-language'] || '';
+      const pluginDefs = plugins.map(p => p.exportTranslatedDef(acceptLanguage));
       const response = {
         //TODO type/version
         pluginDefinitions: null 
@@ -407,6 +411,7 @@ function WebApp(options){
   if (options.sessionTimeoutMs) {
     sessionTimeoutMs = options.sessionTimeoutMs;
   }
+  this.expressApp.use(cookieParser());
   this.expressApp.use(session({
     //TODO properly generate this secret
     secret: process.env.expressSessionSecret ? process.env.expressSessionSecret : 'whatever',
