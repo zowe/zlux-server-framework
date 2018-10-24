@@ -244,11 +244,16 @@ Plugin.prototype = {
 
   exportTranslatedDef(acceptLanguage) {
     const def = this.exportDef();
-    return translationUtils.translate(def, this.translationMaps, acceptLanguage);
+    if (typeof this.webContent === 'object') {
+      return translationUtils.translate(def, this.translationMaps, acceptLanguage);
+    }
+    return def;
   },
 
   loadTranslations() {
-    this.translationMaps = translationUtils.loadTranslations(this.location);
+    if (typeof this.webContent === 'object') {
+      this.translationMaps = translationUtils.loadTranslations(this.location);
+    }
   },
   
   initStaticWebDependencies() {

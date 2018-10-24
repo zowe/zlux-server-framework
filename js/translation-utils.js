@@ -15,6 +15,20 @@ const glob = require('glob');
 const zluxUtil = require('./util');
 const acceptLanguageParser = require('accept-language-parser');
 
+const utilLog = zluxUtil.loggers.utilLogger;
+
+/* loadTranslations reads pluginDefinition.i18n.{lang}-{Country}.json files
+/  for a giveen plugin location.
+/ 
+/  Returns translation maps:
+/  {
+/    '{lang}-{Country}': {
+/      'key': 'value',
+/      ...
+/    },
+/    ...
+/  }
+*/
 function loadTranslations(pluginLocation) {
   const translationMaps = {};
   const relativePath = 'web/assets/i18n';
@@ -36,7 +50,7 @@ function loadTranslations(pluginLocation) {
     try {
       content = jsonUtils.parseJSONWithComments(file);
     } catch (e) {
-      console.log(`failed to parse ${file}`);
+      utilLog.warn(`Failed to parse translation file ${file}. File skipped`);
       continue;
     }
     translationMaps[languageCountry] = content;
@@ -44,25 +58,25 @@ function loadTranslations(pluginLocation) {
   return translationMaps;
 }
 
+// translate translates Plugin Definition choosing most suitable translation map
 function translate(pluginDef, translationMaps, acceptLanguage) {
   const availableTranslations = getAvailableTranslations(translationMaps);
   const langCountry = acceptLanguageParser.pick(
     availableTranslations,
     acceptLanguage
   );
-  console.log(
-    `choosen '${langCountry}' accept-language = ${acceptLanguage} availableTranslations = '${availableTranslations}'`
-  );
   if (!langCountry) {
     return pluginDef;
   }
-  const clone = zluxUtil.clone(pluginDef);
-  const webContent = clone.webContent;
+  const pluginDefClone = zluxUtil.clone(pluginDef);
+  const webContent = pluginDefClone.webContent;
   const translationMap = translationMaps[langCountry];
   translateObject(webContent, translationMap);
-  return clone;
+  return pluginDefClone;
 }
 
+// getAcceptLanguageFromCookies builds acceptLanguage string
+// based on user preferences stored in cookies
 function getAcceptLanguageFromCookies(cookies) {
   const prefix = 'org.zowe.zlux.zlux-app-manager.preferences';
   const languageKey = `${prefix}.language`;
