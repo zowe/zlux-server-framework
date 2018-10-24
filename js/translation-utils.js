@@ -18,7 +18,7 @@ const acceptLanguageParser = require('accept-language-parser');
 const utilLog = zluxUtil.loggers.utilLogger;
 
 /* loadTranslations reads pluginDefinition.i18n.{lang}-{Country}.json files
-/  for a giveen plugin location.
+/  for a given plugin location.
 / 
 /  Returns translation maps:
 /  {
@@ -124,15 +124,15 @@ module.exports = {
 const _unitTest = false;
 function unitTest() {
   const location = '../../sample-app/';
-  const pluginDefintionFile = path.join(location, 'pluginDefinition.json');
-  const pluginDefinition = jsonUtils.parseJSONWithComments(pluginDefintionFile);
+  const pluginDefinitionFile = path.join(location, 'pluginDefinition.json');
+  const pluginDefinition = jsonUtils.parseJSONWithComments(pluginDefinitionFile);
   pluginDefinition.location = location;
-  const acceptlanguage = 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,en-GB;q=0.6';
+  const acceptLanguage = 'ru-RU,ru;q=0.9,en-US;q=0.8,en;q=0.7,en-GB;q=0.6';
   const translationMaps = loadTranslations(location);
   const translatedPluginDefinition = translate(
     pluginDefinition,
     translationMaps,
-    acceptlanguage
+    acceptLanguage
   );
   console.log(JSON.stringify(translationMaps, null, 2));
   console.log(JSON.stringify(translatedPluginDefinition, null, 2));
