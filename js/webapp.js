@@ -843,7 +843,7 @@ WebApp.prototype = {
         if (!pluginRouters) {
           pluginRouters = this.routers[plugin.identifier] = {};
         }
-        pluginRouters[importedService.sourceName] = importedRouter;
+        pluginRouters[importedService.localName] = importedRouter;
       }
     }
   },
