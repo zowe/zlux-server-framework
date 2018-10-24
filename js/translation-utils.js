@@ -116,12 +116,12 @@ function translateObject(object, translationMap) {
 }
 
 module.exports = {
+  getAcceptLanguageFromCookies,
   loadTranslations,
-  translate,
-  getAcceptLanguageFromCookies
+  translate
 };
 
-const _unitTest = true;
+const _unitTest = false;
 function unitTest() {
   const location = '../../sample-app/';
   const pluginDefintionFile = path.join(location, 'pluginDefinition.json');
