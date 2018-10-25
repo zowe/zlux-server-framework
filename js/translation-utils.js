@@ -80,15 +80,20 @@ function translate(pluginDef, translationMaps, acceptLanguage) {
 function getAcceptLanguageFromCookies(cookies) {
   const prefix = 'org.zowe.zlux.zlux-app-manager.preferences';
   const languageKey = `${prefix}.language`;
-  const localeKey = `${prefix}.locale`;
+  // ex.: 'es-ES' or 'es'
   const language = cookies[languageKey];
-  const locale = cookies[localeKey];
-  if (language && locale) {
-    return `${language}-${locale},${language}`;
-  } else if (language) {
-    return language;
+  if (!language) {
+    return null;
   }
-  return null;
+  const baseLanguage = getBaseLanguage(language);
+  if (baseLanguage != language) {
+    return `${language},${baseLanguage}`;
+  }
+  return language;
+}
+
+function getBaseLanguage(language) {
+  return language.split('-')[0];
 }
 
 function getAvailableTranslations(translationMaps) {
