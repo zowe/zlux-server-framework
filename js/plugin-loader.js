@@ -203,6 +203,7 @@ Plugin.prototype = {
   pluginVersion: null,
   pluginType: null,
   webContent: null,
+  copyright:null,
   location: null,
   dataServices: null,
   dataServicesGrouped: null,
@@ -235,6 +236,7 @@ Plugin.prototype = {
       pluginVersion: this.pluginVersion,
       apiVersion: this.apiVersion,
       pluginType: this.pluginType,
+      copyright: this.copyright,
       //TODO move these to the appropraite plugin type(s)
       webContent: this.webContent, 
       configurationData: this.configurationData,
