@@ -22,6 +22,12 @@
       "type": "router",
       "name": "caller",
       "fileName": "caller.js",
+      "version": "1.0.0"
+    },
+    {
+      "type": "router",
+      "name": "caller-with-requirements",
+      "fileName": "caller.js",
       "version": "1.0.0",
       "versionRequirements" : {
         "test-service": "^1.0.0"

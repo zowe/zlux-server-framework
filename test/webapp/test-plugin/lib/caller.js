@@ -14,6 +14,7 @@ module.exports = pluginContext => {
             "test-service response": JSON.parse(callResponse.body)
           })
         }).catch(e => {
+          console.log(e)
           res.status(400).json({
             "plugin": "com.rs.testplugin",
             "service": "caller",

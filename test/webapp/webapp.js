@@ -143,9 +143,29 @@ describe('WebApp', function() {
           })
       })
       
-      it('should respect local service version requirements', function()  {
+      it('should call the highest version by default', function()  {
         const url = '/XXX/plugins/com.rs.testplugin'
             + '/services/caller/_current'
+        const req = chai.request(server).get(url)
+        return req.then(function (res) {
+            res.should.have.status(200);
+            res.body.should.be.a('object');
+            console.log(res.body)
+            res.body.should.deep.equal({
+                "plugin": "com.rs.testplugin",
+                "service": "caller",
+                "test-service response": {
+                  "plugin": "com.rs.testplugin",
+                  "service": "test-service",
+                  "version": "2.1.0"
+                }
+              });
+          })//.catch(e => console.log(e))
+      })
+      
+      it('should respect local service version requirements', function()  {
+        const url = '/XXX/plugins/com.rs.testplugin'
+            + '/services/caller-with-requirements/_current'
         const req = chai.request(server).get(url)
         //console.log(req)
         return req.then(function (res) {

@@ -295,7 +295,11 @@ const commonMiddleware = {
       appData.plugin.callService = function callService(name, url, options) {
         try {
           const allHandles = this.services[name];
-          let version = appData.service.def.versionRequirements[name] || '_current';
+          let version = '_current';
+          if (appData.service.def.versionRequirements 
+              && appData.service.def.versionRequirements[name]) {
+            version = appData.service.def.versionRequirements[name];
+          }
           const service = allHandles[version];
           return service.call(url, options, req);
         } catch (e) {
@@ -753,7 +757,7 @@ WebApp.prototype = {
         versionHandles[version] = handle;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
-          versionHandles[defaultSubUrl] = handle;
+          versionHandles['_current'] = handle;
         }
       }
     }
