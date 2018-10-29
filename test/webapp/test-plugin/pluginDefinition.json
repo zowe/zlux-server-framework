@@ -17,6 +17,15 @@
       "name": "test-service",
       "fileName": "test-router2.js",
       "version": "2.1.0"
+    },
+    {
+      "type": "router",
+      "name": "caller",
+      "fileName": "caller.js",
+      "version": "1.0.0",
+      "versionRequirements" : {
+        "test-service": "^1.0.0"
+      }
     }
   ]
 }

@@ -83,8 +83,6 @@ describe('Plugin', function() {
       assert.equal(p.dataServicesGrouped['bar'].highestVersion, '4.4.4');
       assert(p.dataServicesGrouped['bar'].versions['4.4.4'])
       assert.equal(p.dataServicesGrouped['bar'].versions['4.4.4'].name, 'bar')
-      assert(!p.dataServicesGrouped['blah'])
-      assert(!p.dataServicesGrouped['something'])
     }),
     
     it('should correctly group imports', function() {
@@ -120,6 +118,130 @@ describe('Plugin', function() {
       assert(p.importsGrouped['something'])
       assert.equal(p.importsGrouped['something'].highestVersion, '1.0.0');
       assert(p.importsGrouped['something'].versions['1.0.0'])
-    })    
+    }),
+    
+    it('should correctly check local service version dependencies', function() {
+      const twoVersionsOfAService = {
+        "identifier": "com.rs.testplugin",
+        "baseURI": "testplugin",
+        "apiVersion": "1.0.0",
+        "pluginVersion": "1.0.0",
+        "pluginType": "application",
+        "dataServices": [
+          {
+            "type": "router",
+            "name": "foo",
+            "fileName": "nop-router.js",
+            "version": "1.2.3"
+          },
+          {
+            "type": "router",
+            "name": "foo",
+            "fileName": "nop-router.js",
+            "version": "4.5.6"
+          },
+          {
+            "type": "router",
+            "name": "bar",
+            "fileName": "nop-router.js",
+            "version": "1.0.0",
+            "versionRequirements" : {
+              "foo": "^4.0.0"
+            }
+          }
+        ]
+      };
+      const twoVersionsOfAnImport = {
+          "identifier": "com.rs.testplugin",
+          "baseURI": "testplugin",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "2.0.0",
+              "version": "2.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "com.rs.provider",
+              "sourceName": "foo",
+              "versionRange": "^4.0.0",
+              "version": "4.1.1",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "bar",
+              "fileName": "nop-router.js",
+              "version": "1.0.0",
+              "versionRequirements" : {
+                "foo": "^4.0.0"
+              }
+            }
+          ]
+        };
+      const requiredServiceMissing = {
+          "identifier": "com.rs.testplugin",
+          "baseURI": "testplugin",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "bar",
+              "fileName": "nop-router.js",
+              "version": "1.0.0",
+              "versionRequirements" : {
+                "foo": "^4.0.0"
+              }
+            }
+          ]
+        };
+      const requiredServiceVersionMissing = {
+          "identifier": "com.rs.testplugin",
+          "baseURI": "testplugin",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.2.3"
+            },
+            {
+              "type": "router",
+              "name": "bar",
+              "fileName": "nop-router.js",
+              "version": "1.0.0",
+              "versionRequirements" : {
+                "foo": "^4.0.0"
+              }
+            }
+          ]
+        };
+      const p = makePlugin(twoVersionsOfAService, {}, pluginContext, false);
+      assert.equal(
+          p.dataServicesGrouped['bar'].versions['1.0.0'].versionRequirements.foo,
+          '4.5.6')
+      const p2 = makePlugin(twoVersionsOfAnImport, {}, pluginContext, false);
+      assert.equal(
+          p2.dataServicesGrouped['bar'].versions['1.0.0'].versionRequirements.foo,
+          '4.1.1')
+      assert.throws(() => {
+        makePlugin(requiredServiceMissing, {}, pluginContext, false);
+      }, /Required local service missing/);
+      assert.throws(() => {
+        makePlugin(requiredServiceVersionMissing, {}, pluginContext, false);
+      }, /Could not find a version to satisfy/);
+    })
+    
   })
 })

@@ -254,7 +254,8 @@ WebServiceHandle.prototype = {
       if (options.body) {
         request.write(options.body);
       }
-      utilLog.debug('Callservice: Issuing request to service');
+      utilLog.debug('Callservice: Issuing request to service: ' 
+          + JSON.stringify(requestOptions, null, 2));
       request.end();
     }
     );
@@ -293,7 +294,10 @@ const commonMiddleware = {
       }
       appData.plugin.callService = function callService(name, url, options) {
         try {
-          return this.services[name].call(url, options, req);
+          const allHandles = this.services[name];
+          let version = appData.service.def.versionRequirements[name] || '_current';
+          const service = allHandles[version];
+          return service.call(url, options, req);
         } catch (e) {
           return Promise.reject(e);
         }
@@ -686,28 +690,25 @@ WebApp.prototype = {
     return router;
   },
 
-  _makeRouter: function *(service, subUrl, plugin, pluginContext, pluginChain) {
+  _makeRouter: function *(service, plugin, pluginContext, pluginChain) {
     const serviceRouterWithMiddleware = pluginChain.slice();
-    serviceRouterWithMiddleware.push((req, res, next) => {
-      installLog.debug(`invoked router at ${subUrl}`)
-      next();
-    });
     serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
         service));
     serviceRouterWithMiddleware.push(this.auth.middleware);
     let router;
     switch (service.type) {
     case "service":
-      installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
-      router = this.makeProxy(subUrl);
+      //installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
+      router = this.makeProxy(zLuxUrl.makePluginURL(this.options.productCode, 
+          plugin.identifier) + zLuxUrl.makeServiceSubURL(service, false, true));
       break;
     case "nodeService":
-      installLog.info(
-          `${plugin.identifier}: installing legacy service router at ${subUrl}`);
+      //installLog.info(
+      //    `${plugin.identifier}: installing legacy service router at ${subUrl}`);
       router = this._makeRouterForLegacyService(pluginContext, service);
       break;
     case "router": {
-        installLog.info(`${plugin.identifier}: installing node router at ${subUrl}`);
+        //installLog.info(`${plugin.identifier}: installing node router at ${subUrl}`);
         const serviceConfiguration = configService.getServiceConfiguration(
             plugin.identifier,  service.name, 
             pluginContext.server.config.app, this.options.productCode);
@@ -727,7 +728,7 @@ WebApp.prototype = {
       }
       break;
     case "external":
-      installLog.info(`${plugin.identifier}: installing external proxy at ${subUrl}`);
+//      installLog.info(`${plugin.identifier}: installing external proxy at ${subUrl}`);
       router = this.makeExternalProxy(service.host, service.port,
           service.urlPrefix, service.isHttps);
       break;
@@ -736,20 +737,36 @@ WebApp.prototype = {
     return serviceRouterWithMiddleware;
   },
   
+  _makeServiceHandleMap(plugin, urlBase) {
+    const serviceHandleMap = {};
+    for (const group of zluxUtil.concatIterables(
+        Object.values(plugin.dataServicesGrouped),
+        Object.values(plugin.importsGrouped))) {
+      let versionHandles = serviceHandleMap[group.name];
+      if (!versionHandles) {
+        versionHandles = serviceHandleMap[group.name] = {};
+      }
+      for (const version of Object.keys(group.versions)) {
+        const service = group.versions[version];
+        const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
+        const handle = new WebServiceHandle(subUrl, this.options.httpPort);
+        versionHandles[version] = handle;
+        if (version === group.highestVersion) {
+          const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
+          versionHandles[defaultSubUrl] = handle;
+        }
+      }
+    }
+    return serviceHandleMap;
+  },
+  
   _installDataServices: function*(pluginContext, urlBase) {
     const plugin = pluginContext.pluginDef;
     if (!plugin.dataServicesGrouped) {
       return;
     }
     installLog.info(`${plugin.identifier}: installing data services`)
-    const serviceHandleMap = {};
-    for (const service of plugin.dataServices) {
-      //TODO version
-      const name = (service.type === "import")? service.localName : service.name;
-      const handle = new WebServiceHandle(urlBase + "/services/" + name,
-        this.options.httpPort);
-      serviceHandleMap[name] = handle;
-    }
+    const serviceHandleMap = this._makeServiceHandleMap(plugin, urlBase);
     if (plugin.pluginType === 'nodeAuthentication') {
       //hack for pseudo-SSO
       this.authServiceHandleMaps[plugin.identifier] = serviceHandleMap;
@@ -772,14 +789,15 @@ WebApp.prototype = {
       for (const version of Object.keys(group.versions)) {
         const service = group.versions[version];
         const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
-        const router = yield* this._makeRouter(service, subUrl, plugin, 
-            pluginContext, pluginChain); 
+        const router = yield* this._makeRouter(service, plugin, pluginContext, 
+            pluginChain); 
+        installLog.info(`${plugin.identifier}: installing router at ${subUrl}`);
         this.pluginRouter.use(subUrl, router);
         serviceRouters[version] = router;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
           this.pluginRouter.use(defaultSubUrl, router);
-          serviceRouters['*'] = router;
+          serviceRouters['_current'] = router;
         }
       }
     } 

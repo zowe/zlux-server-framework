@@ -63,6 +63,14 @@ Service.prototype = {
     if (!semver.valid(this.version)) {
       throw new Error(`${this.name}: invalid version "${this.version}"`)
     }
+    if (this.versionRequirements) {
+      for (let serviceName of Object.keys(this.versionRequirements)) {
+        if (!semver.validRange(this.versionRequirements[serviceName])) {
+          throw new Error(`${this.localName}: invalid version range ` +
+              `${serviceName}: ${this.versionRequirements[serviceName]}`)
+        }
+      }
+    }
   }
 }
 
@@ -222,6 +230,7 @@ Plugin.prototype = {
       let group = container[name];
       if (!group) {
         group = container[name] = {
+          name,
           highestVersion: null,
           versions: {},
         };
@@ -284,6 +293,42 @@ Plugin.prototype = {
       }
     }
     this.dataServices = filteredDataServices;
+    this._validateLocalVersionRequirements()
+  },
+  
+  _validateLocalVersionRequirements() {
+    for (let service of this.dataServices) {
+      if (!service.versionRequirements) {
+        continue;
+      }
+      for (let serviceName of Object.keys(service.versionRequirements)) {
+        const allVersions = this.dataServicesGrouped[serviceName] 
+            || this.importsGrouped[serviceName];
+        if (!allVersions) {
+          throw new Error(`${this.identifier}::${service.name} `
+              + "Required local service missing: " + serviceName)
+        }
+        const requiredVersion = service.versionRequirements[serviceName];
+        let found = null;
+        for (let availableVersion of Object.keys(allVersions.versions)) {
+          if (semver.satisfies(availableVersion, requiredVersion)) {
+            found = availableVersion;
+            break;
+          }
+        }
+        if (!found) {
+          throw new Error(`${this.identifier}::${service.name} `
+              + `Could not find a version to satisfy local dependency `
+              + `${serviceName}@${requiredVersion}`)
+        } else {
+          bootstrapLogger.debug(`${this.identifier}::${service.name}: found `
+              + `${serviceName}@${found}`)
+          //replace the mask in the def with an actual version to make the life 
+          // simpler
+          service.versionRequirements[serviceName] = found;
+        }
+      }
+    }
   }
 };
 

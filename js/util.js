@@ -109,6 +109,11 @@ module.exports.readFilesToArray = function(fileList) {
   }
 };
 
+module.exports.concatIterables = function* concatIterables() {
+  for (let i=0; i < arguments.length; i++) {
+    yield *arguments[i];
+  }
+}
 
 /*
   This program and the accompanying materials are
