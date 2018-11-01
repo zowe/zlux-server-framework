@@ -21,6 +21,7 @@ const WebSocket = require('ws');
 const expressWs = require('express-ws');
 const util = require('./util');
 const reader = require('./reader');
+const crypto = require('crypto');
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const contentLogger = util.loggers.contentLogger;
@@ -71,7 +72,7 @@ WebServer.prototype = {
     } else if (config.https && config.https.port) {
       if (config.https.pfx) {
         canRun = true;
-      } else if (config.https.cert && config.https.key) {
+      } else if (config.https.certificates && config.https.keys) {
         canRun = true;
       }
     }
@@ -84,7 +85,10 @@ WebServer.prototype = {
       this.httpOptions = {};
     }
     if (this.config.https && this.config.https.port) {
-      this.httpsOptions = {};
+      let consts = crypto.constants;
+      this.httpsOptions = {
+        secureOptions: consts.SSL_OP_NO_SSLv2 | consts.SSL_OP_NO_SSLv3 | consts.SSL_OP_NO_TLSv1 | consts.SSL_OP_NO_TLSv1_1
+      };
     }
   },
 
