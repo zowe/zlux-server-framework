@@ -21,6 +21,7 @@ const WebSocket = require('ws');
 const expressWs = require('express-ws');
 const util = require('./util');
 const reader = require('./reader');
+const crypto = require('crypto');
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const contentLogger = util.loggers.contentLogger;
@@ -71,7 +72,7 @@ WebServer.prototype = {
     } else if (config.https && config.https.port) {
       if (config.https.pfx) {
         canRun = true;
-      } else if (config.https.cert && config.https.key) {
+      } else if (config.https.certificates && config.https.keys) {
         canRun = true;
       }
     }
@@ -84,7 +85,19 @@ WebServer.prototype = {
       this.httpOptions = {};
     }
     if (this.config.https && this.config.https.port) {
+      let options = this.config.https;
       this.httpsOptions = {};
+      //secureOptions and secureProtocol documented here: https://nodejs.org/api/tls.html#tls_tls_createsecurecontext_options
+      if (typeof options.secureOptions == 'number') {
+        //the numbers you want here actually come from openssl, and are likely in this file: https://github.com/openssl/openssl/blob/master/include/openssl/ssl.h
+        this.httpsOptions.secureOptions = options.secureOptions;
+      } else if (typeof options.secureProtocol == 'string') {
+        this.httpsOptions.secureProtocol = options.secureProtocol;
+      } else {
+        let consts = crypto.constants;
+        //tls 1.3 was released in 2018, and tls 1.2 should be in this blacklist list when it has widespread support
+        this.httpsOptions.secureOptions = consts.SSL_OP_NO_SSLv2 | consts.SSL_OP_NO_SSLv3 | consts.SSL_OP_NO_TLSv1 | consts.SSL_OP_NO_TLSv1_1;
+      }
     }
   },
 
