@@ -85,10 +85,18 @@ WebServer.prototype = {
       this.httpOptions = {};
     }
     if (this.config.https && this.config.https.port) {
-      let consts = crypto.constants;
-      this.httpsOptions = {
-        secureOptions: consts.SSL_OP_NO_SSLv2 | consts.SSL_OP_NO_SSLv3 | consts.SSL_OP_NO_TLSv1 | consts.SSL_OP_NO_TLSv1_1
-      };
+      let options = this.config.https;
+      this.httpsOptions = {};
+      //secureOptions and secureProtocol documented here: https://nodejs.org/api/tls.html#tls_tls_createsecurecontext_options
+      if (typeof options.secureOptions == 'number') {
+        this.httpsOptions.secureOptions = options.secureOptions;
+      } else if (typeof options.secureProtocol == 'string') {
+        this.httpsOptions.secureProtocol = options.secureProtocol;
+      } else {
+        let consts = crypto.constants;
+        //tls 1.3 was released in 2018, and tls 1.2 should be in this blacklist list when it has widespread support
+        this.httpsOptions.secureOptions = consts.SSL_OP_NO_SSLv2 | consts.SSL_OP_NO_SSLv3 | consts.SSL_OP_NO_TLSv1 | consts.SSL_OP_NO_TLSv1_1;
+      }
     }
   },
 
