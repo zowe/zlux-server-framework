@@ -89,6 +89,7 @@ WebServer.prototype = {
       this.httpsOptions = {};
       //secureOptions and secureProtocol documented here: https://nodejs.org/api/tls.html#tls_tls_createsecurecontext_options
       if (typeof options.secureOptions == 'number') {
+        //the numbers you want here actually come from openssl, and are likely in this file: https://github.com/openssl/openssl/blob/master/include/openssl/ssl.h
         this.httpsOptions.secureOptions = options.secureOptions;
       } else if (typeof options.secureProtocol == 'string') {
         this.httpsOptions.secureProtocol = options.secureProtocol;
