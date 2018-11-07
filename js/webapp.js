@@ -18,6 +18,7 @@ const expressWs = require('express-ws');
 const path = require('path');
 const Promise = require('bluebird');
 const http = require('http');
+const https = require('https');
 const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser')
 const session = require('express-session');
@@ -176,9 +177,15 @@ const staticHandlers = {
  *  This is passed to every other service of the plugin, so that 
  *  the service can be called by other services under the plugin
  */
-function WebServiceHandle(urlPrefix, port) {
+function WebServiceHandle(urlPrefix, httpPort, httpsPort) {
   this.urlPrefix = urlPrefix;
-  this.port = port;
+  if (httpsPort) {
+    this.port = httpsPort;
+    this.isHttps = true;
+  } else {
+    this.port = httpPort;
+    this.isHttps = false;
+  }
 }
 WebServiceHandle.prototype = {
   constructor: WebServiceHandle,
@@ -203,13 +210,22 @@ WebServiceHandle.prototype = {
       if (path) {
         url += '/' + path;
       }
+      let rejectUnauthorized;
+      let protocol;
+      if (this.isHttps) {
+        protocol = 'https:';
+        rejectUnauthorized = false;
+      } else {
+        protocol = 'http:';
+      }
       const requestOptions = {
         hostname: "localhost",
         port: this.port,
         method: options.method || "GET",
-        protocol: 'http:',
+        protocol: protocol,
         path: url,
-        auth: options.auth
+        auth: options.auth,
+        rejectUnauthorized: rejectUnauthorized
       };
       const headers = {};
       if (originalRequest) {
@@ -238,8 +254,8 @@ WebServiceHandle.prototype = {
       if (Object.getOwnPropertyNames(headers).length > 0) {
         requestOptions.headers = headers;
       }
-      //console.log('http request', requestOptions);
-      const request = http.request(requestOptions, (response) => {
+      let httpOrHttps = this.isHttps ? https : http;
+      const request = httpOrHttps.request(requestOptions, (response) => {
         var chunks = [];
         response.on('data',(chunk)=> {
           utilLog.debug('Callservice: Data received');
@@ -519,7 +535,7 @@ WebApp.prototype = {
             proxyRouter);
       }
       serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
-          this.options.httpPort);
+          this.options.httpPort, this.options.httpsPort);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
@@ -540,7 +556,7 @@ WebApp.prototype = {
             this.authServiceHandleMaps;
           next();
         },
-        this.auth.getStatus); 
+      this.auth.getStatus);
     this.expressApp.post('/auth-logout',
         jsonParser,
         (req, res, next) => {
@@ -560,12 +576,12 @@ WebApp.prototype = {
         },
         this.auth.doLogout); 
     serviceHandleMap['auth'] = new WebServiceHandle('/auth', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/plugins', 
         //this.auth.middleware, 
         staticHandlers.plugins(this.plugins));
     serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/echo/*', 
       this.auth.middleware, 
       (req, res) =>{
@@ -573,7 +589,7 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/echo/*',  
       this.auth.middleware, 
       (req, res) =>{
@@ -581,12 +597,12 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.use('/apiManagement/', 
         this.auth.middleware, 
         staticHandlers.apiManagement(this));
     serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
   },
   
   _makeRouterForLegacyService(pluginContext, service) {
@@ -693,7 +709,7 @@ WebApp.prototype = {
     for (const service of plugin.dataServices) {
       const name = (service.type === "import")? service.localName : service.name;
       const handle = new WebServiceHandle(urlBase + "/services/" + name,
-        this.options.httpPort);
+                                          this.options.httpPort, this.options.httpsPort);
       serviceHandleMap[name] = handle;
     }
     if (plugin.pluginType === 'nodeAuthentication') {
