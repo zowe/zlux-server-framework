@@ -99,15 +99,6 @@ function sendAuthorizationFailure(res, authType, resource) {
 };
 
 const staticHandlers = {
-  ng2TypeScript: function(ng2Ts) { 
-    return function(req, res) {
-      contentLogger.log(contentLogger.FINER,"generated ng2 module:\n"+util.inspect(ng2Ts));
-      res.setHeader("Content-Type", "text/typescript");
-      res.setHeader("Server", "jdmfws");
-      res.status(200).send(ng2Ts);
-    }
-  },
-
   plugins: function(plugins) {
     return function(req, res) {
       let parsedRequest = url.parse(req.url, true);
@@ -481,9 +472,6 @@ WebApp.prototype = {
   },
   
   installStaticHanders() {
-    this.expressApp.get(
-      `/${this.options.productCode}/plugins/com.rs.mvd/services/com.rs.mvd.ng2.module.ts`,
-      staticHandlers.ng2TypeScript(this.options.staticPlugins.ng2));
     const webdir = path.join(path.join(this.options.productDir,
       this.options.productCode), 'web');
     const rootPage = this.options.rootRedirectURL? this.options.rootRedirectURL 
