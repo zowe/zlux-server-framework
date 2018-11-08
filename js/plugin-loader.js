@@ -226,8 +226,7 @@ Plugin.prototype = {
   },
   
   init(context) {
-    bootstrapLogger.warn(this.identifier
-        + `: "${this.pluginType}" plugins not yet implemented`);
+    //Nothing here anymore: startup checks for validity will be superceeded by https://github.com/zowe/zlux-proxy-server/pull/18 and initialization concept has not manifested for many plugin types, so a warning is not needed.
   },
   
   exportDef() {
@@ -495,7 +494,6 @@ function makePlugin(def, pluginConfiguration, basePath) {
 function PluginLoader(options) {
   EventEmitter.call(this);
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
-  this.ng2 = null;
   this.plugins = null;
   this.pluginMap = {};
   this.unresolvedImports = new ExternalImports();
@@ -504,7 +502,6 @@ PluginLoader.prototype = {
   constructor: PluginLoader,
   __proto__: EventEmitter.prototype,
   options: null,
-  ng2: null,
   plugins: null,
   pluginMap: null,
   unresolvedImports: null,
@@ -557,37 +554,6 @@ PluginLoader.prototype = {
                           + ` found=\n${JSON.stringify(pluginConfiguration)}`);
     return makePlugin(pluginDef, pluginConfiguration, pluginBasePath, 
       this.options.productCode);
-  },
-
-  _generateNg2ModuleTs(plugins) {
-    let importStmts = [];
-    let modules = ["BrowserModule"];
-    plugins.filter(function(def) {
-      return def.webContent && 
-        ("object" === typeof def.webContent) &&
-        (def.webContent.framework === "angular2");
-    }).forEach(function (def) {
-      let ng2ModuleName = def.webContent.ng2ModuleName;
-      let ng2ModuleLocation = def.webContent.ng2ModuleLocation;
-      if (!(ng2ModuleName && ng2ModuleLocation)) {
-        bootstrapLogger.warn(`Invalid NG2 module: ${def.location}: `
-            + "'ng2ModuleName' or 'ng2ModuleLocation' missing");
-        return;
-      } 
-      importStmts.push("import { "+ng2ModuleName+" } from '"+ng2ModuleLocation+"';\n");
-      modules.push(ng2ModuleName);
-    });
-    let ng2 = 
-        "import { NgModule } from '@angular/core';\n"+
-        "import { BrowserModule } from '@angular/platform-browser';\n"+
-        importStmts.join("") +
-        "@NgModule({\n"+
-        "  imports: ["+modules.join(", ")+"]\n" +
-        "})\n" +
-        "export class Ng2RootModule {}\n";
-    bootstrapLogger.log(bootstrapLogger.FINER,
-      "Generated ng2 module:\n" + ng2);
-    return ng2;
   },
   
   _toposortPlugins(plugins, pluginMap) {
@@ -669,7 +635,6 @@ PluginLoader.prototype = {
         });
       this.unresolvedImports.reset();
     }
-    this.ng2 = this._generateNg2ModuleTs(pluginContext.plugins);
     for (const plugin of pluginContext.plugins) {
       zluxUtil.deepFreeze(plugin);
       this.pluginMap[plugin.identifier] = plugin;
@@ -755,7 +720,6 @@ function unitTest() {
   var pm = new PluginLoader(configData, process.cwd());
   var pl = pm.loadPlugins();
   console.log("plugins: ", pl);
-  //console.log(pl.ng2)
 }
 if (_unitTest) {
   unitTest()

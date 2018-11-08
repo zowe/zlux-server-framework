@@ -228,8 +228,7 @@ Server.prototype = {
       serverConfig: this.userConfig,
       staticPlugins: {
         list: this.pluginLoader.plugins,
-        pluginMap: this.pluginLoader.pluginMap,
-        ng2: this.pluginLoader.ng2
+        pluginMap: this.pluginLoader.pluginMap
       },
       newPluginHandler: (pluginDef) => this.newPluginSubmitted(pluginDef),
       auth: webauth
