@@ -561,13 +561,13 @@ WebApp.prototype = {
         staticHandlers.plugins(this.plugins));
     serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
         this.options.httpPort);
-    this.expressApp.get('/proxiedHostInfo', 
+    this.expressApp.get('/server/proxies', 
         this.auth.middleware, 
       (req, res) =>{
-        contentLogger.log(contentLogger.INFO, 'proxiedHostInfo\n' + util.inspect(req));      
+        contentLogger.log(contentLogger.INFO, '/server/proxies\n' + util.inspect(req));      
         res.json({"zssServerHostName":this.options.proxiedHost,"zssPort":this.options.proxiedPort});
       }); 
-    serviceHandleMap['proxiedHostInfo'] = new WebServiceHandle('/proxiedHostInfo', 
+    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', 
         this.options.httpPort);
         
     this.expressApp.get('/echo/*', 
