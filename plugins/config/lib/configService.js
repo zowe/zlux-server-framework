@@ -2300,6 +2300,7 @@ function ConfigService(context) {
   });
 
   /*extra level*/
+  /*
   router.all('/:pluginID/group/:groupname/:resource*',(request, response)=> {
     request.scope = CONFIG_SCOPE_GROUP;
     request.resourceURL+='/group';
@@ -2327,7 +2328,7 @@ function ConfigService(context) {
     var namedScope = percentEncode(request.params.username);
     determineResourceForNamedScope(request,response,namedScope);    
   });
-
+  */
 
   var dispatchByMethod = function(request, response, lastPath) {
     /* HERE:

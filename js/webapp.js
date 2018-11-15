@@ -18,7 +18,9 @@ const expressWs = require('express-ws');
 const path = require('path');
 const Promise = require('bluebird');
 const http = require('http');
+const https = require('https');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser')
 const session = require('express-session');
 const zluxUtil = require('./util');
 const configService = require('../plugins/config/lib/configService.js');
@@ -26,6 +28,7 @@ const proxy = require('./proxy');
 const zLuxUrl = require('./url');
 const makeSwaggerCatalog = require('./swagger-catalog');
 const UNP = require('./unp-constants');
+const translationUtils = require('./translation-utils');
 
 /**
  * Sets up an Express application to serve plugin data files and services  
@@ -97,15 +100,6 @@ function sendAuthorizationFailure(res, authType, resource) {
 };
 
 const staticHandlers = {
-  ng2TypeScript: function(ng2Ts) { 
-    return function(req, res) {
-      contentLogger.log(contentLogger.FINER,"generated ng2 module:\n"+util.inspect(ng2Ts));
-      res.setHeader("Content-Type", "text/typescript");
-      res.setHeader("Server", "jdmfws");
-      res.status(200).send(ng2Ts);
-    }
-  },
-
   plugins: function(plugins) {
     return function(req, res) {
       let parsedRequest = url.parse(req.url, true);
@@ -124,7 +118,9 @@ const staticHandlers = {
         do404(req.url, res, "A plugin type must be specified");
         return;
       }
-      const pluginDefs = plugins.map(p => p.exportDef());
+      const acceptLanguage = 
+        translationUtils.getAcceptLanguageFromCookies(req.cookies) || req.headers['accept-language'] || '';
+      const pluginDefs = plugins.map(p => p.exportTranslatedDef(acceptLanguage));
       const response = {
         //TODO type/version
         pluginDefinitions: null 
@@ -172,9 +168,15 @@ const staticHandlers = {
  *  This is passed to every other service of the plugin, so that 
  *  the service can be called by other services under the plugin
  */
-function WebServiceHandle(urlPrefix, port) {
+function WebServiceHandle(urlPrefix, httpPort, httpsPort) {
   this.urlPrefix = urlPrefix;
-  this.port = port;
+  if (httpsPort) {
+    this.port = httpsPort;
+    this.isHttps = true;
+  } else {
+    this.port = httpPort;
+    this.isHttps = false;
+  }
 }
 WebServiceHandle.prototype = {
   constructor: WebServiceHandle,
@@ -199,13 +201,22 @@ WebServiceHandle.prototype = {
       if (path) {
         url += '/' + path;
       }
+      let rejectUnauthorized;
+      let protocol;
+      if (this.isHttps) {
+        protocol = 'https:';
+        rejectUnauthorized = false;
+      } else {
+        protocol = 'http:';
+      }
       const requestOptions = {
         hostname: "localhost",
         port: this.port,
         method: options.method || "GET",
-        protocol: 'http:',
+        protocol: protocol,
         path: url,
-        auth: options.auth
+        auth: options.auth,
+        rejectUnauthorized: rejectUnauthorized
       };
       const headers = {};
       if (originalRequest) {
@@ -234,8 +245,8 @@ WebServiceHandle.prototype = {
       if (Object.getOwnPropertyNames(headers).length > 0) {
         requestOptions.headers = headers;
       }
-      //console.log('http request', requestOptions);
-      const request = http.request(requestOptions, (response) => {
+      let httpOrHttps = this.isHttps ? https : http;
+      const request = httpOrHttps.request(requestOptions, (response) => {
         var chunks = [];
         response.on('data',(chunk)=> {
           utilLog.debug('Callservice: Data received');
@@ -407,6 +418,7 @@ function WebApp(options){
   if (options.sessionTimeoutMs) {
     sessionTimeoutMs = options.sessionTimeoutMs;
   }
+  this.expressApp.use(cookieParser());
   this.expressApp.use(session({
     //TODO properly generate this secret
     secret: process.env.expressSessionSecret ? process.env.expressSessionSecret : 'whatever',
@@ -476,9 +488,6 @@ WebApp.prototype = {
   },
   
   installStaticHanders() {
-    this.expressApp.get(
-      `/${this.options.productCode}/plugins/com.rs.mvd/services/com.rs.mvd.ng2.module.ts`,
-      staticHandlers.ng2TypeScript(this.options.staticPlugins.ng2));
     const webdir = path.join(path.join(this.options.productDir,
       this.options.productCode), 'web');
     const rootPage = this.options.rootRedirectURL? this.options.rootRedirectURL 
@@ -514,7 +523,7 @@ WebApp.prototype = {
             proxyRouter);
       }
       serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
-          this.options.httpPort);
+          this.options.httpPort, this.options.httpsPort);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
@@ -535,7 +544,7 @@ WebApp.prototype = {
             this.authServiceHandleMaps;
           next();
         },
-        this.auth.getStatus); 
+      this.auth.getStatus);
     this.expressApp.post('/auth-logout',
         jsonParser,
         (req, res, next) => {
@@ -555,12 +564,12 @@ WebApp.prototype = {
         },
         this.auth.doLogout); 
     serviceHandleMap['auth'] = new WebServiceHandle('/auth', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/plugins', 
         //this.auth.middleware, 
         staticHandlers.plugins(this.plugins));
     serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/server/proxies', 
         this.auth.middleware, 
       (req, res) =>{
@@ -568,8 +577,7 @@ WebApp.prototype = {
         res.json({"zssServerHostName":this.options.proxiedHost,"zssPort":this.options.proxiedPort});
       }); 
     serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', 
-        this.options.httpPort);
-        
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/echo/*', 
       this.auth.middleware, 
       (req, res) =>{
@@ -577,7 +585,7 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/echo/*',  
       this.auth.middleware, 
       (req, res) =>{
@@ -585,12 +593,12 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.use('/apiManagement/', 
         this.auth.middleware, 
         staticHandlers.apiManagement(this));
     serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
   },
   
   _makeRouterForLegacyService(pluginContext, service) {
@@ -697,7 +705,7 @@ WebApp.prototype = {
     for (const service of plugin.dataServices) {
       const name = (service.type === "import")? service.localName : service.name;
       const handle = new WebServiceHandle(urlBase + "/services/" + name,
-        this.options.httpPort);
+                                          this.options.httpPort, this.options.httpsPort);
       serviceHandleMap[name] = handle;
     }
     if (plugin.pluginType === 'nodeAuthentication') {
@@ -847,7 +855,7 @@ WebApp.prototype = {
         if (!pluginRouters) {
           pluginRouters = this.routers[plugin.identifier] = {};
         }
-        pluginRouters[importedService.sourceName] = importedRouter;
+        pluginRouters[importedService.localName] = importedRouter;
       }
     }
   },
