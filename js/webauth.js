@@ -156,6 +156,22 @@ module.exports = function(authManager) {
       }
       res.status(200).json(result);
     },
+
+    // get status for creat accout button to define if display
+    getAuthStatus(req, res) {
+      const handlers = authManager.getAllHandlers();
+      const result = new StatusResponse();
+      for (const handler of handlers) {
+        const pluginDef = handler.pluginDef;
+        
+        result.addHandlerResult(pluginDef, handler);
+      }
+      res.status(200).send(JSON.stringify({
+        default: authManager.defaultType,
+        types: result,
+        headerless: authManager.config.headerless
+      }));
+    },
     
     doLogin: Promise.coroutine(function*(req, res) {
       try {

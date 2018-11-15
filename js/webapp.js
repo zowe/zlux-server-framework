@@ -545,6 +545,15 @@ WebApp.prototype = {
           next();
         },
       this.auth.getStatus);
+    this.expressApp.get('/auth/types',
+        jsonParser,
+        (req, res, next) => {
+          //hack for pseudo-SSO
+          req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps = 
+            this.authServiceHandleMaps;
+          next();
+        },
+        this.auth.getAuthStatus);
     this.expressApp.post('/auth-logout',
         jsonParser,
         (req, res, next) => {
