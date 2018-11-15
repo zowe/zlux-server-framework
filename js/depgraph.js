@@ -1,7 +1,7 @@
 "use strict";
 
 const semver = require('semver');
-const assert = require('assert');
+//const assert = require('assert');
 const zluxUtil = require('./util');
 
 module.exports = DependencyGraph;
@@ -185,8 +185,8 @@ DependencyGraph.prototype = {
       //See the proof at the end of Cormen et al. (2001), 
       // "Section 22.4: Topological sort"
       //loop invariant derived from the proof
-      assert((pluginsSorted.length === 0) 
-          || (pluginNode.finishingTime > pluginsSorted[0].finishingTime));
+      //assert((pluginsSorted.length === 0) 
+      //   || (pluginNode.finishingTime > pluginsSorted[0].finishingTime));
       pluginsSorted.unshift(pluginNode);
     } 
   },
