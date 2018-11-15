@@ -2,14 +2,12 @@
 
 const semver = require('semver');
 const assert = require('assert');
+const zluxUtil = require('./util');
 
 module.exports = DependencyGraph;
 
-const logger = {
-  debug() {
-   //console.log.apply(console, arguments)
-  }
-}
+const logger = zluxUtil.loggers.bootstrapLogger
+
 /**
  * Checks if all plugin dependencies are met, including versions.
  * Sorts the plugins so that they can be installed in that order.

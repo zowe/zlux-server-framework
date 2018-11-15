@@ -21,7 +21,7 @@
     "express-session": "~1.15.6",
     "express-ws": "~4.0.0",
     "require-from-string": "~2.0.2",
-    "semver": "^5.5.1",
+    "semver": "~5.5.1",
     "ws": "~5.2.0"
   }
 }
