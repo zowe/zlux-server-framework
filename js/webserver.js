@@ -101,7 +101,7 @@ WebServer.prototype = {
     }
   },
 
-  startListening: Promise.coroutine(function* (app) {
+  startListening: function (app) {
     let t = this;
     if (this.config.https && this.config.https.port) {
       let listening = false;
@@ -112,14 +112,10 @@ WebServer.prototype = {
           this.expressWsHttps = expressWs(app, this.httpsServer, {maxPayload: 50000});
           listening = true;
         } catch (e) {
-          if (e.message == 'mac verify failure' && !noPrompt) {
-            const r = reader();
-            try {
-              httpsOptions.passphrase = yield reader.readPassword(
+          if (e.message == 'mac verify failure') {
+            const r = new reader();
+            this.httpsOptions.passphrase = r.readPasswordSync(
                 'HTTPS key or PFX decryption failure. Please enter passphrase: ');
-            } finally {
-              r.close();
-            }
           } else {
             throw e;
           }
@@ -132,7 +128,7 @@ WebServer.prototype = {
       this.expressWsHttp = expressWs(app, this.httpServer);
       this.callListen(this.httpServer, 'http', 'HTTP');
     }
-  }),
+  },
 
   callListen(methodServer, methodName, methodNameForLogging) {
     var methodConfig = this.config[methodName];

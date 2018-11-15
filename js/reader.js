@@ -11,6 +11,7 @@
 */
 
 const readline = require('readline');
+const readlineSync = require('readline-sync');
 
 function Reader() {
   this.readlineReader = readline.createInterface({
@@ -46,6 +47,12 @@ Reader.prototype = {
 
   close() {
     this.readlineReader.close();
+  }, 
+
+  readPasswordSync (question) {
+    let passPhrase = readlineSync.question(question, {hideEchoBack: true, caseSensitive: true, print: function(display, encoding)
+      { process.stdout.write("Passphrase received...\n", encoding); }} );
+    return passPhrase
   }
 };
 
