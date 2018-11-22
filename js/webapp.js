@@ -808,36 +808,6 @@ WebApp.prototype = {
     }
   },
 
-//  /*
-//    Order of plugins given is expected to be in order of dependency, so a loop is not run on import resolution
-//   */
-//  resolveAllImports(pluginDefs) {
-//    let unresolvedPlugins = [];
-//    installLog.info(`Resolving imports for ${pluginDefs.length} remaining plugins`);
-//    pluginDefs.forEach((plugin) => {
-//      installLog.debug(
-//        `${plugin.identifier}: ${plugin.dataServicesGrouped? 'has' : 'does not have'}`
-//          + ' services')
-//      const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
-//                                            plugin.identifier);
-//      try {
-//       
-//      } catch (e) {
-//        unresolvedPlugins.push(plugin);
-//      }
-//    });
-//    if (unresolvedPlugins.length === 0) {
-//      installLog.info(`All imports resolved for all plugins.`);
-//      return true;
-//    } else {
-//      installLog.info(`Unable to resolve imports for ${unresolvedPlugins.length} plugins.`);
-//      unresolvedPlugins.forEach((plugin)=> {
-//        installLog.info(`${plugin.identifier} has unresolved imports.`);
-//      });
-//      return false;
-//    }
-//  },
-
   _resolveImports(plugin, urlBase) {
     if (plugin.dataServicesGrouped  
         && plugin.dataServicesGrouped.import.length > 0) {
