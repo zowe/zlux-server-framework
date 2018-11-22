@@ -31,7 +31,8 @@ const loggers = {
   childLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.child"),
   utilLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.utils"),
   proxyLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.proxy"),
-  installLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.install")
+  installLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.install"),
+  apiml: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.apiml")
 };
 
 module.exports.loggers = loggers;

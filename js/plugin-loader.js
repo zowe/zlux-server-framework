@@ -25,6 +25,7 @@ const zluxUtil = require('./util');
 const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
 const translationUtils = require('./translation-utils.js');
+const makeSwaggerCatalog = require('./swagger-catalog');
 
 /**
  * Plugin loader: reads the entire plugin configuration tree
@@ -339,7 +340,12 @@ Plugin.prototype = {
         }
       }
     }
+  },
+  
+  getApiCatalog(productCode) {
+    return makeSwaggerCatalog(this, productCode)
   }
+  
 };
 
 function LibraryPlugIn(def, configuration, location) {
@@ -642,11 +648,6 @@ PluginLoader.prototype = {
     this.plugins = this._toposortPlugins(pluginContext.plugins, this.pluginMap);
 //    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
 //        + JSON.stringify(this.pluginMap));  
-    
-    // Share with index.js the amount of plugins that should load
-    this.emit('givePluginAmount', {
-      data: this.plugins.length
-    });  
     for (const plugin of this.plugins) {
       this.emit('pluginAdded', {
         data: plugin

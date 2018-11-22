@@ -26,7 +26,6 @@ function getServiceSummary(service) {
 }
 
 function makeCatalogForPlugin(plugin, productCode) {
-  const router = express.Router();
   const openApi = {
     openapi: "3.0.0",
     info: {
@@ -76,10 +75,7 @@ function makeCatalogForPlugin(plugin, productCode) {
       },
     }
   }
-  router.get("/", (req, res) => {
-    res.status(200).json(openApi);
-  });
-  return router;
+  return openApi;
 }
 
 module.exports = makeCatalogForPlugin;
