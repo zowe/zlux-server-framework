@@ -145,13 +145,6 @@ Server.prototype = {
       newPluginHandler: (pluginDef) => this.newPluginSubmitted(pluginDef),
       auth: webauth
     };
-    this.apiml = new ApimlConnector({
-      hostName: 'localhost',
-      ipAddr: '127.0.0.1',
-      httpPort: webAppOptions.httpPort, 
-      httpsPort: webAppOptions.httpsPort, 
-      apimlConfig: this.userConfig.node.mediationLayer
-    });
     this.webApp = makeWebApp(webAppOptions);
     this.webServer.startListening(this.webApp.expressApp);
     let pluginsLoaded = [];
@@ -171,7 +164,16 @@ Server.prototype = {
     this.processManager.addCleanupFunction(function() {
       this.webServer.close();
     }.bind(this));
-    yield this.apiml.registerMainServerInstance();
+    if (this.userConfig.node.mediationLayer.enabled) {
+      this.apiml = new ApimlConnector({
+        hostName: 'localhost',
+        ipAddr: '127.0.0.1',
+        httpPort: webAppOptions.httpPort, 
+        httpsPort: webAppOptions.httpsPort, 
+        apimlConfig: this.userConfig.node.mediationLayer
+      });
+      yield this.apiml.registerMainServerInstance();
+    }
   }),
 
   newPluginSubmitted(pluginDef) {
