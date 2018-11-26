@@ -63,6 +63,9 @@ WebServer.prototype = {
     if (this.config.https.certificateRevocationLists) {
       this.httpsOptions.crl = util.readFilesToArray(this.config.https.certificateRevocationLists);
     };
+    if (this.config.https.passphrase) {
+      this.httpsOptions.passphrase = this.config.https.passphrase
+    }
   },
 
   isConfigValid(config) {
