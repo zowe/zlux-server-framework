@@ -475,7 +475,7 @@ WebApp.prototype = {
   
   makeExternalProxy(host, port, urlPrefix, isHttps, noAuth, pluginID, serviceName) {
     const r = express.Router();
-    installLog.info(`Setting up proxy to ${host}:${port}/${urlPrefix}`);
+    installLog.info(`Setting up proxy (${pluginID}:${serviceName}) to destination=${host}:${port}/${urlPrefix}`);
     let myProxy = proxy.makeSimpleProxy(host, port, {
       urlPrefix, 
       isHttps, 
@@ -893,15 +893,18 @@ WebApp.prototype = {
       + ' services')
     const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
         plugin.identifier);
-    this._installSwaggerCatalog(plugin, urlBase);
-    this._installPluginStaticHandlers(plugin, urlBase);
     try {
+      //dataservices load first since in case of error, we want to skip the rest of the plugin load
       yield *this._installDataServices(pluginContext, urlBase);
+      this._installSwaggerCatalog(plugin, urlBase);
+      this._installPluginStaticHandlers(plugin, urlBase);      
+      //import resolution will be postponed until all non-import plugins are loaded
+      //only push plugin if no exceptions were seen
+      this.plugins.push(plugin);
     } catch (e) {
-      installLog.warn(e.stack);
+      installLog.warn(`Exception occurred, plugin (${plugin.identifier}) installation skipped. Message: ${e.message}`);
+      installLog.debug(e.stack);
     }
-    //import resolution will be postponed until all non-import plugins are loaded
-    this.plugins.push(plugin);
   }),
 
   installErrorHanders() {
