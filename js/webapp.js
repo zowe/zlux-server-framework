@@ -935,6 +935,9 @@ WebApp.prototype = {
             do404(req.url, res, this.options.productCode
             + ": unknown resource requested");
           }
+        } else {
+          do404(req.url, res, this.options.productCode
+                + ": unknown resource requested");
         }
       }
     });
