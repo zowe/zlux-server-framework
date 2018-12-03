@@ -19,6 +19,7 @@ if (!global.COM_RS_COMMON_LOGGER) {
 
 const path = require('path');
 const fs = require('fs');
+const Promise = require('bluebird');
 
 function compoundPathFragments(left, right) {
   return path.join(left, right).normalize();
@@ -109,6 +110,15 @@ module.exports.readFilesToArray = function(fileList) {
     return null;
   }
 };
+
+module.exports.asyncEventListener = function(listenerFun) {
+  let promise = Promise.resolve();
+  return function(event) {
+    promise = promise.then(() => {
+      return listenerFun(event);
+    });
+  }
+}
 
 
 /*

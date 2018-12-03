@@ -148,16 +148,15 @@ Server.prototype = {
     this.webApp = makeWebApp(webAppOptions);
     this.webServer.startListening(this.webApp.expressApp);
     let pluginsLoaded = [];
-    // Add the plugin and add it to the count
-    this.pluginLoader.on('pluginAdded', event => {
-      this.pluginLoaded(event.data).then(() => {
+    this.pluginLoader.on('pluginAdded', util.asyncEventListener(event => {
+      return this.pluginLoaded(event.data).then(() => {
         installLogger.info('Installed plugin: ' + event.data.identifier);
       }, err => {
         installLogger.warn('Failed to install plugin: ' 
                            + event.data.identifier);
         console.log(err);
       });
-    });
+    }));
     this.pluginLoader.loadPlugins();
     yield this.authManager.loadAuthenticators(this.userConfig);
     this.authManager.validateAuthPluginList();
