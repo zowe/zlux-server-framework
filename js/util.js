@@ -111,11 +111,24 @@ module.exports.readFilesToArray = function(fileList) {
   }
 };
 
-module.exports.asyncEventListener = function(listenerFun) {
+/**
+ * Makes sure that the invocations of an asynchronous event handler are properly
+ * queued. Creates an event listener that wraps the asynchronous `listenerFun`
+ * 
+ * `listenerFun` should return a promise
+ */
+module.exports.asyncEventListener = function(listenerFun, logger) {
+  //the handler for the most recent event: when this is resolved,
+  //another event can be handled
   let promise = Promise.resolve();
+  
   return function(event) {
     promise = promise.then(() => {
       return listenerFun(event);
+    }, err => {
+      if (logger) {
+        logger.warn("Event handler failed: " + err);
+      }
     });
   }
 }

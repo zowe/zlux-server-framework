@@ -156,7 +156,7 @@ Server.prototype = {
                            + event.data.identifier);
         console.log(err);
       });
-    }));
+    }, installLogger));
     this.pluginLoader.loadPlugins();
     yield this.authManager.loadAuthenticators(this.userConfig);
     this.authManager.validateAuthPluginList();
