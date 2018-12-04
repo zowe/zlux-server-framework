@@ -25,6 +25,7 @@ const zluxUtil = require('./util');
 const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
 const DependencyGraph = require('./depgraph');
+const translationUtils = require('./translation-utils.js');
 
 /**
  * Plugin loader: reads the entire plugin configuration tree
@@ -164,6 +165,7 @@ function Plugin(def, configuration) {
   if (!this.location) {
     this.location = process.cwd();
   }
+  this.translationMaps = {};
 }
 Plugin.prototype = {
   constructor: Plugin,
@@ -172,6 +174,7 @@ Plugin.prototype = {
   pluginVersion: null,
   pluginType: null,
   webContent: null,
+  copyright:null,
   location: null,
   dataServices: null,
   dataServicesGrouped: null,
@@ -194,8 +197,7 @@ Plugin.prototype = {
   },
   
   init(context) {
-    bootstrapLogger.warn(this.identifier
-        + `: "${this.pluginType}" plugins not yet implemented`);
+    //Nothing here anymore: startup checks for validity will be superceeded by https://github.com/zowe/zlux-proxy-server/pull/18 and initialization concept has not manifested for many plugin types, so a warning is not needed.
   },
   
   exportDef() {
@@ -204,11 +206,26 @@ Plugin.prototype = {
       pluginVersion: this.pluginVersion,
       apiVersion: this.apiVersion,
       pluginType: this.pluginType,
+      copyright: this.copyright,
       //TODO move these to the appropraite plugin type(s)
       webContent: this.webContent, 
       configurationData: this.configurationData,
       dataServices: this.dataServices
     };
+  },
+
+  exportTranslatedDef(acceptLanguage) {
+    const def = this.exportDef();
+    if (typeof this.webContent === 'object') {
+      return translationUtils.translate(def, this.translationMaps, acceptLanguage);
+    }
+    return def;
+  },
+
+  loadTranslations() {
+    if (typeof this.webContent === 'object') {
+      this.translationMaps = translationUtils.loadTranslations(this.location);
+    }
   },
   
   initStaticWebDependencies() {
@@ -495,15 +512,13 @@ function makePlugin(def, pluginConfiguration, pluginContext, dynamicallyCreated)
 function PluginLoader(options) {
   EventEmitter.call(this);
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
-  this.ng2 = null;
-  this.plugins = [];
+  this.plugins = null;
   this.pluginMap = {};
 };
 PluginLoader.prototype = {
   constructor: PluginLoader,
   __proto__: EventEmitter.prototype,
   options: null,
-  ng2: null,
   plugins: null,
   pluginMap: null,
 
@@ -543,37 +558,6 @@ PluginLoader.prototype = {
         + `'${pluginDef.pluginType}'`);
     pluginDef.location = pluginBasePath;
     return pluginDef;
-  },
-
-  _generateNg2ModuleTs(plugins) {
-    let importStmts = [];
-    let modules = ["BrowserModule"];
-    plugins.filter(function(def) {
-      return def.webContent && 
-        ("object" === typeof def.webContent) &&
-        (def.webContent.framework === "angular2");
-    }).forEach(function (def) {
-      let ng2ModuleName = def.webContent.ng2ModuleName;
-      let ng2ModuleLocation = def.webContent.ng2ModuleLocation;
-      if (!(ng2ModuleName && ng2ModuleLocation)) {
-        bootstrapLogger.warn(`Invalid NG2 module: ${def.location}: `
-            + "'ng2ModuleName' or 'ng2ModuleLocation' missing");
-        return;
-      } 
-      importStmts.push("import { "+ng2ModuleName+" } from '"+ng2ModuleLocation+"';\n");
-      modules.push(ng2ModuleName);
-    });
-    let ng2 = 
-        "import { NgModule } from '@angular/core';\n"+
-        "import { BrowserModule } from '@angular/platform-browser';\n"+
-        importStmts.join("") +
-        "@NgModule({\n"+
-        "  imports: ["+modules.join(", ")+"]\n" +
-        "})\n" +
-        "export class Ng2RootModule {}\n";
-    bootstrapLogger.log(bootstrapLogger.FINER,
-      "Generated ng2 module:\n" + ng2);
-    return ng2;
   },
   
   readPluginDefs() {

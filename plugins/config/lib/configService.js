@@ -47,17 +47,17 @@ const PERMISSION_DEFAULT_ALLOW = 1;
 const CURRENT_JSON_VERSION = "0.8.5";
 
 //a file
-const MSG_TYPE_RESOURCE = "com.rs.config.resource";
+const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
 //contents of a folder
-const MSG_TYPE_RESOURCESET = "com.rs.config.resourceset";
+const MSG_TYPE_RESOURCESET = "org.zowe.configjs.resourceset";
 //names of contents in folder
-const MSG_TYPE_RESOURCESET_LISTING = "com.rs.config.resourceset.listing";
+const MSG_TYPE_RESOURCESET_LISTING = "org.zowe.configjs.resourceset.listing";
 //names of folders
-const MSG_TYPE_SUBRESOURCE_LISTING = "com.rs.config.subresource.listing";
+const MSG_TYPE_SUBRESOURCE_LISTING = "org.zowe.configjs.subresource.listing";
 
-const MSG_TYPE_ERROR = "com.rs.config.error";
-const MSG_TYPE_UPDATE = "com.rs.config.resource.update";
-const MSG_TYPE_DELETE = "com.rs.config.delete";
+const MSG_TYPE_ERROR = "org.zowe.configjs.error";
+const MSG_TYPE_UPDATE = "org.zowe.configjs.resource.update";
+const MSG_TYPE_DELETE = "org.zowe.configjs.delete";
 
 
 
@@ -2040,13 +2040,13 @@ function addJSONFilesToJSON(startingPath,json) {
       if (fs.statSync(filepath).isFile()) {
         let contents = jsonUtils.parseJSONWithComments(filepath);
         if (contents) {
-          json[filename] = {"_objectType": 'com.rs.config.internal.file', "contents":contents};
+          json[filename] = {"_objectType": 'org.zowe.configjs.internal.file', "contents":contents};
         }
       }
       else {
         let contents = addJSONFilesToJSON(filepath,null);//TODO does this result in proper recursion
         if (contents) {
-          json[filename] = {"_objectType": 'com.rs.config.internal.folder', "contents":contents};
+          json[filename] = {"_objectType": 'org.zowe.configjs.internal.folder', "contents":contents};
         }
       }
     });
@@ -2300,6 +2300,7 @@ function ConfigService(context) {
   });
 
   /*extra level*/
+  /*
   router.all('/:pluginID/group/:groupname/:resource*',(request, response)=> {
     request.scope = CONFIG_SCOPE_GROUP;
     request.resourceURL+='/group';
@@ -2327,7 +2328,7 @@ function ConfigService(context) {
     var namedScope = percentEncode(request.params.username);
     determineResourceForNamedScope(request,response,namedScope);    
   });
-
+  */
 
   var dispatchByMethod = function(request, response, lastPath) {
     /* HERE:
