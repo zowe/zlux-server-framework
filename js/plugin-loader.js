@@ -512,7 +512,7 @@ function makePlugin(def, pluginConfiguration, pluginContext, dynamicallyCreated)
 function PluginLoader(options) {
   EventEmitter.call(this);
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
-  this.plugins = null;
+  this.plugins = [];
   this.pluginMap = {};
 };
 PluginLoader.prototype = {
