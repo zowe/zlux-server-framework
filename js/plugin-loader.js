@@ -26,6 +26,7 @@ const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
 const DependencyGraph = require('./depgraph');
 const translationUtils = require('./translation-utils.js');
+const makeSwaggerCatalog = require('./swagger-catalog');
 
 /**
  * Plugin loader: reads the entire plugin configuration tree
@@ -346,7 +347,12 @@ Plugin.prototype = {
         }
       }
     }
+  },
+  
+  getApiCatalog(productCode) {
+    return makeSwaggerCatalog(this, productCode)
   }
+  
 };
 
 function LibraryPlugIn(def, configuration) {
@@ -626,19 +632,9 @@ PluginLoader.prototype = {
           `Failed to load ${pluginDef.identifier}: ${e}`);
       }
     }
-    bootstrapLogger.info(`Plugin batch processed. Loaded ${successCount} out of`
-        + ` ${pluginDefs.length}`);
-    // FIXME (1) 'give plugin amount' is not an event -- not something that _happens_
-    // (2) this idea is incompatible with dynamic plugins, they're broken now. 
-    // Need to come up with another event scheme, e.g. 'pluginAdded' + 
-    // 'fileSystemPluginsLoaded', or maybe 'pluginAdded' + 'processingPluginBatchCompeleted',
-    // or 'startedProcessingPluginBatch' + 'pluginAdded', etc, if we want to 
-    // distinguish between filesystem and dynamic plugins or if we just need to 
-    // have a reference point in time, when a subscriber can know it can call 
-    // e.g. Eureka
-    this.emit('givePluginAmount', {
-      data: this.plugins.length
-    });  
+    this.plugins = this._toposortPlugins(pluginContext.plugins, this.pluginMap);
+//    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
+//        + JSON.stringify(this.pluginMap));  
     for (const plugin of this.plugins) {
       this.emit('pluginAdded', {
         data: plugin

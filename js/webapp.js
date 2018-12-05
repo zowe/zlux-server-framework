@@ -26,7 +26,6 @@ const zluxUtil = require('./util');
 const configService = require('../plugins/config/lib/configService.js');
 const proxy = require('./proxy');
 const zLuxUrl = require('./url');
-const makeSwaggerCatalog = require('./swagger-catalog');
 const UNP = require('./unp-constants');
 const translationUtils = require('./translation-utils');
 
@@ -162,6 +161,17 @@ const staticHandlers = {
         });
     });
     return r;
+  },
+  
+  eureka() {
+    const router = express.Router();
+    router.get('/application/info', function(req, res, next) {
+      res.send('{"id":"zlux"}');
+    });
+    router.get('/application/health', function(req, res, next) {
+      res.send('{"status":"UP"}');
+    });
+    return router;
   }
 };
 
@@ -618,6 +628,7 @@ WebApp.prototype = {
         staticHandlers.apiManagement(this));
     serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
         this.options.httpPort, this.options.httpsPort);
+    this.expressApp.use(staticHandlers.eureka());
   },
   
   _makeRouterForLegacyService(pluginContext, service) {
@@ -830,36 +841,6 @@ WebApp.prototype = {
     } 
   },
 
-  /*
-    Order of plugins given is expected to be in order of dependency, so a loop is not run on import resolution
-   */
-  resolveAllImports(pluginDefs) {
-    let unresolvedPlugins = [];
-    installLog.info(`Resolving imports for ${pluginDefs.length} remaining plugins`);
-    pluginDefs.forEach((plugin) => {
-      installLog.debug(
-        `${plugin.identifier}: ${plugin.dataServicesGrouped? 'has' : 'does not have'}`
-          + ' services')
-      const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
-                                            plugin.identifier);
-      try {
-        this._resolveImports(plugin, urlBase);
-      } catch (e) {
-        unresolvedPlugins.push(plugin);
-      }
-    });
-    if (unresolvedPlugins.length === 0) {
-      installLog.info(`All imports resolved for all plugins.`);
-      return true;
-    } else {
-      installLog.info(`Unable to resolve imports for ${unresolvedPlugins.length} plugins.`);
-      unresolvedPlugins.forEach((plugin)=> {
-        installLog.info(`${plugin.identifier} has unresolved imports.`);
-      });
-      return false;
-    }
-  },
-
   _resolveImports(plugin, urlBase) {
     if (!plugin.importsGrouped) {
       return;
@@ -907,8 +888,11 @@ WebApp.prototype = {
   },
   
   _installSwaggerCatalog(plugin, urlBase) {
-    const router = makeSwaggerCatalog(plugin, 
-        this.options.productCode);
+    const openApi = plugin.getApiCatalog(this.options.productCode);
+    const router = express.Router();
+    router.get("/", (req, res) => {
+      res.status(200).json(openApi);
+    });
     this.pluginRouter.use(zLuxUrl.join(urlBase, '/catalogs/swagger'),
         router);
   },
@@ -930,7 +914,7 @@ WebApp.prototype = {
           + ": " + e.stack);
       throw e
     }
-    //import resolution will be postponed until all non-import plugins are loaded
+    this._resolveImports(plugin, urlBase);
     this.plugins.push(plugin);
   }),
 
