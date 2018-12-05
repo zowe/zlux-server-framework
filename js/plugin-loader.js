@@ -632,9 +632,6 @@ PluginLoader.prototype = {
           `Failed to load ${pluginDef.identifier}: ${e}`);
       }
     }
-    this.plugins = this._toposortPlugins(pluginContext.plugins, this.pluginMap);
-//    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
-//        + JSON.stringify(this.pluginMap));  
     for (const plugin of this.plugins) {
       this.emit('pluginAdded', {
         data: plugin
