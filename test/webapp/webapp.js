@@ -8,6 +8,7 @@ const PluginLoader = require('plugin-loader')
 const makePlugin = PluginLoader.makePlugin
 const makeWebApp = require('webapp').makeWebApp;
 
+// start with uncommenting these once a test fails 
 global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.install", 0);
 global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.utils", 0);
 global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.bootstrap", 0);
@@ -15,7 +16,9 @@ global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.bootstrap", 0);
 const webAppOptions = {
     sessionTimeoutMs: 60  * 60 * 1000,
     httpPort: 31337,
-    httpsPort: 31338,
+    // this will break things because callService() will try HTTPS if is't
+    // present and in this test env we only have an HTTP listener 
+//   httpsPort: 31338,
     productCode: 'XXX',
     productDir: process.cwd(),
     proxiedHost: "localhost",
@@ -74,6 +77,7 @@ describe('WebApp', function() {
     
     beforeEach(function(done)  {
       try {
+        console.log("\n\n\n")
        // console.log("webApp", webApp)
         server = http.createServer(webApp.expressApp)
        // console.log("server", server)

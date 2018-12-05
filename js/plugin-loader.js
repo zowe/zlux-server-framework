@@ -663,7 +663,7 @@ PluginLoader.prototype = {
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
       this.options.productCode);
-    const plugin = makePlugin(pluginDef, pluginConfiguration, pluginContext,
+    const plugin = makePlugin(pluginDef, pluginConfiguration, null, pluginContext,
         true);
 //    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
 //      throw new Error('unresolved dependencies');
