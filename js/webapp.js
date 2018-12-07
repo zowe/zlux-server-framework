@@ -78,7 +78,7 @@ DataserviceContext.prototype = {
 function do404(URL, res, message) {
   contentLogger.debug("404: "+message+", url="+URL);
   res.statusMessage = message;
-  res.status(404).send("<h1>"+message+"</h1>");
+  res.status(404).send("<h1>Resource not found, URL: "+URL+"</h1></br><h2>Additional info: "+message+"</h2>");
 }
 
 function sendAuthenticationFailure(res, authType) {
@@ -912,10 +912,11 @@ WebApp.prototype = {
          * redirect to our server,
          */
         if (header == 'referer') {
-          var pattern = /^http.+\/ZLUX\/plugins\/.+/;
-          if (pattern.test(headers[header])) {
+          let referrer = headers[header];
+          var pattern = new RegExp('^http.+\/'+this.options.productCode+'\/plugins\/.+');
+          if (pattern.test(referrer)) {
             var parts = headers[header].split("/");
-            var zluxIndex = parts.indexOf("ZLUX");
+            var zluxIndex = parts.indexOf(this.options.productCode);
             var pluginID = parts[zluxIndex + 2];
             var serviceName = parts[zluxIndex + 4];
             var myProxy = proxyMap.get(pluginID + ":" + serviceName);
@@ -927,29 +928,22 @@ WebApp.prototype = {
               utilLog.debug("After myProxy call");
             }
             else {
-              do404(req.url, res, this.options.productCode
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match an existing proxy service`);
+              return do404(req.url, res, this.options.productCode
               + ": unknown resource requested");
             }
           }
-          else {
-            do404(req.url, res, this.options.productCode
-            + ": unknown resource requested");
+            else {
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match a plugin pattern`);               
+            return do404(req.url, res, this.options.productCode
+            + ": unknown resource requested. Referrer="+referrer);
           }
         } else {
-          do404(req.url, res, this.options.productCode
-                + ": unknown resource requested");
+          return do404(req.url, res, this.options.productCode
+               + ": unknown resource requested");
         }
       }
     });
-//      if (!next) {
-//        // TODO how was this tested? I'd say it never happens: `next` is always 
-//        // there - it's Express's wrapper, not literally the next user middleware
-//        // piece, as one might think (note that you call it without params, not like
-//        // next(req, res, ...))
-//
-//      } else {
-//        return next();
-//      }
   }
 };
 
