@@ -164,10 +164,10 @@ const staticHandlers = {
   
   eureka() {
     const router = express.Router();
-    router.get('/application/info', function(req, res, next) {
+    router.get('/server/eureka/info', function(req, res, next) {
       res.send('{"id":"zlux"}');
     });
-    router.get('/application/health', function(req, res, next) {
+    router.get('/server/eureka/health', function(req, res, next) {
       res.send('{"status":"UP"}');
     });
     return router;
