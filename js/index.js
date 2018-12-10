@@ -21,6 +21,7 @@ const WebAuth = require('./webauth');
 const unp = require('./unp-constants');
 const http = require('http');
 const ApimlConnector = require('./apiml');
+const net = require('net');
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const installLogger = util.loggers.installLogger;
@@ -126,6 +127,7 @@ Server.prototype = {
       //deeply nested structures and default values on all levels 
       sessionTimeoutMs = wsConfig.session.cookie.timeoutMS;
     } catch (nullReferenceError) { /* ignore */ }
+    yield this.checkProxiedHost(this.startUpConfig.proxiedHost, this.startUpConfig.proxiedPort);
     const webAppOptions = {
       sessionTimeoutMs: sessionTimeoutMs,
       httpPort: wsConfig.http ? wsConfig.http.port : undefined,
@@ -198,6 +200,27 @@ Server.prototype = {
       }
     };
     return this.webApp.installPlugin(pluginContext);
+  },
+
+  checkProxiedHost: function (host, port) {
+    const client = new net.Socket();
+    return new Promise((resolve, reject) => {
+      client.connect(port, host, () => {
+        client.destroy();
+        resolve();
+      });
+      client.on('error', (e) => {
+        bootstrapLogger.warn(`Failed to reach the auth services host for address ${host}:${port}`);
+        if (host === '127.0.0.1') {
+          bootstrapLogger.warn("The auth services host system was not " +
+            "specified at startup, and defaulted to 127.0.0.1.\n" +
+            "Verify that the auth services server is running, " +
+            "or specify at startup the remote host and port to connect to. " +
+            "See documentation for details.");
+        }
+        reject(`Communication with ${host}:${port} failed: ${e.toString()}`);
+      });    
+    });
   }
 };
 
