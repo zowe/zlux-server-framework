@@ -33,29 +33,29 @@ const MEDIATION_LAYER_INSTANCE_DEFAULTS = {
   },
   metadata: {
     "routed-services.1.gateway-url": "/api/v1",
-    "routed-services.1.service-url": "/ZLUX",
+    "routed-services.1.service-url": "/",
     "routed-services.2.gateway-url": "/ui/v1",
-    "routed-services.2.service-url": "/ZLUX",
+    "routed-services.2.service-url": "/",
     "routed-services.3.gateway-url": "/ws/v1",
-    "routed-services.3.service-url": "/ZLUX",
+    "routed-services.3.service-url": "/",
     "routed-services.4.gateway-url": "/v1/api-doc",
-    "routed-services.4.service-url": "/ZLUX",
+    "routed-services.4.service-url": "/",
 
     'mfaas.discovery.catalogUiTile.id': 'zlux',
-    'mfaas.discovery.catalogUiTile.title': 'ZLux Proxy Server',
+    'mfaas.discovery.catalogUiTile.title': 'Zowe Application Server',
     'mfaas.discovery.catalogUiTile.description': 'The Proxy Server is an '
        + 'HTTP, HTTPS, and Websocket server built upon NodeJS and ExpressJS. '
        + 'This serves static content via "Plugins", and is extensible by '
        + 'REST and Websocket "Dataservices" optionally present within Plugins.',
     'mfaas.discovery.catalogUiTile.version': '1.0.0',
 
-    'mfaas.discovery.service.title': 'ZLux Proxy Server',
+    'mfaas.discovery.service.title': 'Zowe Application Server',
     'mfaas.discovery.service.description': 'The Proxy Server is an HTTP, '
       + 'HTTPS, and Websocket server built upon NodeJS and ExpressJS. This '
       + 'serves static content via "Plugins", and is extensible by REST and '
       + 'Websocket "Dataservices" optionally present within Plugins.',
 
-    'mfaas.api-info.apiVersionProperties.v1.title': 'ZLux Proxy Server API',
+    'mfaas.api-info.apiVersionProperties.v1.title': 'Zowe Application Server API',
     'mfaas.api-info.apiVersionProperties.v1.description': 'An API for the ZLux '
       +' Proxy Server',
     'mfaas.api-info.apiVersionProperties.v1.version': '1.0.0'
@@ -88,8 +88,8 @@ ApimlConnector.prototype = {
        hostName:  this.hostName,
        ipAddr: this.ipAddr,
        vipAddress: "zlux",//this.vipAddress,
-       statusPageUrl: `${proto}://${this.hostName}:${port}/application/info`,
-       healthCheckUrl: `${proto}://${this.hostName}:${port}/application/health`,
+       statusPageUrl: `${proto}://${this.hostName}:${port}/server/eureka/info`,
+       healthCheckUrl: `${proto}://${this.hostName}:${port}/server/eureka/health`,
        homePageUrl: `${proto}://${this.hostName}:${port}/`,
        port: {
          "$": Number(port),
