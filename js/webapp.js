@@ -910,17 +910,17 @@ WebApp.prototype = {
               utilLog.debug("About to call myProxy");
               myProxy(req, res);
               utilLog.debug("After myProxy call");
-            }
-            else {
-              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match an existing proxy service`);
+            } else {
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending`
+                  + ` 404 because referrer (${referrer}) didn't match an existing proxy service`);
               return do404(req.url, res, this.options.productCode
-              + ": unknown resource requested");
+                  + ": unknown resource requested");
             }
-          }
-            else {
-              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match a plugin pattern`);               
+          } else {
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending`
+                  + ` 404 because referrer (${referrer}) didn't match a plugin pattern`);               
             return do404(req.url, res, this.options.productCode
-            + ": unknown resource requested. Referrer="+referrer);
+                  + ": unknown resource requested. Referrer="+referrer);
           }
         } else {
           return do404(req.url, res, this.options.productCode
