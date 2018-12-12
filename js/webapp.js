@@ -861,12 +861,12 @@ WebApp.prototype = {
         }
         installLog.info(`${plugin.identifier}: installing import`
            + ` ${importedService.sourcePlugin}:${importedService.sourceName}`
-           ` at ${subUrl}`);
+           + ` at ${subUrl}`);
         this.pluginRouter.use(subUrl, importedRouter);
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase 
               + zLuxUrl.makeServiceSubURL(importedService, true);
-          this.pluginRouter.use(defaultSubUrl, router);
+          this.pluginRouter.use(defaultSubUrl, importedRouter);
         }
       }
     }
