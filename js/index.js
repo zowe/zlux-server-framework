@@ -127,7 +127,11 @@ Server.prototype = {
       //deeply nested structures and default values on all levels 
       sessionTimeoutMs = wsConfig.session.cookie.timeoutMS;
     } catch (nullReferenceError) { /* ignore */ }
-    yield this.checkProxiedHost(this.startUpConfig.proxiedHost, this.startUpConfig.proxiedPort);
+    if (process.platform !== 'os390') {
+      const host = this.startUpConfig.proxiedHost;
+      const port = this.startUpConfig.proxiedPort;
+      yield this.checkProxiedHost(host, port);
+    }
     const webAppOptions = {
       sessionTimeoutMs: sessionTimeoutMs,
       httpPort: wsConfig.http ? wsConfig.http.port : undefined,
