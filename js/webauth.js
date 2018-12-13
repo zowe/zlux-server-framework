@@ -39,8 +39,9 @@ function getAuthPluginSession(req, pluginID, dflt) {
 
 function setAuthPluginSession(req, pluginID, authPluginSession) {
   if (req.session) {
-    // Note that it does something only when req.session[pluginID] is 
+    // FIXME Note that it does something only when req.session[pluginID] is 
     // undefined. Otherwise it does nothing (see getAuthPluginSession()) 
+    // -- don't get confused
     req.session[pluginID] = authPluginSession;
   }
 }
@@ -169,9 +170,16 @@ module.exports = function(authManager) {
           const authPluginSession = getAuthPluginSession(req, pluginID, {});
           req[`${UNP.APP_NAME}Data`].plugin.services = 
             authServiceHandleMaps[pluginID];
+          // FIXME This is a bug: in webauth.js we shouldn't make assumptions
+          // about the contents of the session. We only can look at the return 
+          // values of the method.
           const wasAuthenticated = authPluginSession.authenticated;
           const handlerResult = yield handler.authenticate(req, 
               authPluginSession);
+          if (handlerResult.success) {
+            authLogger.debug(`Successful authenticate to auth handler ${pluginID}. `
+                + 'Plugin response: ' + JSON.stringify(handlerResult));
+          }
           //do not modify session if not authenticated or deauthenticated
           if (wasAuthenticated || handlerResult.success) {
             setAuthPluginSession(req, pluginID, authPluginSession);
@@ -192,6 +200,7 @@ module.exports = function(authManager) {
       const handlers = getRelevantHandlers(authManager, req.body);
       for (const handler of handlers) {
         const pluginID = handler.pluginID;
+        authLogger.debug(`User logout for auth handler ${pluginID}`);
         delete req.session[pluginID];
       }
       res.status(200).send('');
