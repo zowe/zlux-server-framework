@@ -173,7 +173,7 @@ module.exports = function(authManager) {
           const handlerResult = yield handler.authenticate(req, 
               authPluginSession);
           //do not modify session if not authenticated or deauthenticated
-          if (wasAuthenticated || authPluginSession.success) {
+          if (wasAuthenticated || handlerResult.success) {
             setAuthPluginSession(req, pluginID, authPluginSession);
           }
           result.addHandlerResult(handlerResult, handler);
