@@ -127,7 +127,12 @@ Server.prototype = {
       //deeply nested structures and default values on all levels 
       sessionTimeoutMs = wsConfig.session.cookie.timeoutMS;
     } catch (nullReferenceError) { /* ignore */ }
-    if (process.platform !== 'os390') {
+    /*
+      if either proxiedHost or proxiedPort were specified, then there is intent to connect to an agent.
+      However, zlux may be run without one, so if both are undefined then don't check for connection.
+    */
+    if (process.platform !== 'os390' &&
+        ((this.startupConfig.proxiedHost !== undefined) || (this.startupConfig.proxiedPort !== undefined))) {
       const host = this.startUpConfig.proxiedHost;
       const port = this.startUpConfig.proxiedPort;
       yield checkProxiedHost(host, port);
