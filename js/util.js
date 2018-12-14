@@ -33,7 +33,8 @@ const loggers = {
   utilLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.utils"),
   proxyLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.proxy"),
   installLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.install"),
-  apiml: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.apiml")
+  apiml: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.apiml"),
+  routing: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.routing")
 };
 
 module.exports.loggers = loggers;

@@ -177,8 +177,8 @@ module.exports = function(authManager) {
           const handlerResult = yield handler.authenticate(req, 
               authPluginSession);
           if (handlerResult.success) {
-            authLogger.debug(`Successful authenticate to auth handler ${pluginID}. `
-                + 'Plugin response: ' + JSON.stringify(handlerResult));
+            authLogger.debug(`${req.session.id}: Successful authenticate to auth ` 
+            + `handler ${pluginID}. Plugin response: ` + JSON.stringify(handlerResult));
           }
           //do not modify session if not authenticated or deauthenticated
           if (wasAuthenticated || handlerResult.success) {
@@ -200,7 +200,7 @@ module.exports = function(authManager) {
       const handlers = getRelevantHandlers(authManager, req.body);
       for (const handler of handlers) {
         const pluginID = handler.pluginID;
-        authLogger.debug(`User logout for auth handler ${pluginID}`);
+        authLogger.debug(`${req.session.id}: User logout for auth handler ${pluginID}`);
         delete req.session[pluginID];
       }
       res.status(200).send('');
