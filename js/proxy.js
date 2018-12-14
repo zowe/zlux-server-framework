@@ -21,6 +21,7 @@ const express = require('express');
 const util = require('./util');
 const unpconst = require('./unp-constants');
 const WebSocket = require('ws');
+const net = require('net');
 
 const proxyLog = util.loggers.proxyLogger;
 
@@ -286,8 +287,30 @@ function makeWsProxy(host, port, urlPrefix, isHttps) {
   };
 };
 
+function checkProxiedHost(host, port) {
+  const client = new net.Socket();
+  return new Promise((resolve, reject) => {
+    client.connect(port, host, () => {
+      client.destroy();
+      resolve();
+    });
+    client.on('error', (e) => {
+      proxyLog.warn(`Failed to reach the auth services host for address ${host}:${port}`);
+      if (host === '127.0.0.1') {
+        proxyLog.warn("The auth services host system was not " +
+          "specified at startup, and defaulted to 127.0.0.1.\n" +
+          "Verify that the auth services server is running, " +
+          "or specify at startup the remote host and port to connect to. " +
+          "See documentation for details.");
+      }
+      reject(`Communication with ${host}:${port} failed: ${e.toString()}`);
+    });
+  });
+}
+
 exports.makeSimpleProxy = makeSimpleProxy;
 exports.makeWsProxy = makeWsProxy;
+exports.checkProxiedHost = checkProxiedHost;
 
 
 /*

@@ -21,6 +21,7 @@ const WebAuth = require('./webauth');
 const unp = require('./unp-constants');
 const http = require('http');
 const ApimlConnector = require('./apiml');
+const checkProxiedHost = require('./proxy').checkProxiedHost;
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const installLogger = util.loggers.installLogger;
@@ -126,6 +127,11 @@ Server.prototype = {
       //deeply nested structures and default values on all levels 
       sessionTimeoutMs = wsConfig.session.cookie.timeoutMS;
     } catch (nullReferenceError) { /* ignore */ }
+    if (process.platform !== 'os390') {
+      const host = this.startUpConfig.proxiedHost;
+      const port = this.startUpConfig.proxiedPort;
+      yield checkProxiedHost(host, port);
+    }
     const webAppOptions = {
       sessionTimeoutMs: sessionTimeoutMs,
       httpPort: wsConfig.http ? wsConfig.http.port : undefined,
