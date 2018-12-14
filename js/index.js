@@ -21,7 +21,10 @@ const WebAuth = require('./webauth');
 const unp = require('./unp-constants');
 const http = require('http');
 const ApimlConnector = require('./apiml');
+<<<<<<< HEAD
+=======
 const checkProxiedHost = require('./proxy').checkProxiedHost;
+>>>>>>> b48352d2f0232d9d1909f3062898f026b102de2f
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const installLogger = util.loggers.installLogger;
