@@ -27,6 +27,18 @@ const bootstrapLogger = util.loggers.bootstrapLogger;
 const contentLogger = util.loggers.contentLogger;
 const childLogger = util.loggers.childLogger;
 
+function sanitizeIps(ipAddresses) {
+  let set = new Set();
+  ipAddresses.forEach((ipAddress)=> {
+    if (typeof ipAddress == 'string') {
+      set.add(ipAddress);
+    } else {
+      bootstrapLogger.warn(`Skipping invalid listener address=${ipAddress}`);
+    }
+  });
+  return set;
+}
+
 function WebServer() {
   this.config = null;
 }
@@ -39,6 +51,29 @@ WebServer.prototype = {
   httpServers: [],
   expressWsHttps: [],
   expressWsHttp: [],
+
+  _setErrorLogger(server, type, ipAddress, port) {
+    //the server object will not tell the ipAddr & port unless it has successfully connected, making logging poor unless passed
+    server.on('error',(e)=> {
+      switch (e.code) {
+      case 'EADDRINUSE':
+        bootstrapLogger.severe(`Could not listen on address ${ipAddress}:${port}. It is already in use by another process.`);
+        //While I'd like to close the server here,
+        //it seems that an exception is thrown that can't be caught, causing server to stop anyway
+        break;
+      case 'ENOTFOUND':
+      case 'EADDRNOTAVAIL':
+        bootstrapLogger.severe(`Could not listen on address ${ipAddress}:${port}. Invalid IP format for NodeJS.`);
+        //While I'd like to close the server here,
+        //it seems that an exception is thrown that can't be caught, causing server to stop anyway
+        break;
+      default:
+        bootstrapLogger.warn(`Unexpected error on server ${ipAddress}:${port}. E=${e}. Stack trace follows.`);
+        bootstrapLogger.warn(e.stack);
+      }
+    });
+
+  },
   
   _loadHttpsKeyData() {
     if (this.config.https.pfx) {
@@ -115,6 +150,7 @@ WebServer.prototype = {
         while (!listening) {
           try {
             httpsServer = https.createServer(t.httpsOptions, app);
+            t._setErrorLogger(httpsServer, 'HTTPS', ipAddress, port);
             t.httpsServers.push(httpsServer);
             t.expressWsHttps.push(expressWs(app, httpsServer, {maxPayload: 50000}));
             listening = true;
@@ -135,15 +171,17 @@ WebServer.prototype = {
         t.callListen(httpsServer, 'https', 'HTTPS', ipAddress, port);
       };
 
-      let httpsIps = this.config.https.ipAddresses;
-      if (httpsIps) {
-        for (let i = 0; i < httpsIps.length; i++) {
-          let ipAddress = httpsIps[i];
-          if (typeof ipAddress == 'string') {
-            yield* makeHttpsServer(ipAddress, this.config.https.port);
-          } else {
-            bootstrapLogger.warn(`Skipping invalid listener address=${ipAddress}`);
+     
+      if (this.config.https.ipAddresses) {
+        let httpsIps = sanitizeIps(this.config.https.ipAddresses);
+        let len = httpsIps.size;
+        if (len > 0) {
+          const iterator = httpsIps.entries();
+          for (let ipAddress of iterator) {
+            yield* makeHttpsServer(ipAddress[0], this.config.https.port);
           }
+        } else {
+          makeHttpsServer('0.0.0.0', this.config.https.port);
         }
       } else {
         makeHttpsServer('0.0.0.0', this.config.https.port);
@@ -152,19 +190,21 @@ WebServer.prototype = {
     if (this.config.http && this.config.http.port) {
       let makeHttpServer = function(ipAddress, port) {
         let httpServer = http.createServer(app);
+        t._setErrorLogger(httpServer, 'HTTP', ipAddress, port);
         t.httpServers.push(httpServer);
         t.expressWsHttp.push(expressWs(app, httpServer));
         t.callListen(httpServer, 'http', 'HTTP', ipAddress, port);
       }
       
       if (this.config.http.ipAddresses) {
-        this.config.http.ipAddresses.forEach((ipAddress)=> {
-          if (typeof ipAddress == 'string') {
+        let httpIps = sanitizeIps(this.config.http.ipAddresses);
+        if (httpIps.size > 0) {
+          httpIps.forEach((ipAddress)=> {
             makeHttpServer(ipAddress, this.config.http.port);
-          } else {
-            bootstrapLogger.warn(`Skipping invalid listener address=${ipAddress}`);
-          }
-        });
+          });
+        } else {
+          makeHttpServer('0.0.0.0', this.config.http.port);
+        }
       } else {
         makeHttpServer('0.0.0.0', this.config.http.port);
       }
@@ -177,23 +217,19 @@ WebServer.prototype = {
       bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  Listening on ${addressForLogging}`)
     };
     bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  About to start listening on ${addressForLogging}`);
-
     methodServer.listen(port, ipAddress, logFunction);
   },
 
   close() {
     this.httpServers.forEach((server)=> {
-      //server._connectionKey is a combination of internal ID + IP + port, with colons in between
-      let ipPort = server._connectionKey ?
-          server._connectionKey.substring(server._connectionKey.indexOf(':')+1) : '';
-      bootstrapLogger.info(`(HTTP) Closing server ${ipPort}`);
-      server.close();
+      let info = server.address();
+      bootstrapLogger.info(`(HTTP) Closing server ${info.address}:${info.port}`);
+      server.close();      
     });
     this.httpsServers.forEach((server)=> {
-      let ipPort = server._connectionKey ?
-          server._connectionKey.substring(server._connectionKey.indexOf(':')+1) : '';
-      bootstrapLogger.info(`(HTTPS) Closing server ${ipPort}`);
-      server.close();
+      let info = server.address();
+      bootstrapLogger.info(`(HTTPS) Closing server ${info.address}:${info.port}`);
+      server.close();      
     });
   }
 };
