@@ -19,7 +19,8 @@ const ProcessManager = require('./process');
 const AuthManager = require('./auth-manager');
 const WebAuth = require('./webauth');
 const unp = require('./unp-constants');
-
+const http = require('http');
+const ApimlConnector = require('./apiml');
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const installLogger = util.loggers.installLogger;
@@ -34,7 +35,7 @@ function Server(appConfig, userConfig, startUpConfig) {
   util.deepFreeze(userConfig);
   this.startUpConfig = startUpConfig;
   util.deepFreeze(startUpConfig);
-  this.processManager = new ProcessManager();
+  this.processManager = new ProcessManager(true);
   this.authManager = new AuthManager({
     config: userConfig.dataserviceAuthentication,
     productCode:  appConfig.productCode
@@ -105,8 +106,8 @@ Server.prototype = {
       bootstrapLogger.warn('HTTPS requires either a PFX file or Key & Certificate files.');
       bootstrapLogger.warn('Given PFX: '+ (httpsConfig? httpsConfig.pfx : null));
       bootstrapLogger.warn('Given Key: '+ (httpsConfig? httpsConfig.keys : null));
-      bootstrapLogger.warn('Given Certificate: '+ (httpsConfig? 
-          httpsConfig.certificates : null));    
+      bootstrapLogger.warn('Given Certificate: '+ (httpsConfig?
+          httpsConfig.certificates : null));
       if ((typeof wsConfig) == 'object') {
         bootstrapLogger.warn('config was: '+JSON.stringify(wsConfig, null, 2));
       } else {
@@ -119,8 +120,16 @@ Server.prototype = {
     }
     this.webServer.setConfig(wsConfig);
     const webauth = WebAuth(this.authManager);
+    let sessionTimeoutMs = null;
+    try { 
+      //TODO a better configuration infrastructure that supports 
+      //deeply nested structures and default values on all levels 
+      sessionTimeoutMs = wsConfig.session.cookie.timeoutMS;
+    } catch (nullReferenceError) { /* ignore */ }
     const webAppOptions = {
-      httpPort: wsConfig.http.port,
+      sessionTimeoutMs: sessionTimeoutMs,
+      httpPort: wsConfig.http ? wsConfig.http.port : undefined,
+      httpsPort: wsConfig.https ? wsConfig.https.port : undefined,
       productCode: this.appConfig.productCode,
       productDir: this.userConfig.productDir,
       proxiedHost: this.startUpConfig.proxiedHost,
@@ -131,23 +140,41 @@ Server.prototype = {
       serverConfig: this.userConfig,
       staticPlugins: {
         list: this.pluginLoader.plugins,
-        pluginMap: this.pluginLoader.pluginMap,
-        ng2: this.pluginLoader.ng2
+        pluginMap: this.pluginLoader.pluginMap
       },
       newPluginHandler: (pluginDef) => this.newPluginSubmitted(pluginDef),
-      auth: webauth,
+      auth: webauth
     };
     this.webApp = makeWebApp(webAppOptions);
     this.webServer.startListening(this.webApp.expressApp);
-    this.pluginLoader.on('pluginAdded', event => this.pluginLoaded(event.data));
+    let pluginsLoaded = [];
+    this.pluginLoader.on('pluginAdded', util.asyncEventListener(event => {
+      return this.pluginLoaded(event.data).then(() => {
+        installLogger.info('Installed plugin: ' + event.data.identifier);
+      }, err => {
+        installLogger.warn('Failed to install plugin: ' 
+                           + event.data.identifier);
+        console.log(err);
+      });
+    }, installLogger));
     this.pluginLoader.loadPlugins();
     yield this.authManager.loadAuthenticators(this.userConfig);
     this.authManager.validateAuthPluginList();
     this.processManager.addCleanupFunction(function() {
       this.webServer.close();
     }.bind(this));
+    if (this.userConfig.node.mediationLayer.enabled) {
+      this.apiml = new ApimlConnector({
+        hostName: 'localhost',
+        ipAddr: '127.0.0.1',
+        httpPort: webAppOptions.httpPort, 
+        httpsPort: webAppOptions.httpsPort, 
+        apimlConfig: this.userConfig.node.mediationLayer
+      });
+      yield this.apiml.registerMainServerInstance();
+    }
   }),
-  
+
   newPluginSubmitted(pluginDef) {
     installLogger.debug("Adding plugin ", pluginDef);
     this.pluginLoader.addDynamicPlugin(pluginDef);
@@ -155,28 +182,22 @@ Server.prototype = {
       process.clusterManager.addDynamicPlugin(pluginDef);
     }
   },
-  
+
   pluginLoaded(pluginDef) {
     const pluginContext = {
-      pluginDef, 
+      pluginDef,
       server: {
         config: {
           app: this.appConfig,
           user: this.userConfig,
-          startUp: this.startUpConfig,
-        },        
+          startUp: this.startUpConfig
+        },
         state: {
           pluginMap: this.pluginMapRO
         }
       }
     };
-    this.webApp.installPlugin(pluginContext).then(() => {
-      installLogger.info('Installed plugin: ' + pluginDef.identifier);
-    }, err => {
-      installLogger.warn('Failed to install plugin: ' 
-          + pluginDef.identifier);
-      console.log(err)
-    });
+    return this.webApp.installPlugin(pluginContext);
   }
 };
 

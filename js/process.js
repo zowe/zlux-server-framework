@@ -27,7 +27,7 @@ function ProcessManager(exitOnException) {
     bootstrapLogger.warn('Uncaught exception found. Error:\n'+err.stack);  
     if (this.exitOnException) {
       bootstrapLogger.warn('Ending server process due to uncaught exception.');
-      process.exit(unp.UNP_EXIT_UNCAUGHT_ERROR);    
+      this.endServer('SIGQUIT');    
     }
   });
   process.on('unhandledRejection', (err) => {

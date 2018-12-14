@@ -13,6 +13,7 @@
 
 const zluxUtil = require('./util');
 const bootstrapLogger = zluxUtil.loggers.bootstrapLogger;
+const fs = require('fs');
 
 // **************************************************************************************************************************************************
 // Set up JSON Schema using ajv library
@@ -21,410 +22,22 @@ const Ajv = require('ajv')
 const ajv = new Ajv({ allErrors: true, jsonPointers: true, verbose: true, $data: true })
 require('ajv-errors')(ajv)
 
-const semverRegex = "^[0-9]+\.[0-9]+\.[0-9]+(-.+)?$"
-
-// **************************************************************************************************************************************************
-// A JSON Schema that defines the fields of web content
-const webContentSchema = Object.freeze({
-    $schema: "http://json-schema.org/schema#",
-    type: "object",
-    if: {
-        properties: {
-            framework: {
-                const: "iframe"
-            }
-        }
-    },
-    then: {
-        required: ["startingPage"]
-    },
-    properties: {
-        framework: {
-            type: "string",
-            enum: ["angular2", "react", "iframe"],
-            errorMessage: {
-                type: "must be a string",
-                enum: "Valid values for framework are angular2, react, and iframe",
-            }
-        },
-        launchDefinition: {
-            type: "object",
-            errorMessage: {
-                type: "must be an object"
-            },
-            properties: {
-                pluginShortNameKey: {
-                    type: "string",
-                    errorMessage: {
-                        type: "must be a string"
-                    }
-                },
-                pluginShortNameDefault: {
-                    type: "string",
-                    errorMessage: {
-                        type: "must be a string"
-                    }
-                },
-                imageSrc: {
-                    type: "string",
-                    errorMessage: {
-                        type: "must be a string"
-                    }
-                }
-            },
-            required: ["pluginShortNameKey", "pluginShortNameDefault"]
-        },
-        startingPage: {
-            type: "string",
-            errorMessage: {
-                type: "must be a string"
-            }
-        },
-        descriptionDefault: {
-            type: "string",
-            errorMessage: {
-                type: "must be a string"
-            }
-        },
-        defaultWindowStyle: {
-            type: "object",
-            properties: {
-                width: {
-                    type: "integer",
-                    errorMessage: {
-                        type: "must be an integer"
-                    }
-                },
-                height: {
-                    type: "integer",
-                    errorMessage: {
-                        type: "must be an integer"
-                    }
-                },
-                x: {
-                    type: "integer",
-                    errorMessage: {
-                        type: "must be an integer"
-                    }
-                },
-                y: {
-                    type: "integer",
-                    errorMessage: {
-                        type: "must be an integer"
-                    }
-                }
-            },
-            errorMessage: {
-                type: "must be an object"
-            }
-        }
-    },
-    errorMessage: {
-        type: "must be an object"
-    }
-})
-
-// **************************************************************************************************************************************************
-// A JSON Schema that defines the fields of a plugin definition. Uses the web content schema defined above
-
-const pluginDefinitionSchema = Object.freeze({
-    $schema: "http://json-schema.org/schema#",
-    type: "object",
-    if: {
-        properties: {
-            pluginType: {
-                const: "library"
-            }
-        }
-    },
-    then: {
-        required: ["libraryName", "libraryVersion"]
-    },
-    else: {
-        if: {
-            properties: {
-                pluginType: {
-                    const: "nodeAuthentication"
-                }
-            }
-        },
-        then: {
-            required: ["authenticationCategory", "filename"]
-        },
-        else: {
-            if: {
-                properties: {
-                    pluginType: {
-                        const: "desktop"
-                    }
-                }
-            },
-            then: {
-                properties: {
-                    webContent: {
-                        if: {
-                            additionalProperties: false //Checks if the webcontent is empty
-                        },
-                        then: {},
-                        else: {
-                            webContentSchema,
-                            required: ["framework"]
-                        }
-                    }
-                }
-            },
-            else: {
-                properties: {
-                    webContent: {
-                        if: {
-                            additionalProperties: false //Checks if the webcontent is empty
-                        },
-                        then: {},
-                        else: {
-                            webContentSchema,
-                            required: ["framework", "launchDefinition", "descriptionKey", "descriptionDefault", "defaultWindowStyle"]
-                        }
-                    }
-                }
-            }
-        }
-    },
-    properties: {
-        pluginType: {
-            type: "string",
-            enum: ["application", "bootstrap", "desktop", "library", "nodeAuthentication", "windowManager"],
-            errorMessage: {
-                type: "must be a string",
-                enum: "must be one of the following values: \n  application\n  bootstrap\n  desktop\n  library\n  nodeAuthentication\n  windowManager"
-            }
-        },
-        identifier: {
-            type: "string",
-            errorMessage: {
-                type: "must be a string"
-            }
-        },
-        pluginVersion: {
-            type: "string",
-            pattern: semverRegex,
-            errorMessage: {
-                type: "must be a string",
-                pattern: "must follow semantic versioning spec (x.y.z-anything)"
-            }
-        },
-        apiVersion: {
-            type: "string",
-            pattern: semverRegex,
-            errorMessage: {
-                type: "must be a string",
-                pattern: "must follow semantic versioning spec (x.y.z-anything)"
-            }
-        },
-        configurationData: {
-            type: "object",
-            properties: {
-                resources: {
-                    type: "object",
-                    errorMessage: {
-                        type: "must be an object"
-                    }
-                },
-            },
-            required: ["resources"],
-            errorMessage: {
-                required: "is required for configurationData in plugin",
-            }
-        },
-        dataServices: {
-            type: "array",
-            if: {
-                maxItems: 0
-            },
-            then: {},
-            else: {
-                items: {
-                    type: "object",
-                    if: {
-                        properties: {
-                            type: {
-                                const: "router"
-                            }
-                        }
-                    },
-                    then: {
-                        required: ["name", "initializerLookupMethod", "filename", "dependenciesIncluded"]
-                    },
-                    else: {
-                        if: {
-                            properties: {
-                                type: {
-                                    const: "service"
-                                }
-                            }
-                        },
-                        then: {
-                            required: ["name", "initializerLookupMethod", "initializerName", "methods"]
-                        },
-                        else: {
-                            if: {
-                                properties: {
-                                    type: {
-                                        const: "import"
-                                    }
-                                }
-                            },
-                            then: {
-                                required: ["sourcePlugin", "sourceName", "localName"]
-                            },
-                            else: {
-                                if: {
-                                    properties: {
-                                        type: {
-                                            const: "external"
-                                        }
-                                    }
-                                },
-                                then: {
-                                    required: ["name", "urlPrefix", "isHttps"]
-                                }
-                            }
-                        }
-                    },
-                    properties: {
-                        type: {
-                            type: "string",
-                            enum: ["import", "external", "service", "router"],
-                            errorMessage: {
-                                type: "must be a string",
-                                enum: "must be one of the following values: \n  import\n  external\n  service\n  router"
-                            }
-                        },
-                        sourcePlugin: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        sourceName: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        localName: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        name: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        urlPrefix: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        isHttps: {
-                            type: "boolean",
-                            errorMessage: {
-                                type: "must be a boolean"
-                            }
-                        },
-                        initializerLookupMethod: {
-                            type: "string",
-                            enum: ["internal", "external"],
-                            errorMessage: {
-                                type: "must be a string",
-                                enum: "must be one of the following values:\n  internal\n  external"
-                            }
-                        },
-                        initializerName: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        methods: {
-                            type: "array",
-                            errorMessage: {
-                                type: "must be an array"
-                            }
-                        },
-                        filename: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        routerFactory: {
-                            type: "string",
-                            errorMessage: {
-                                type: "must be a string"
-                            }
-                        },
-                        dependenciesIncluded: {
-                            type: "boolean",
-                            errorMessage: {
-                                type: "must be a boolean"
-                            }
-                        },
-                    },
-                    required: ["type"],
-                    errorMessage: {
-                        type: "must be an object",
-                        required: "is required in non-empty data service"
-                    }
-                }
-            },
-            errorMessage: {
-                type: "must be an array"
-            }
-        },
-        libraryName: {
-            type: "string",
-            errorMessage: "must be a string"
-        },
-        libraryVersion: {
-            type: "string",
-            pattern: semverRegex,
-            errorMessage: {
-                type: "must be a string",
-                pattern: "must follow semantic versioning spec (x.y.z-anything)"
-            }
-        },
-        authenticationCategory: {
-            type: "string",
-            errorMessage: {
-                type: "must be a string"
-            }
-        },
-        filename: {
-            type: "string",
-            errorMessage: {
-                type: "must be a string"
-            }
-        }
-    },
-    required: ["pluginType", "identifier", "pluginVersion", "apiVersion"],
-    errorMessage: {
-        type: "must be an object",
-        required: "is required in pluginDefinition.json"
-    }
-})
+const pdSchemaContents = fs.readFileSync(__dirname + "/../lib/schema/pluginDefinitionSchema.json");
+const wcSchemaContents = fs.readFileSync(__dirname + "/../lib/schema/webContentSchema.json");
+const pluginDefinitionSchema = JSON.parse(pdSchemaContents);
+const webContentSchema = JSON.parse(wcSchemaContents);
+const validate = ajv.addSchema(webContentSchema).compile(pluginDefinitionSchema);
 
 // **************************************************************************************************************************************************
 // Validates the plugin definition based on the json schema defined above
 // Uses custom error messages in conjunction with the error messages defined in the schema
 
 module.exports.validatePluginDef = function validatePluginDef(pluginDef) {
-    const validate = ajv.compile(pluginDefinitionSchema)
-
     const valid = validate(pluginDef)
+    if(pluginDef.apiVersion !== pluginDefinitionSchema.apiVersion){
+        bootstrapLogger.warn(`Cannot validate ${pluginDef.identifier}. Key 'apiVersion=${pluginDef.apiVersion} is incompatible with schema version (apiVersion=${pluginDefinitionSchema.apiVersion}).`);
+        return false;
+    }
     if (!valid) {
         var errorMessage = "Unknown Error Occured";  // Default error message
         if (validate.errors.length > 0) {
@@ -438,15 +51,16 @@ module.exports.validatePluginDef = function validatePluginDef(pluginDef) {
             var message = searchErrors(validate.errors[0], "message")
             const failedData = searchErrors(validate.errors[0], "data")
             var key = replaceSlashes(searchErrors(validate.errors[0], "dataPath"))
+            var pluginId = pluginDef.identifier;
             switch (failedField) {
                 case "type":
-                    errorMessage = `Key "${key}" of value ${JSON.stringify(failedData)} ${message}, is ${typeof (failedData)}`
+                    errorMessage = `Error validating plugin ${pluginId}. Key "${key}" of value ${JSON.stringify(failedData)} ${message}, is ${typeof (failedData)}`
                     break;
                 case "enum":
-                    errorMessage = `Key "${key}" is ${failedData}, ${message}`
+                    errorMessage = `Error validating plugin ${pluginId}. Key "${key}" is ${failedData}, ${message}`
                     break;
                 case "pattern":
-                    errorMessage = `Key "${key}" ${message}, is ${failedData}`
+                    errorMessage = `Error validating plugin ${pluginId}. Key "${key}" ${message}, is ${failedData}`
                     break;
                 case "required":
                     if (validate.errors[0].params.errors) {
@@ -462,11 +76,13 @@ module.exports.validatePluginDef = function validatePluginDef(pluginDef) {
         else {
             errorMessage = JSON.stringify(validate.errors)
         }
-        throw new Error(errorMessage);
+        bootstrapLogger.warn(errorMessage);
+        return false;
         //TODO: Check for warnings and dont throw errors just log the warning (i.e. semantic versioning)
     }
     else {
         bootstrapLogger.info("Plugin Definition Validated")
+        return true;
     }
 }
 

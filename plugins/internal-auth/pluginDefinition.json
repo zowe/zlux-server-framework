@@ -3,7 +3,7 @@
   "pluginType": "nodeAuthentication",
   "authenticationCategory": "fallback",
   "apiVersion": "1.0.0",
-  "pluginVersion": "1.0.0",
+  "pluginVersion": "0.9.0",
   "filename": "internalAuth.js",
   "authenticationInstaller": "internalAuthInstaller"
 }

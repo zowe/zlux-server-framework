@@ -1,5 +1,5 @@
 {
-  "identifier": "com.rs.terminalproxy",
+  "identifier": "org.zowe.terminal.proxy",
   "baseURI": "terminalproxy",
   "apiVersion": "1.0.0",
   "pluginVersion": "0.0.0-zlux.version.replacement",

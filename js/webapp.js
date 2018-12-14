@@ -18,18 +18,22 @@ const expressWs = require('express-ws');
 const path = require('path');
 const Promise = require('bluebird');
 const http = require('http');
+const https = require('https');
 const bodyParser = require('body-parser');
+const cookieParser = require('cookie-parser')
 const session = require('express-session');
 const zluxUtil = require('./util');
 const configService = require('../plugins/config/lib/configService.js');
 const proxy = require('./proxy');
 const zLuxUrl = require('./url');
-const makeSwaggerCatalog = require('./swagger-catalog');
 const UNP = require('./unp-constants');
+const translationUtils = require('./translation-utils');
 
 /**
  * Sets up an Express application to serve plugin data files and services  
  */
+
+const DEFAULT_SESSION_TIMEOUT_MS = 60 /* min */ * 60 * 1000;
 
 const SERVICE_TYPE_NODE = 0;
 const SERVICE_TYPE_PROXY = 1;
@@ -47,6 +51,8 @@ var utilLog = zluxUtil.loggers.utilLogger;
 
 const jsonParser = bodyParser.json()
 const urlencodedParser = bodyParser.urlencoded({ extended: false })
+
+const proxyMap = new Map();
 
 function DataserviceContext(serviceDefinition, serviceConfiguration, 
     pluginContext) {
@@ -71,7 +77,7 @@ DataserviceContext.prototype = {
 function do404(URL, res, message) {
   contentLogger.debug("404: "+message+", url="+URL);
   res.statusMessage = message;
-  res.status(404).send("<h1>"+message+"</h1>");
+  res.status(404).send("<h1>Resource not found, URL: "+URL+"</h1></br><h2>Additional info: "+message+"</h2>");
 }
 
 function sendAuthenticationFailure(res, authType) {
@@ -93,15 +99,6 @@ function sendAuthorizationFailure(res, authType, resource) {
 };
 
 const staticHandlers = {
-  ng2TypeScript: function(ng2Ts) { 
-    return function(req, res) {
-      contentLogger.log(contentLogger.FINER,"generated ng2 module:\n"+util.inspect(ng2Ts));
-      res.setHeader("Content-Type", "text/typescript");
-      res.setHeader("Server", "jdmfws");
-      res.status(200).send(ng2Ts);
-    }
-  },
-
   plugins: function(plugins) {
     return function(req, res) {
       let parsedRequest = url.parse(req.url, true);
@@ -120,7 +117,9 @@ const staticHandlers = {
         do404(req.url, res, "A plugin type must be specified");
         return;
       }
-      const pluginDefs = plugins.map(p => p.exportDef());
+      const acceptLanguage = 
+        translationUtils.getAcceptLanguageFromCookies(req.cookies) || req.headers['accept-language'] || '';
+      const pluginDefs = plugins.map(p => p.exportTranslatedDef(acceptLanguage));
       const response = {
         //TODO type/version
         pluginDefinitions: null 
@@ -161,6 +160,17 @@ const staticHandlers = {
         });
     });
     return r;
+  },
+  
+  eureka() {
+    const router = express.Router();
+    router.get('/server/eureka/info', function(req, res, next) {
+      res.send('{"id":"zlux"}');
+    });
+    router.get('/server/eureka/health', function(req, res, next) {
+      res.send('{"status":"UP"}');
+    });
+    return router;
   }
 };
 
@@ -168,9 +178,15 @@ const staticHandlers = {
  *  This is passed to every other service of the plugin, so that 
  *  the service can be called by other services under the plugin
  */
-function WebServiceHandle(urlPrefix, port) {
+function WebServiceHandle(urlPrefix, httpPort, httpsPort) {
   this.urlPrefix = urlPrefix;
-  this.port = port;
+  if (httpsPort) {
+    this.port = httpsPort;
+    this.isHttps = true;
+  } else {
+    this.port = httpPort;
+    this.isHttps = false;
+  }
 }
 WebServiceHandle.prototype = {
   constructor: WebServiceHandle,
@@ -195,13 +211,22 @@ WebServiceHandle.prototype = {
       if (path) {
         url += '/' + path;
       }
+      let rejectUnauthorized;
+      let protocol;
+      if (this.isHttps) {
+        protocol = 'https:';
+        rejectUnauthorized = false;
+      } else {
+        protocol = 'http:';
+      }
       const requestOptions = {
         hostname: "localhost",
         port: this.port,
         method: options.method || "GET",
-        protocol: 'http:',
+        protocol: protocol,
         path: url,
-        auth: options.auth
+        auth: options.auth,
+        rejectUnauthorized: rejectUnauthorized
       };
       const headers = {};
       if (originalRequest) {
@@ -230,8 +255,8 @@ WebServiceHandle.prototype = {
       if (Object.getOwnPropertyNames(headers).length > 0) {
         requestOptions.headers = headers;
       }
-      //console.log('http request', requestOptions);
-      const request = http.request(requestOptions, (response) => {
+      let httpOrHttps = this.isHttps ? https : http;
+      const request = httpOrHttps.request(requestOptions, (response) => {
         var chunks = [];
         response.on('data',(chunk)=> {
           utilLog.debug('Callservice: Data received');
@@ -382,7 +407,7 @@ const commonMiddleware = {
 
 function makeSubloggerFromDefinitions(pluginDefinition, serviceDefinition, name) {
   return global.COM_RS_COMMON_LOGGER.makeComponentLogger(pluginDefinition.identifier
-      + "." + serviceDefinition.name + '.' + name);
+      + "." + serviceDefinition.name + ':' + name);
 }
 
 const defaultOptions = {
@@ -399,11 +424,19 @@ const defaultOptions = {
 
 function WebApp(options){
   this.expressApp = express();
+  let sessionTimeoutMs = DEFAULT_SESSION_TIMEOUT_MS;
+  if (options.sessionTimeoutMs) {
+    sessionTimeoutMs = options.sessionTimeoutMs;
+  }
+  this.expressApp.use(cookieParser());
   this.expressApp.use(session({
     //TODO properly generate this secret
     secret: process.env.expressSessionSecret ? process.env.expressSessionSecret : 'whatever',
     store: require("./sessionStore").sessionStore,
-    resave: true, saveUninitialized: false
+    resave: true, saveUninitialized: false,
+    cookie: {
+      maxAge: sessionTimeoutMs
+    }
   }));
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
   this.auth = options.auth;
@@ -450,22 +483,21 @@ WebApp.prototype = {
     return r;
   },
   
-  makeExternalProxy(host, port, urlPrefix, isHttps, noAuth) {
+  makeExternalProxy(host, port, urlPrefix, isHttps, noAuth, pluginID, serviceName) {
     const r = express.Router();
-    installLog.info(`Setting up proxy to ${host}:${port}/${urlPrefix}`);
-    r.use(proxy.makeSimpleProxy(host, port, {
+    installLog.info(`Setting up proxy (${pluginID}:${serviceName}) to destination=${host}:${port}/${urlPrefix}`);
+    let myProxy = proxy.makeSimpleProxy(host, port, {
       urlPrefix, 
       isHttps, 
       addProxyAuthorizations: (noAuth? null : this.auth.addProxyAuthorizations),
       allowInvalidTLSProxy: this.options.allowInvalidTLSProxy
-    }));
+    }, pluginID, serviceName);
+    proxyMap.set(pluginID + ":" + serviceName, myProxy);
+    r.use(myProxy);
     return r;
   },
   
   installStaticHanders() {
-    this.expressApp.get(
-      `/${this.options.productCode}/plugins/com.rs.mvd/services/com.rs.mvd.ng2.module.ts`,
-      staticHandlers.ng2TypeScript(this.options.staticPlugins.ng2));
     const webdir = path.join(path.join(this.options.productDir,
       this.options.productCode), 'web');
     const rootPage = this.options.rootRedirectURL? this.options.rootRedirectURL 
@@ -501,7 +533,7 @@ WebApp.prototype = {
             proxyRouter);
       }
       serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
-          this.options.httpPort);
+          this.options.httpPort, this.options.httpsPort);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
@@ -522,7 +554,7 @@ WebApp.prototype = {
             this.authServiceHandleMaps;
           next();
         },
-        this.auth.getStatus); 
+      this.auth.getStatus);
     this.expressApp.post('/auth-logout',
         jsonParser,
         (req, res, next) => {
@@ -542,12 +574,20 @@ WebApp.prototype = {
         },
         this.auth.doLogout); 
     serviceHandleMap['auth'] = new WebServiceHandle('/auth', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/plugins', 
         //this.auth.middleware, 
         staticHandlers.plugins(this.plugins));
     serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
+    this.expressApp.get('/server/proxies', 
+        this.auth.middleware, 
+      (req, res) =>{
+        contentLogger.log(contentLogger.INFO, '/server/proxies\n' + util.inspect(req));      
+        res.json({"zssServerHostName":this.options.proxiedHost,"zssPort":this.options.proxiedPort});
+      }); 
+    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', 
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/echo/*', 
       this.auth.middleware, 
       (req, res) =>{
@@ -555,7 +595,7 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.get('/echo/*',  
       this.auth.middleware, 
       (req, res) =>{
@@ -563,12 +603,13 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
     this.expressApp.use('/apiManagement/', 
         this.auth.middleware, 
         staticHandlers.apiManagement(this));
     serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
-        this.options.httpPort);
+        this.options.httpPort, this.options.httpsPort);
+    this.expressApp.use(staticHandlers.eureka());
   },
   
   _makeRouterForLegacyService(pluginContext, service) {
@@ -675,7 +716,7 @@ WebApp.prototype = {
     for (const service of plugin.dataServices) {
       const name = (service.type === "import")? service.localName : service.name;
       const handle = new WebServiceHandle(urlBase + "/services/" + name,
-        this.options.httpPort);
+                                          this.options.httpPort, this.options.httpsPort);
       serviceHandleMap[name] = handle;
     }
     if (plugin.pluginType === 'nodeAuthentication') {
@@ -765,7 +806,8 @@ WebApp.prototype = {
         serviceRouterWithMiddleware.push(this.auth.middleware);
         serviceRouterWithMiddleware.push(this.makeExternalProxy(
             externalService.host, externalService.port,
-            externalService.urlPrefix, externalService.isHttps));
+            externalService.urlPrefix, externalService.isHttps,
+            undefined, plugin.identifier, externalService.name));
         installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
         this.pluginRouter.use(subUrl, serviceRouterWithMiddleware);
         pluginRouters[externalService.name] = serviceRouterWithMiddleware;
@@ -790,6 +832,11 @@ WebApp.prototype = {
         installLog.info(`${plugin.identifier}: installing import`
            + ` ${importedService.sourcePlugin}:${importedService.sourceName} at ${subUrl}`);
         this.pluginRouter.use(subUrl, importedRouter);
+        let pluginRouters = this.routers[plugin.identifier];
+        if (!pluginRouters) {
+          pluginRouters = this.routers[plugin.identifier] = {};
+        }
+        pluginRouters[importedService.localName] = importedRouter;
       }
     }
   },
@@ -810,8 +857,11 @@ WebApp.prototype = {
   },
   
   _installSwaggerCatalog(plugin, urlBase) {
-    const router = makeSwaggerCatalog(plugin, 
-        this.options.productCode);
+    const openApi = plugin.getApiCatalog(this.options.productCode);
+    const router = express.Router();
+    router.get("/", (req, res) => {
+      res.status(200).json(openApi);
+    });
     this.pluginRouter.use(zLuxUrl.join(urlBase, '/catalogs/swagger'),
         router);
   },
@@ -827,12 +877,17 @@ WebApp.prototype = {
       + ' services')
     const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
         plugin.identifier);
-    this._installSwaggerCatalog(plugin, urlBase);
-    this._installPluginStaticHandlers(plugin, urlBase);
     try {
+      //dataservices load first since in case of error, we want to skip the rest of the plugin load
       yield *this._installDataServices(pluginContext, urlBase);
+      this._installSwaggerCatalog(plugin, urlBase);
+      this._installPluginStaticHandlers(plugin, urlBase);      
+      //import resolution will be postponed until all non-import plugins are loaded
+      //only push plugin if no exceptions were seen
+      this.plugins.push(plugin);
     } catch (e) {
-      installLog.warn(e.stack);
+      installLog.warn(`Exception occurred, plugin (${plugin.identifier}) installation skipped. Message: ${e.message}`);
+      installLog.debug(e.stack);
     }
     this._resolveImports(plugin, urlBase);
     this.plugins.push(plugin);
@@ -840,18 +895,44 @@ WebApp.prototype = {
 
   installErrorHanders() {
     this.expressApp.use((req, res, next) => {
-      do404(req.url, res, this.options.productCode
-          + ": unknown resource requested");
+      const headers = req.headers
+      for (const header of Object.keys(headers)) {
+        /* Try to find a referer header and try to
+         * redirect to our server,
+         */
+        if (header == 'referer') {
+          let referrer = headers[header];
+          var pattern = new RegExp('^http.+\/'+this.options.productCode+'\/plugins\/.+');
+          if (pattern.test(referrer)) {
+            var parts = headers[header].split("/");
+            var zluxIndex = parts.indexOf(this.options.productCode);
+            var pluginID = parts[zluxIndex + 2];
+            var serviceName = parts[zluxIndex + 4];
+            var myProxy = proxyMap.get(pluginID + ":" + serviceName);
+            var fullUrl = req.originalUrl;
+            req.url = fullUrl;
+            if (myProxy != undefined) {
+              utilLog.debug("About to call myProxy");
+              myProxy(req, res);
+              utilLog.debug("After myProxy call");
+            }
+            else {
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match an existing proxy service`);
+              return do404(req.url, res, this.options.productCode
+              + ": unknown resource requested");
+            }
+          }
+            else {
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match a plugin pattern`);               
+            return do404(req.url, res, this.options.productCode
+            + ": unknown resource requested. Referrer="+referrer);
+          }
+        } else {
+          return do404(req.url, res, this.options.productCode
+               + ": unknown resource requested");
+        }
+      }
     });
-//      if (!next) {
-//        // TODO how was this tested? I'd say it never happens: `next` is always 
-//        // there - it's Express's wrapper, not literally the next user middleware
-//        // piece, as one might think (note that you call it without params, not like
-//        // next(req, res, ...))
-//
-//      } else {
-//        return next();
-//      }
   }
 };
 

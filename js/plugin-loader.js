@@ -25,6 +25,8 @@ const zluxUtil = require('./util');
 const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
 const pluginDefinitionValidation = require('./pluginDefinitionValidation.js')
+const translationUtils = require('./translation-utils.js');
+const makeSwaggerCatalog = require('./swagger-catalog');
 
 /**
  * Plugin loader: reads the entire plugin configuration tree
@@ -45,6 +47,7 @@ const defaultOptions = {
 }
 
 var uniquePluginIdentifiers = []
+var uniquePluginPaths = []
 
 function ExternalImports() {
   this.map = {};
@@ -196,6 +199,7 @@ function Plugin(def, configuration, location) {
   Object.assign(this, def);
   this.configuration = configuration;
   this.location = location;
+  this.translationMaps = {};
 }
 Plugin.prototype = {
   constructor: Plugin,
@@ -204,6 +208,7 @@ Plugin.prototype = {
   pluginVersion: null,
   pluginType: null,
   webContent: null,
+  copyright:null,
   location: null,
   dataServices: null,
   dataServicesGrouped: null,
@@ -226,8 +231,7 @@ Plugin.prototype = {
   },
   
   init(context) {
-    bootstrapLogger.warn(this.identifier
-        + `: "${this.pluginType}" plugins not yet implemented`);
+    //Nothing here anymore: startup checks for validity will be superceeded by https://github.com/zowe/zlux-proxy-server/pull/18 and initialization concept has not manifested for many plugin types, so a warning is not needed.
   },
   
   exportDef() {
@@ -236,11 +240,26 @@ Plugin.prototype = {
       pluginVersion: this.pluginVersion,
       apiVersion: this.apiVersion,
       pluginType: this.pluginType,
+      copyright: this.copyright,
       //TODO move these to the appropraite plugin type(s)
       webContent: this.webContent, 
       configurationData: this.configurationData,
       dataServices: this.dataServices
     };
+  },
+
+  exportTranslatedDef(acceptLanguage) {
+    const def = this.exportDef();
+    if (typeof this.webContent === 'object') {
+      return translationUtils.translate(def, this.translationMaps, acceptLanguage);
+    }
+    return def;
+  },
+
+  loadTranslations() {
+    if (typeof this.webContent === 'object') {
+      this.translationMaps = translationUtils.loadTranslations(this.location);
+    }
   },
   
   initStaticWebDependencies() {
@@ -301,7 +320,17 @@ Plugin.prototype = {
             const nodeModule = requireFromString(dataservice.source);
             dataservice.nodeModule = nodeModule;
           } else {
-            const fileLocation = path.join(this.location, 'lib', dataservice.filename);
+            // Quick fix before MVD-947 is merged
+            var fileLocation = ""
+            if (dataservice.filename) {
+              fileLocation = path.join(this.location, 'lib', dataservice.filename);
+            }
+            else if (dataservice.fileName) {
+              fileLocation = path.join(this.location, 'lib', dataservice.fileName);
+            }
+            else {
+              throw new Error (`No file name for data service`)
+            }
             const nodeModule = require(fileLocation);
             dataservice.nodeModule = nodeModule;
           }
@@ -315,7 +344,12 @@ Plugin.prototype = {
         }
       }
     }
+  },
+  
+  getApiCatalog(productCode) {
+    return makeSwaggerCatalog(this, productCode)
   }
+  
 };
 
 function LibraryPlugIn(def, configuration, location) {
@@ -470,7 +504,6 @@ function makePlugin(def, pluginConfiguration, basePath) {
 function PluginLoader(options) {
   EventEmitter.call(this);
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
-  this.ng2 = null;
   this.plugins = null;
   this.pluginMap = {};
   this.unresolvedImports = new ExternalImports();
@@ -479,14 +512,23 @@ PluginLoader.prototype = {
   constructor: PluginLoader,
   __proto__: EventEmitter.prototype,
   options: null,
-  ng2: null,
   plugins: null,
   pluginMap: null,
   unresolvedImports: null,
+
+  _emitPluginEurekaInfo(pluginDef) {
+    this.emit('updateEurekaMetadata', {
+      id: pluginDef.identifier,
+      pluginVersion: pluginDef.pluginVersion,
+      webContent: pluginDef.webContent,
+      dataServices: pluginDef.dataServices
+    });
+  },
   
   _readPluginDef(pluginDescriptorFilename) {
-    bootstrapLogger.info(`Processing plugin reference ${pluginDescriptorFilename}...`);
-    const pluginPtrPath = path.join(this.options.pluginsDir, pluginDescriptorFilename);
+    const pluginPtrPath = path.join(this.options.pluginsDir, 
+        pluginDescriptorFilename);
+    bootstrapLogger.info(`Processing plugin reference ${pluginPtrPath}...`);
     if (!fs.existsSync(pluginPtrPath)) {
       throw new Error(`${pluginPtrPath} is missing`);
     }
@@ -509,11 +551,15 @@ PluginLoader.prototype = {
           + `don't match - plugin ignored`);
     }
     bootstrapLogger.info(`Validating Plugin Definition at ${pluginBasePath}/pluginDefinition.json`)
-    pluginDefinitionValidation.validatePluginDef(pluginDef);
-    if(uniquePluginIdentifiers.includes(pluginDef.identifier)) {
-      throw new Error (`Plugin Identifier ${pluginDef.identifier} is already in use, please choose a unique identifier`)
+    if(!pluginDefinitionValidation.validatePluginDef(pluginDef)){
+      throw new Error(`${pluginDef.identifier} is invalid`)
+    }
+    var identifierIndex = uniquePluginIdentifiers.indexOf(pluginDef.identifier);
+    if(identifierIndex > -1) {
+      throw new Error(`Error in file ${pluginDefPath}.  The identifier '${pluginDef.identifier}' is already used in file ${uniquePluginPaths[identifierIndex]}.  Please choose a unique identifier.`)
     }
     uniquePluginIdentifiers.push(pluginDef.identifier)
+    uniquePluginPaths.push(pluginDefPath)
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
       this.options.productCode);
@@ -521,37 +567,6 @@ PluginLoader.prototype = {
                           + ` found=\n${JSON.stringify(pluginConfiguration)}`);
     return makePlugin(pluginDef, pluginConfiguration, pluginBasePath, 
       this.options.productCode);
-  },
-
-  _generateNg2ModuleTs(plugins) {
-    let importStmts = [];
-    let modules = ["BrowserModule"];
-    plugins.filter(function(def) {
-      return def.webContent && 
-        ("object" === typeof def.webContent) &&
-        (def.webContent.framework === "angular2");
-    }).forEach(function (def) {
-      let ng2ModuleName = def.webContent.ng2ModuleName;
-      let ng2ModuleLocation = def.webContent.ng2ModuleLocation;
-      if (!(ng2ModuleName && ng2ModuleLocation)) {
-        bootstrapLogger.warn(`Invalid NG2 module: ${def.location}: `
-            + "'ng2ModuleName' or 'ng2ModuleLocation' missing");
-        return;
-      } 
-      importStmts.push("import { "+ng2ModuleName+" } from '"+ng2ModuleLocation+"';\n");
-      modules.push(ng2ModuleName);
-    });
-    let ng2 = 
-        "import { NgModule } from '@angular/core';\n"+
-        "import { BrowserModule } from '@angular/platform-browser';\n"+
-        importStmts.join("") +
-        "@NgModule({\n"+
-        "  imports: ["+modules.join(", ")+"]\n" +
-        "})\n" +
-        "export class Ng2RootModule {}\n";
-    bootstrapLogger.log(bootstrapLogger.FINER,
-      "Generated ng2 module:\n" + ng2);
-    return ng2;
   },
   
   _toposortPlugins(plugins, pluginMap) {
@@ -603,12 +618,12 @@ PluginLoader.prototype = {
         plugin.initStaticWebDependencies();
         plugin.initWebServiceDependencies(this.unresolvedImports, pluginContext);
         plugin.init(pluginContext);
+        plugin.loadTranslations();
         pluginContext.plugins.push(plugin);
         bootstrapLogger.log(bootstrapLogger.INFO,
-          `Plugin ${plugin.identifier} at path=${plugin.location} loaded\n`);
+          `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
         bootstrapLogger.debug(' Content:\n' + plugin.toString());
       } catch (e) {
-        console.log(e);
         bootstrapLogger.warn(e)
         bootstrapLogger.log(bootstrapLogger.INFO,
           `Failed to load ${pluginDescriptorFilename}\n`);
@@ -632,14 +647,13 @@ PluginLoader.prototype = {
         });
       this.unresolvedImports.reset();
     }
-    this.ng2 = this._generateNg2ModuleTs(pluginContext.plugins);
     for (const plugin of pluginContext.plugins) {
       zluxUtil.deepFreeze(plugin);
       this.pluginMap[plugin.identifier] = plugin;
     }
     this.plugins = this._toposortPlugins(pluginContext.plugins, this.pluginMap);
 //    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
-//        + JSON.stringify(this.pluginMap));    
+//        + JSON.stringify(this.pluginMap));  
     for (const plugin of this.plugins) {
       this.emit('pluginAdded', {
         data: plugin
@@ -713,7 +727,6 @@ function unitTest() {
   var pm = new PluginLoader(configData, process.cwd());
   var pl = pm.loadPlugins();
   console.log("plugins: ", pl);
-  //console.log(pl.ng2)
 }
 if (_unitTest) {
   unitTest()

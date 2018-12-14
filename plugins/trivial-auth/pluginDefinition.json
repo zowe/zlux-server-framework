@@ -1,9 +1,9 @@
 {
-  "identifier": "com.rs.auth.trivialAuth",
+  "identifier": "org.zowe.zlux.auth.trivial",
   "pluginType": "nodeAuthentication",
   "authenticationCategory": "fallback",
   "apiVersion": "1.0.0",
-  "pluginVersion": "1.0.0",
+  "pluginVersion": "0.9.0",
   "filename": "trivialAuth.js",
   "authenticationInstaller": "trivialAuthInstaller"
 }

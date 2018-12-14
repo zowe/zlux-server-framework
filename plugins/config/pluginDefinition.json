@@ -1,6 +1,5 @@
 {
-  "identifier": "com.rs.configjs",
-  "baseURI": "configservicejs",
+  "identifier": "org.zowe.configjs",
   "apiVersion": "1.0.0",
   "pluginVersion": "0.0.0-zlux.version.replacement",
   "pluginType": "application",
