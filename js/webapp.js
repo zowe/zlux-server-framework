@@ -958,7 +958,7 @@ WebApp.prototype = {
             else {
               utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match a plugin pattern`);               
             return do404(req.url, res, this.options.productCode
-            + ": unknown resource requested. Referrer="+referrer);
+            + ": unknown resource requested");
           }
         } else {
           return do404(req.url, res, this.options.productCode

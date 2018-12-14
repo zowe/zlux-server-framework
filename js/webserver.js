@@ -35,6 +35,10 @@ WebServer.prototype = {
   config: null,
   httpOptions: null,
   httpsOptions: null,
+  httpsServers: [],
+  httpServers: [],
+  expressWsHttps: [],
+  expressWsHttp: [],
   
   _loadHttpsKeyData() {
     if (this.config.https.pfx) {
@@ -104,62 +108,93 @@ WebServer.prototype = {
   startListening: Promise.coroutine(function* (app) {
     let t = this;
     if (this.config.https && this.config.https.port) {
-      let listening = false;
-      this._loadHttpsKeyData();
-      while (!listening) {
-        try {
-          this.httpsServer = https.createServer(this.httpsOptions, app);
-          this.expressWsHttps = expressWs(app, this.httpsServer, {maxPayload: 50000});
-          listening = true;
-        } catch (e) {
-          if (e.message == 'mac verify failure' && !noPrompt) {
-            const r = reader();
-            try {
-              httpsOptions.passphrase = yield reader.readPassword(
-                'HTTPS key or PFX decryption failure. Please enter passphrase: ');
-            } finally {
-              r.close();
+      let makeHttpsServer = function*(ipAddress, port) {
+        let listening = false;
+        let httpsServer;
+        t._loadHttpsKeyData();
+        while (!listening) {
+          try {
+            httpsServer = https.createServer(t.httpsOptions, app);
+            t.httpsServers.push(httpsServer);
+            t.expressWsHttps.push(expressWs(app, httpsServer, {maxPayload: 50000}));
+            listening = true;
+          } catch (e) {
+            if (e.message == 'mac verify failure') {
+              const r = reader();
+              try {
+                t.httpsOptions.passphrase = yield reader.readPassword(
+                  'HTTPS key or PFX decryption failure. Please enter passphrase: ');
+              } finally {
+                r.close();
+              }
+            } else {
+              throw e;
             }
-          } else {
-            throw e;
           }
         }
+        t.callListen(httpsServer, 'https', 'HTTPS', ipAddress, port);
+      };
+
+      let httpsIps = this.config.https.ipAddresses;
+      if (httpsIps) {
+        for (let i = 0; i < httpsIps.length; i++) {
+          let ipAddress = httpsIps[i];
+          if (typeof ipAddress == 'string') {
+            yield* makeHttpsServer(ipAddress, this.config.https.port);
+          } else {
+            bootstrapLogger.warn(`Skipping invalid listener address=${ipAddress}`);
+          }
+        }
+      } else {
+        makeHttpsServer('0.0.0.0', this.config.https.port);
       }
-      this.callListen(this.httpsServer, 'https', 'HTTPS');
     }
     if (this.config.http && this.config.http.port) {
-      this.httpServer = http.createServer(app);
-      this.expressWsHttp = expressWs(app, this.httpServer);
-      this.callListen(this.httpServer, 'http', 'HTTP');
+      let makeHttpServer = function(ipAddress, port) {
+        let httpServer = http.createServer(app);
+        t.httpServers.push(httpServer);
+        t.expressWsHttp.push(expressWs(app, httpServer));
+        t.callListen(httpServer, 'http', 'HTTP', ipAddress, port);
+      }
+      
+      if (this.config.http.ipAddresses) {
+        this.config.http.ipAddresses.forEach((ipAddress)=> {
+          if (typeof ipAddress == 'string') {
+            makeHttpServer(ipAddress, this.config.http.port);
+          } else {
+            bootstrapLogger.warn(`Skipping invalid listener address=${ipAddress}`);
+          }
+        });
+      } else {
+        makeHttpServer('0.0.0.0', this.config.http.port);
+      }
     }
   }),
 
-  callListen(methodServer, methodName, methodNameForLogging) {
-    var methodConfig = this.config[methodName];
-    var addressForLogging = methodConfig.hostname ? methodConfig.hostname : "*";
-    addressForLogging += ":" + methodConfig.port;
-
+  callListen(methodServer, methodName, methodNameForLogging, ipAddress, port) {
+    var addressForLogging = `${ipAddress}:${port}`;
     var logFunction = function () {
-      bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  listening on ${addressForLogging}`)
+      bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  Listening on ${addressForLogging}`)
     };
-    bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  about to start listening on ${addressForLogging}`);
+    bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  About to start listening on ${addressForLogging}`);
 
-    if (methodConfig.hostname) {
-      methodServer.listen(methodConfig.port, logFunction);
-    } else {
-      methodServer.listen(methodConfig.port, methodConfig.hostname, logFunction);
-    }
+    methodServer.listen(port, ipAddress, logFunction);
   },
 
   close() {
-    if (this.httpServer) {
-      bootstrapLogger.log(bootstrapLogger.INFO,'Closing http server');
-      this.httpServer.close();
-    }
-    if (this.httpsServer) {
-      bootstrapLogger.log(bootstrapLogger.INFO,'Closing https server');
-      this.httpsServer.close();
-    }
+    this.httpServers.forEach((server)=> {
+      //server._connectionKey is a combination of internal ID + IP + port, with colons in between
+      let ipPort = server._connectionKey ?
+          server._connectionKey.substring(server._connectionKey.indexOf(':')+1) : '';
+      bootstrapLogger.info(`(HTTP) Closing server ${ipPort}`);
+      server.close();
+    });
+    this.httpsServers.forEach((server)=> {
+      let ipPort = server._connectionKey ?
+          server._connectionKey.substring(server._connectionKey.indexOf(':')+1) : '';
+      bootstrapLogger.info(`(HTTPS) Closing server ${ipPort}`);
+      server.close();
+    });
   }
 };
 
@@ -193,8 +228,6 @@ function unitTest() {
 if (_unitTest) {
   unitTest();
 }
-  
-  
   
 
 
