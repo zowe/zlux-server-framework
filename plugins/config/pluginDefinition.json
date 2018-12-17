@@ -1,6 +1,5 @@
 {
-  "identifier": "com.rs.configjs",
-  "baseURI": "configservicejs",
+  "identifier": "org.zowe.configjs",
   "apiVersion": "1.0.0",
   "pluginVersion": "0.0.0-zlux.version.replacement",
   "pluginType": "application",
@@ -11,7 +10,8 @@
       "initializerLookupMethod": "external",
       "fileName": "configService.js",
       "routerFactory": "configRouter",
-      "dependenciesIncluded": true
+      "dependenciesIncluded": true,
+      "version": "1.0.0"
     }
   ]
 }

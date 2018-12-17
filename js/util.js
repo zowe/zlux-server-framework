@@ -19,6 +19,7 @@ if (!global.COM_RS_COMMON_LOGGER) {
 
 const path = require('path');
 const fs = require('fs');
+const Promise = require('bluebird');
 
 function compoundPathFragments(left, right) {
   return path.join(left, right).normalize();
@@ -31,7 +32,8 @@ const loggers = {
   childLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.child"),
   utilLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.utils"),
   proxyLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.proxy"),
-  installLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.install")
+  installLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.install"),
+  apiml: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.apiml")
 };
 
 module.exports.loggers = loggers;
@@ -130,6 +132,33 @@ module.exports.makeErrorObject = function makeError(details) {
   return err;
 }
 
+module.exports.concatIterables = function* concatIterables() {
+  for (let i=0; i < arguments.length; i++) {
+    yield *arguments[i];
+  }
+}
+
+/**
+ * Makes sure that the invocations of an asynchronous event handler are properly
+ * queued. Creates an event listener that wraps the asynchronous `listenerFun`
+ * 
+ * `listenerFun` should return a promise
+ */
+module.exports.asyncEventListener = function(listenerFun, logger) {
+  //the handler for the most recent event: when this is resolved,
+  //another event can be handled
+  let promise = Promise.resolve();
+  
+  return function(event) {
+    promise = promise.then(() => {
+      return listenerFun(event);
+    }, err => {
+      if (logger) {
+        logger.warn("Event handler failed: " + err);
+      }
+    });
+  }
+}
 
 /*
   This program and the accompanying materials are

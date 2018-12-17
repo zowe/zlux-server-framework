@@ -9,7 +9,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-
 'use strict';
 const Promise = require('bluebird');
 const util = require('./util');
@@ -20,96 +19,8 @@ const ProcessManager = require('./process');
 const AuthManager = require('./auth-manager');
 const WebAuth = require('./webauth');
 const unp = require('./unp-constants');
-const eureka = require('eureka-js-client').Eureka;
 const http = require('http');
-
-
-
-
-const MEDIATION_LAYER_INSTANCE_DEFAULTS = {
-  "instanceId": "zowe-zlux",
-  "app": "zowe-zlux",
-  "hostName": "localhost",
-  "ipAddr": "127.0.0.1", 
-  "vipAddress": "zowe-zlux",
-  "dataCenterInfo": {
-    "@class": "com.netflix.appinfo.InstanceInfo$DefaultDataCenterInfo",
-    "name": "MyOwn"
-  }
-};
-
-function getMediationLayerInstanceObject(webAppOptions, overrides) {
-  let instance = Object.assign(MEDIATION_LAYER_INSTANCE_DEFAULTS,overrides);
-  let isHttps = webAppOptions.httpsPort ? true : false;
-  let statusPageUrl;
-  let healthCheckUrl;
-  let homePageUrl;
-  let dollar;
-  if (isHttps) {
-    statusPageUrl = `https://${instance.hostName}:${webAppOptions.httpsPort}/pluginInfo`;
-    healthCheckUrl = `https://${instance.hostName}:${webAppOptions.httpsPort}/application/health`;
-    homePageUrl = `https://${instance.hostName}:${webAppOptions.httpsPort}/`;
-    dollar = webAppOptions.httpsPort;
-  } else {
-    statusPageUrl = `http://${instance.hostName}:${webAppOptions.httpPort}/pluginInfo`;
-    healthCheckUrl = `http://${instance.hostName}:${webAppOptions.httpPort}/application/health`;
-    homePageUrl = `http://${instance.hostName}:${webAppOptions.httpPort}/`;
-    dollar = webAppOptions.httpPort;
-  }
-  return Object.assign(instance,
-                       {
-                         "status": "UP",
-                         statusPageUrl:statusPageUrl,
-                         healthCheckUrl: healthCheckUrl,
-                         homePageUrl: homePageUrl,
-                         port: {
-                           "$": Number(dollar),
-                           "@enabled": true
-                         },
-                         metadata: {
-                           'routed-services.uiv1.gateway-url': 'ui/v1',
-                           'routed-services.uiv1.service-url': '/',
-                           'routed-services.users_v1.gateawy-url': 'api/v1',
-                           'routed-services.users_v1.service-url': '/',
-                           'routed-services.app_v1.gateawy-url': 'api/v1',
-                           'routed-services.app_v1.service-url': '/',
-                           'routed-services.api-doc.gateway-url': 'api/v1/api-doc',
-                           'routed-services.api-doc.service-url': '/api-doc',
-                           'mfaas.discovery.parent.id': 'nodejsapps',
-                           'mfaas.discovery.parent.title': 'Node JS Applications',
-                           'mfaas.discovery.parent.description': 'Apps running in a NodeJS server',
-                           'mfaas.discovery.parent.version': '1.0.0',
-                           'mfaas.discovery.serviceTitle': 'Zowe ZLUX',
-                           'mfaas.discovery.description': 'Zowe ZLUX Server',
-                           'mfaas.api-info.apiVersionProperties.v1.title': 'Discoverable NodeJS API',
-                           'mfaas.api-info.apiVersionProperties.v1.description': 'An API for a NodeJS server of apps',
-                           'mfaas.api-info.apiVersionProperties.v1.version': '1.0.0'
-                         }
-                       });
-}
-
-  
-
-const MEDIATION_LAYER_EUREKA_DEFAULTS = {
-  "preferSameZone": false,
-  "requestRetryDelay": 10000,
-  "heartbeatInterval": 3000,
-  "registryFetchInterval": 10000,
-  "fetchRegistry": false,
-  "availabilityZones": {
-    "defaultZone": ["defaultZone"]
-  }
-};
-
-function getMediationLayerEurekaObject(webAppOptions, overrides, mediationConfig) {
-  let eureka = Object.assign({},MEDIATION_LAYER_EUREKA_DEFAULTS);
-  eureka.serviceUrls = {
-    default: [
-      mediationConfig.isHttps ? `https://${mediationConfig.username}:${mediationConfig.password}@${mediationConfig.hostname}:${mediationConfig.port}/eureka/apps/` : `http://${mediationConfig.username}:${mediationConfig.password}@${mediationConfig.hostname}:${mediationConfig.port}/eureka/apps/`
-    ]
-  };
-  return Object.assign(eureka,overrides);
-}
+const ApimlConnector = require('./apiml');
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const installLogger = util.loggers.installLogger;
@@ -229,55 +140,41 @@ Server.prototype = {
       serverConfig: this.userConfig,
       staticPlugins: {
         list: this.pluginLoader.plugins,
-        pluginMap: this.pluginLoader.pluginMap,
-        ng2: this.pluginLoader.ng2
+        pluginMap: this.pluginLoader.pluginMap
       },
       newPluginHandler: (pluginDef) => this.newPluginSubmitted(pluginDef),
       auth: webauth
     };
     this.webApp = makeWebApp(webAppOptions);
     this.webServer.startListening(this.webApp.expressApp);
-    const eurekaJSON = this.userConfig.node.mediationLayer;
-
-    // Add to eureka metadata info
-
-    var totalPlugins = -1;    // Stores the number of plugins that should load
-    var addedPlugins = 0;     // Stores the number of plugins that have attempted to load
-    
-    // Get number of plugins that should load
-    this.pluginLoader.on('givePluginAmount', event => totalPlugins = event.data);
-    
-    // Add the plugin and add it to the count
-    this.pluginLoader.on('pluginAdded', event => {
-      this.pluginLoaded(event.data);
-      addedPlugins++;            // Make sure total plugins did not get overwritten to null
-
-      if (totalPlugins != null && totalPlugins == addedPlugins) {   // If all the plugins have attempted to load
-        if(eurekaJSON && (eurekaJSON.enabled === true)){
-          var eCopy = JSON.parse(JSON.stringify(eurekaJSON))
-          eCopy.instance = getMediationLayerInstanceObject(webAppOptions, eCopy.instance);
-          eCopy.eureka = getMediationLayerEurekaObject(webAppOptions, eCopy.eureka, eCopy.server);
-          bootstrapLogger.info(`Mediation Layer Configuration = ${JSON.stringify(eCopy,null,2)}`);
-          const client = new eureka(eCopy);
-          delete eCopy.eureka.serviceUrls.default;
-          bootstrapLogger.info('Eureka Instance Id:' + eCopy.instance.instanceId);
-          bootstrapLogger.info("Total Plugins: " + totalPlugins + " Added Plugins: " + addedPlugins);
-          bootstrapLogger.info("############# Connect to Eureka #############");
-          
-          client.logger.level('debug');
-          client.start(function (error) {     // Connect to Eureka Server
-            bootstrapLogger.warn(error || 'complete');
-          });
-        }
-      }
-    });
+    let pluginsLoaded = [];
+    this.pluginLoader.on('pluginAdded', util.asyncEventListener(event => {
+      return this.pluginLoaded(event.data).then(() => {
+        installLogger.info('Installed plugin: ' + event.data.identifier);
+      }, err => {
+        installLogger.warn('Failed to install plugin: ' 
+                           + event.data.identifier);
+        console.log(err);
+      });
+    }, installLogger));
     this.pluginLoader.loadPlugins();
     yield this.authManager.loadAuthenticators(this.userConfig);
     this.authManager.validateAuthPluginList();
     this.processManager.addCleanupFunction(function() {
       this.webServer.close();
     }.bind(this));
+    if (this.userConfig.node.mediationLayer.enabled) {
+      this.apiml = new ApimlConnector({
+        hostName: 'localhost',
+        ipAddr: '127.0.0.1',
+        httpPort: webAppOptions.httpPort, 
+        httpsPort: webAppOptions.httpsPort, 
+        apimlConfig: this.userConfig.node.mediationLayer
+      });
+      yield this.apiml.registerMainServerInstance();
+    }
   }),
+
   newPluginSubmitted(pluginDef) {
     installLogger.debug("Adding plugin ", pluginDef);
     this.pluginLoader.addDynamicPlugin(pluginDef);
@@ -300,13 +197,7 @@ Server.prototype = {
         }
       }
     };
-    this.webApp.installPlugin(pluginContext).then(() => {
-      installLogger.info('Installed plugin: ' + pluginDef.identifier);
-    }, err => {
-      installLogger.warn('Failed to install plugin: ' 
-          + pluginDef.identifier);
-      console.log(err)
-    });
+    return this.webApp.installPlugin(pluginContext);
   }
 };
 
