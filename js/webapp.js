@@ -276,6 +276,7 @@ const commonMiddleware = {
       if (!req[`${UNP.APP_NAME}Data`]) {
         req[`${UNP.APP_NAME}Data`] = appData; 
       }
+      appData.makeErrorObject = zluxUtil.makeErrorObject; 
       if (!appData.webApp) {
         appData.webApp = {};
       } else {
