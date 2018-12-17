@@ -112,7 +112,7 @@ module.exports.readFilesToArray = function(fileList) {
 };
 
 const errorProto = {
-    "_objectType": "com.zoeproject.error",
+    "_objectType": "org.zowe.zlux.error",
     "_metaDataVersion": "1.0.0",
     "returnCode": "1",
     "messageID": "ZOE000E",
