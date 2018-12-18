@@ -43,7 +43,7 @@ const webAppOptions = {
 };
 
 const pl = new PluginLoader({ pluginsDir: process.cwd() });
-const def = pl._readPluginDef("com.rs.testplugin.json");
+const def = pl._readPluginDef("org.zowe.testplugin.json");
 const plugin = makePlugin(def, {}, {
     productCode: "XXX",
     config: {},
@@ -94,7 +94,7 @@ describe('WebApp', function() {
     
     describe('versioning', function() {
       it('should install test-service v1.3.0', function()  {
-        const url = '/XXX/plugins/com.rs.testplugin'
+        const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/test-service/1.3.0'
         return chai.request(server)
           .get(url)
@@ -104,7 +104,7 @@ describe('WebApp', function() {
             res.body.should.be.a('object');
             res.body.should.deep.equal(
               {
-                "plugin": "com.rs.testplugin",
+                "plugin": "org.zowe.testplugin",
                 "service": "test-service",
                 "version": "1.3.0"
               });
@@ -112,7 +112,7 @@ describe('WebApp', function() {
       })
       
      it('should install test-service v2.1.0', function()  {
-        const url = '/XXX/plugins/com.rs.testplugin'
+        const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/test-service/2.1.0'
         return chai.request(server)
           .get(url)
@@ -122,7 +122,7 @@ describe('WebApp', function() {
             console.log(res.body)
             res.body.should.deep.equal(
               {
-                "plugin": "com.rs.testplugin",
+                "plugin": "org.zowe.testplugin",
                 "service": "test-service",
                 "version": "2.1.0"
               });
@@ -130,7 +130,7 @@ describe('WebApp', function() {
       })
     
       it('should point the _current version of test-service to v2.1.0', function()  {
-        const url = '/XXX/plugins/com.rs.testplugin'
+        const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/test-service/_current'
         return chai.request(server)
           .get(url)
@@ -140,7 +140,7 @@ describe('WebApp', function() {
             console.log(res.body)
             res.body.should.deep.equal(
               {
-                "plugin": "com.rs.testplugin",
+                "plugin": "org.zowe.testplugin",
                 "service": "test-service",
                 "version": "2.1.0"
               });
@@ -148,7 +148,7 @@ describe('WebApp', function() {
       })
       
       it('should call the highest version by default', function()  {
-        const url = '/XXX/plugins/com.rs.testplugin'
+        const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/caller/_current'
         const req = chai.request(server).get(url)
         return req.then(function (res) {
@@ -156,10 +156,10 @@ describe('WebApp', function() {
             res.body.should.be.a('object');
             console.log(res.body)
             res.body.should.deep.equal({
-                "plugin": "com.rs.testplugin",
+                "plugin": "org.zowe.testplugin",
                 "service": "caller",
                 "test-service response": {
-                  "plugin": "com.rs.testplugin",
+                  "plugin": "org.zowe.testplugin",
                   "service": "test-service",
                   "version": "2.1.0"
                 }
@@ -168,7 +168,7 @@ describe('WebApp', function() {
       })
       
       it('should respect local service version requirements', function()  {
-        const url = '/XXX/plugins/com.rs.testplugin'
+        const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/caller-with-requirements/_current'
         const req = chai.request(server).get(url)
         //console.log(req)
@@ -177,10 +177,10 @@ describe('WebApp', function() {
             res.body.should.be.a('object');
             console.log(res.body)
             res.body.should.deep.equal({
-                "plugin": "com.rs.testplugin",
+                "plugin": "org.zowe.testplugin",
                 "service": "caller",
                 "test-service response": {
-                  "plugin": "com.rs.testplugin",
+                  "plugin": "org.zowe.testplugin",
                   "service": "test-service",
                   "version": "1.3.0"
                 }

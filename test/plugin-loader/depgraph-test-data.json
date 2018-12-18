@@ -1,7 +1,7 @@
 {
   "goodCase": [
         {
-          "identifier": "com.rs.consumer",
+          "identifier": "org.zowe.consumer",
           "baseURI": "consumer",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
@@ -9,21 +9,21 @@
           "dataServices": [
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "~1.0.0",
               "localName": "foo"
             },
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "^2.0.0",
               "localName": "foo"
             },
             {
               "type": "import",
-              "sourcePlugin": "com.rs.intermediary",
+              "sourcePlugin": "org.zowe.intermediary",
               "sourceName": "something",
               "versionRange": "1.0.0",
               "localName": "something"
@@ -31,7 +31,7 @@
           ]
         },
         {
-          "identifier": "com.rs.loner",
+          "identifier": "org.zowe.loner",
           "baseURI": "loner",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -46,7 +46,7 @@
           ]
         },
         {
-          "identifier": "com.rs.provider",
+          "identifier": "org.zowe.provider",
           "baseURI": "provider",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -73,7 +73,7 @@
           ]
         },
         {
-          "identifier": "com.rs.intermediary",
+          "identifier": "org.zowe.intermediary",
           "baseURI": "intermediary",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -81,7 +81,7 @@
           "dataServices": [
              {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "^1.0.0",
               "localName": "foo"
@@ -97,7 +97,7 @@
   ],
     "brokenProvider": [
         {
-          "identifier": "com.rs.consumer",
+          "identifier": "org.zowe.consumer",
           "baseURI": "consumer",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
@@ -105,21 +105,21 @@
           "dataServices": [
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "1.0.0",
               "localName": "foo"
             },
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "1.0.0",
               "localName": "foo"
             },
             {
               "type": "import",
-              "sourcePlugin": "com.rs.intermediary",
+              "sourcePlugin": "org.zowe.intermediary",
               "sourceName": "something",
               "versionRange": "1.0.0",
               "localName": "something"
@@ -127,7 +127,7 @@
           ]
         },
         {
-          "identifier": "com.rs.loner",
+          "identifier": "org.zowe.loner",
           "baseURI": "loner",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -142,7 +142,7 @@
           ]
         },
         {
-          "identifier": "com.rs.provider",
+          "identifier": "org.zowe.provider",
           "baseURI": "provider",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -176,7 +176,7 @@
           ]
         },
         {
-          "identifier": "com.rs.intermediary",
+          "identifier": "org.zowe.intermediary",
           "baseURI": "intermediary",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -184,7 +184,7 @@
           "dataServices": [
              {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "1.0.0",
               "localName": "foo"
@@ -200,7 +200,7 @@
   ],
   "versionMismatch": [
         {
-          "identifier": "com.rs.consumer",
+          "identifier": "org.zowe.consumer",
           "baseURI": "consumer",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
@@ -208,21 +208,21 @@
           "dataServices": [
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "1.0.0",
               "localName": "foo"
             },
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "2.0.0",
               "localName": "foo"
             },
             {
               "type": "import",
-              "sourcePlugin": "com.rs.intermediary",
+              "sourcePlugin": "org.zowe.intermediary",
               "sourceName": "something",
               "versionRange": "1.0.0",
               "localName": "something"
@@ -230,7 +230,7 @@
           ]
         },
         {
-          "identifier": "com.rs.loner",
+          "identifier": "org.zowe.loner",
           "baseURI": "loner",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -245,7 +245,7 @@
           ]
         },
         {
-          "identifier": "com.rs.provider",
+          "identifier": "org.zowe.provider",
           "baseURI": "provider",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -272,7 +272,7 @@
           ]
         },
         {
-          "identifier": "com.rs.intermediary",
+          "identifier": "org.zowe.intermediary",
           "baseURI": "intermediary",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -280,7 +280,7 @@
           "dataServices": [
              {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "3.0.0",
               "localName": "foo"
@@ -296,7 +296,7 @@
   ],
   "cycle": [
         {
-          "identifier": "com.rs.a",
+          "identifier": "org.zowe.a",
           "baseURI": "a",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
@@ -304,7 +304,7 @@
           "dataServices": [
             {
               "type": "import",
-              "sourcePlugin": "com.rs.b",
+              "sourcePlugin": "org.zowe.b",
               "sourceName": "foo",
               "versionRange": "1.0.0",
               "localName": "foo"
@@ -318,7 +318,7 @@
           ]
         },
         {
-          "identifier": "com.rs.b",
+          "identifier": "org.zowe.b",
           "baseURI": "b",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -326,7 +326,7 @@
           "dataServices": [
             {
               "type": "import",
-              "sourcePlugin": "com.rs.a",
+              "sourcePlugin": "org.zowe.a",
               "sourceName": "bar",
               "versionRange": "1.0.0",
               "localName": "bar"

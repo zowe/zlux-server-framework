@@ -9,14 +9,14 @@ module.exports = pluginContext => {
     req.zluxData.plugin.callService('test-service').then(
         callResponse => {
           res.status(callResponse.statusCode).json({
-            "plugin": "com.rs.testplugin",
+            "plugin": "org.zowe.testplugin",
             "service": "caller",
             "test-service response": JSON.parse(callResponse.body)
           })
         }).catch(e => {
           console.log(e)
           res.status(400).json({
-            "plugin": "com.rs.testplugin",
+            "plugin": "org.zowe.testplugin",
             "service": "caller",
             "error": e
           })

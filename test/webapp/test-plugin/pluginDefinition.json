@@ -1,6 +1,5 @@
 {
-  "identifier": "com.rs.testplugin",
-  "baseURI": "test",
+  "identifier": "org.zowe.testplugin",
   "apiVersion": "1.0.0",
   "pluginVersion": "1.0.0",
   "pluginType": "application",

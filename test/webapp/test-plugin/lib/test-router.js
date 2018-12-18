@@ -7,7 +7,7 @@ module.exports = pluginContext => {
   const r = express.Router();
   r.get('/', (req, res) => {
     res.status(200).json({
-      "plugin": "com.rs.testplugin",
+      "plugin": "org.zowe.testplugin",
       "service": "test-service",
       "version": "1.3.0"
     })

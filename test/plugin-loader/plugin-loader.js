@@ -15,14 +15,14 @@ describe('Plugin', function() {
     
     it('should correctly process a basic plugin def', function() {
       const testPluginDef = {
-        "identifier": "com.rs.testplugin",
+        "identifier": "org.zowe.testplugin",
         "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
         "pluginType": "application",
       };
       const p = makePlugin(testPluginDef, {}, pluginContext, false);
-      assert.equal(p.identifier, "com.rs.testplugin");
+      assert.equal(p.identifier, "org.zowe.testplugin");
       assert.equal(p.pluginVersion, "1.0.0");
       assert.equal(p.pluginType, "application");
       assert.equal(p.constructor.name, "ApplicationPlugIn");
@@ -45,7 +45,7 @@ describe('Plugin', function() {
     
     it('should correctly group services', function() {
       const testPluginDef = {
-        "identifier": "com.rs.testplugin",
+        "identifier": "org.zowe.testplugin",
         "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
@@ -87,7 +87,7 @@ describe('Plugin', function() {
     
     it('should correctly group imports', function() {
       const testPluginDef = {
-        "identifier": "com.rs.testplugin",
+        "identifier": "org.zowe.testplugin",
         "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
@@ -95,7 +95,7 @@ describe('Plugin', function() {
         "dataServices": [
           {
             "type": "import",
-            "sourcePlugin": "com.rs.provider",
+            "sourcePlugin": "org.zowe.provider",
             "sourceName": "blah",
             "versionRange": "2.0.0",
             "version": "2.0.0",
@@ -103,7 +103,7 @@ describe('Plugin', function() {
           },
           {
             "type": "import",
-            "sourcePlugin": "com.rs.intermediary",
+            "sourcePlugin": "org.zowe.intermediary",
             "sourceName": "something",
             "versionRange": "1.0.0",
             "version": "1.0.0",
@@ -122,7 +122,7 @@ describe('Plugin', function() {
     
     it('should correctly check local service version dependencies', function() {
       const twoVersionsOfAService = {
-        "identifier": "com.rs.testplugin",
+        "identifier": "org.zowe.testplugin",
         "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
@@ -152,7 +152,7 @@ describe('Plugin', function() {
         ]
       };
       const twoVersionsOfAnImport = {
-          "identifier": "com.rs.testplugin",
+          "identifier": "org.zowe.testplugin",
           "baseURI": "testplugin",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -160,7 +160,7 @@ describe('Plugin', function() {
           "dataServices": [
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "2.0.0",
               "version": "2.0.0",
@@ -168,7 +168,7 @@ describe('Plugin', function() {
             },
             {
               "type": "import",
-              "sourcePlugin": "com.rs.provider",
+              "sourcePlugin": "org.zowe.provider",
               "sourceName": "foo",
               "versionRange": "^4.0.0",
               "version": "4.1.1",
@@ -186,7 +186,7 @@ describe('Plugin', function() {
           ]
         };
       const requiredServiceMissing = {
-          "identifier": "com.rs.testplugin",
+          "identifier": "org.zowe.testplugin",
           "baseURI": "testplugin",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
@@ -204,7 +204,7 @@ describe('Plugin', function() {
           ]
         };
       const requiredServiceVersionMissing = {
-          "identifier": "com.rs.testplugin",
+          "identifier": "org.zowe.testplugin",
           "baseURI": "testplugin",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
