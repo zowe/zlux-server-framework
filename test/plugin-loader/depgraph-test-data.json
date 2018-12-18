@@ -2,7 +2,6 @@
   "goodCase": [
         {
           "identifier": "org.zowe.consumer",
-          "baseURI": "consumer",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
           "pluginType": "application",
@@ -32,7 +31,6 @@
         },
         {
           "identifier": "org.zowe.loner",
-          "baseURI": "loner",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -47,7 +45,6 @@
         },
         {
           "identifier": "org.zowe.provider",
-          "baseURI": "provider",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -74,7 +71,6 @@
         },
         {
           "identifier": "org.zowe.intermediary",
-          "baseURI": "intermediary",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -98,7 +94,6 @@
     "brokenProvider": [
         {
           "identifier": "org.zowe.consumer",
-          "baseURI": "consumer",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
           "pluginType": "application",
@@ -128,7 +123,6 @@
         },
         {
           "identifier": "org.zowe.loner",
-          "baseURI": "loner",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -143,7 +137,6 @@
         },
         {
           "identifier": "org.zowe.provider",
-          "baseURI": "provider",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -177,7 +170,6 @@
         },
         {
           "identifier": "org.zowe.intermediary",
-          "baseURI": "intermediary",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -201,7 +193,6 @@
   "versionMismatch": [
         {
           "identifier": "org.zowe.consumer",
-          "baseURI": "consumer",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
           "pluginType": "application",
@@ -231,7 +222,6 @@
         },
         {
           "identifier": "org.zowe.loner",
-          "baseURI": "loner",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -246,7 +236,6 @@
         },
         {
           "identifier": "org.zowe.provider",
-          "baseURI": "provider",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -273,7 +262,6 @@
         },
         {
           "identifier": "org.zowe.intermediary",
-          "baseURI": "intermediary",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -297,7 +285,6 @@
   "cycle": [
         {
           "identifier": "org.zowe.a",
-          "baseURI": "a",
           "apiVersion": "1.0.0",
           "pluginVersion": "0.0.0-zlux.version.replacement",
           "pluginType": "application",

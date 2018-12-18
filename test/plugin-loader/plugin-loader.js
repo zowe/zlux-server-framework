@@ -16,7 +16,6 @@ describe('Plugin', function() {
     it('should correctly process a basic plugin def', function() {
       const testPluginDef = {
         "identifier": "org.zowe.testplugin",
-        "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
         "pluginType": "application",
@@ -33,7 +32,6 @@ describe('Plugin', function() {
        * TODO other invalid combinations
        */
       const testPluginDef = {
-        "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
         "pluginType": "application",
@@ -46,7 +44,6 @@ describe('Plugin', function() {
     it('should correctly group services', function() {
       const testPluginDef = {
         "identifier": "org.zowe.testplugin",
-        "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
         "pluginType": "application",
@@ -88,7 +85,6 @@ describe('Plugin', function() {
     it('should correctly group imports', function() {
       const testPluginDef = {
         "identifier": "org.zowe.testplugin",
-        "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
         "pluginType": "application",
@@ -123,7 +119,6 @@ describe('Plugin', function() {
     it('should correctly check local service version dependencies', function() {
       const twoVersionsOfAService = {
         "identifier": "org.zowe.testplugin",
-        "baseURI": "testplugin",
         "apiVersion": "1.0.0",
         "pluginVersion": "1.0.0",
         "pluginType": "application",
@@ -153,7 +148,6 @@ describe('Plugin', function() {
       };
       const twoVersionsOfAnImport = {
           "identifier": "org.zowe.testplugin",
-          "baseURI": "testplugin",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -187,7 +181,6 @@ describe('Plugin', function() {
         };
       const requiredServiceMissing = {
           "identifier": "org.zowe.testplugin",
-          "baseURI": "testplugin",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
@@ -205,7 +198,6 @@ describe('Plugin', function() {
         };
       const requiredServiceVersionMissing = {
           "identifier": "org.zowe.testplugin",
-          "baseURI": "testplugin",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
