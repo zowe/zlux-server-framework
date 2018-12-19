@@ -18,13 +18,15 @@ const url = require('url');
 const path = require('path');
 const os = require('os');
 const assert = require('assert');
-const toposort = require('toposort');
 const requireFromString = require('require-from-string');
 const EventEmitter = require('events');
+const semver = require('semver');
 const zluxUtil = require('./util');
 const jsonUtils = require('./jsonUtils.js');
 const configService = require('../plugins/config/lib/configService.js');
+const DependencyGraph = require('./depgraph');
 const translationUtils = require('./translation-utils.js');
+const makeSwaggerCatalog = require('./swagger-catalog');
 
 /**
  * Plugin loader: reads the entire plugin configuration tree
@@ -44,113 +46,75 @@ const defaultOptions = {
   serverConfig: null
 }
 
-function ExternalImports() {
-  this.map = {};
-}
-
-ExternalImports.prototype = {
-  constructor: ExternalImports,
-  /**
-   * A plugin import table in the opposite direction. 
-   * Shows who imports us, rather than whom we import.
-   *   
-   *   <plugin id>: {
-   *     <service name>: [
-   *       ...,
-   *       {
-   *         "toPlugin": the id of a plugin that imports the service from the plugin
-   *         "alias": the target alias of the service
-   *       },
-   *       ...
-   *     ]
-   *   }
-   */
-  map: null, 
-  
-  /**
-   * Register a newly obtained plugin definition's dependencies to the table
-   */
-  registerAsImporterOfAs(destPlugin, sourcePlugin, sourceName, localName) {
-    let sourcePluginEntry = this.map[sourcePlugin];
-    if (!sourcePluginEntry) {
-      sourcePluginEntry = this.map[sourcePlugin] = {};
-    }
-    let sourceServiceRefs = sourcePluginEntry[sourceName];
-    if (!sourceServiceRefs) {
-      sourceServiceRefs = sourcePluginEntry[sourceName] = [];
-    }
-    sourceServiceRefs.push({
-      toPlugin: destPlugin.identifier,
-      alias: localName
-    });
-  },
-  
-  /**
-   * Ensure that none of the `plugins` contains unsatisfied imports.
-   * 
-   * Every service of every plugin from `plugins` cancels out the corresponding
-   * records from the table.
-   * 
-   * Updates every imported data service's externalRefs
-   * 
-   * Returns true if the table ends up being empty, false otherwise
-   */
-  allImportsResolved(plugins) {
-    let success = true;
-    for (const plugin of plugins) {
-      const externalImports = this.map[plugin.identifier];
-      if (externalImports) {
-        if (plugin.dataServices) {
-          for (const dataservice of plugin.dataServices) {
-            dataservice.externalRefs = externalImports[dataservice.name];
-            delete externalImports[dataservice.name];
-          }
-        }
-        const missingServices = Object.keys(externalImports);
-        if (missingServices.length > 0) {
-          success = false;
-        }
-        delete this.map[plugin.identifier];
-      }
-    }
-    const missingPlugins = Object.keys(this.map);
-    if (missingPlugins.length > 0) {
-      success = false;
-    }
-    return success;
-  },
-   
-  /*
-   * TODO recursively mark broken the dependents of a broken plugin
-   */
-  getBrokenPlugins() {
-    let report = {};
-    for (const plugin of Object.keys(this.map)) {
-      const serviceMap = this.map[plugin]
-      for (const service of Object.keys(serviceMap)) {
-        const imports = serviceMap[service];
-        for (const im of imports) {
-          let p = report[im.toPlugin];
-          if (!p) {
-            p = report[im.toPlugin] = {};
-          }
-          p[im.alias] = true;
-        }
-      }
-    }
-    return report;
-  },
-  
-  reset() {
-    this.map = {};
-  }
-};
-
 function Service(def, configuration, plugin) {
   this.configuration = configuration;
   //don't do this here: avoid circular structures:
   //this.plugin = plugin; 
   Object.assign(this, def);
+  if (this.version === undefined) {
+    //FIXME temporary hack until everyone has fixed their plugin defs.
+    bootstrapLogger.warn(`Service ${plugin.identifier}::${this.name} doesn't` 
+      + ` specify a version. Resorting to the plugin's API version ${plugin.apiVersion}`);
+    this.version = plugin.apiVersion;
+  }
+}
+Service.prototype = {
+  constructor: Service,
+  
+  validate() {
+    if (!semver.valid(this.version)) {
+      throw new Error(`${this.name}: invalid version "${this.version}"`)
+    }
+    if (this.versionRequirements) {
+      for (let serviceName of Object.keys(this.versionRequirements)) {
+        if (!semver.validRange(this.versionRequirements[serviceName])) {
+          throw new Error(`${this.localName}: invalid version range ` +
+              `${serviceName}: ${this.versionRequirements[serviceName]}`)
+        }
+      }
+    }
+  }
+}
+
+function Import(def, configuration, plugin) {
+  Service.call(this, def, configuration, plugin);
+}
+Import.prototype = {
+  constructor: Import,
+  __proto__:  Service.prototype,
+  
+  validate() {
+    if (!semver.validRange(this.versionRange)) {
+      throw new Error(`${this.localName}: invalid version range "${this.versionRange}"`)
+    }
+  }
+}
+
+function NodeService(def, configuration, plugin) {
+  Service.call(this, def, configuration, plugin);
+}
+NodeService.prototype = {
+  constructor: NodeService,
+  __proto__:  Service.prototype,
+  
+  loadImplementation(dynamicallyCreated, location) {
+    if (dynamicallyCreated) {
+      const nodeModule = requireFromString(this.source);
+      this.nodeModule = nodeModule;
+    } else {
+      // Quick fix before MVD-947 is merged
+      var fileLocation = ""
+      if (this.filename) {
+        fileLocation = path.join(location, 'lib', this.filename);
+      } else if (this.fileName) {
+        fileLocation = path.join(location, 'lib', this.fileName);
+      } else {
+        throw new Error(`No file name for data service`)
+      }
+      const nodeModule = require(fileLocation);
+      this.nodeModule = nodeModule;
+    }
+  }
 }
 
 //first checks if the parent plugin has a host and port 
@@ -184,16 +148,24 @@ function makeDataService(def, plugin, context) {
   let dataservice;
   if (def.type == "external") {
     dataservice = new ExternalService(def, configuration, plugin);
+  } else if (def.type == "import") {
+    dataservice = new Import(def, configuration, plugin);
+  } else if ((def.type == 'nodeService')
+        || (def.type === 'router')) {
+    dataservice = new NodeService(def, configuration, plugin);
   } else {
     dataservice = new Service(def, configuration, plugin);
   }
+  dataservice.validate();
   return dataservice;
 }
 
-function Plugin(def, configuration, location) {
+function Plugin(def, configuration) {
   Object.assign(this, def);
   this.configuration = configuration;
-  this.location = location;
+  if (!this.location) {
+    this.location = process.cwd();
+  }
   this.translationMaps = {};
 }
 Plugin.prototype = {
@@ -271,83 +243,120 @@ Plugin.prototype = {
     }
   },
   
-  initWebServiceDependencies(unresolvedImports, context) {
-    if (this.dataServices) {
-      this.dataServicesGrouped = {
-        router: [],
-        import: [],
-        node: [],
-        proxy: [],
-        external: []
-      };
-      for (const dataServiceDef of this.dataServices) {
-        const dataservice = makeDataService(dataServiceDef, this, context);
-        if (dataservice.type == "service") {          
-          this.dataServicesGrouped.proxy.push(dataservice);
+  initDataServices(context) {
+    function addService(service, name, container) {
+      let group = container[name];
+      if (!group) {
+        group = container[name] = {
+          name,
+          highestVersion: null,
+          versions: {},
+        };
+      }
+      if (!group.highestVersion 
+          || semver.gt(service.version, group.highestVersion)) {
+        group.highestVersion = service.version;
+      }
+      group.versions[service.version] = service;
+    }
+    
+    if (!this.dataServices) {
+      return;
+    }
+    this.dataServicesGrouped = {};
+    this.importsGrouped = {};
+    const filteredDataServices = [];
+    for (const dataServiceDef of this.dataServices) {
+      const dataservice = makeDataService(dataServiceDef, this, context);
+      if (dataservice.type == "service") {          
+        addService(dataservice, dataservice.name, this.dataServicesGrouped);
+        bootstrapLogger.info(`${this.identifier}: `
+            + `found proxied service '${dataservice.name}'`);
+        filteredDataServices.push(dataservice);
+      } else   if (dataservice.type === 'import') {
+        bootstrapLogger.info(`${this.identifier}:`
+            + ` importing service '${dataservice.sourceName}'`
+            + ` from ${dataservice.sourcePlugin}`
+            + ` as '${dataservice.localName}'`);
+        addService(dataservice, dataservice.localName, this.importsGrouped);
+        filteredDataServices.push(dataservice);
+      } else if ((dataservice.type == 'nodeService')
+          || (dataservice.type === 'router')) {
+        //TODO what is this? Why do we need it?
+//        if ((dataservice.serviceLookupMethod == 'internal')
+//            || !dataservice.dependenciesIncluded) {
+//          bootstrapLogger.warn(`${this.identifier}:`
+//              + ` loading dataservice ${dataservice.name} failed, declaration invalid`);
+//          continue;
+//        }
+        dataservice.loadImplementation(this.dynamicallyCreated, this.location);
+        if (dataservice.type === 'router') {
           bootstrapLogger.info(`${this.identifier}: `
-              + `found proxied service '${dataservice.name}'`);
-        } else   if (dataservice.type === 'import') {
-          this.dataServicesGrouped.import.push(dataservice);
-          unresolvedImports.registerAsImporterOfAs(this, dataservice.sourcePlugin,
-              dataservice.sourceName, dataservice.localName);
-          bootstrapLogger.info(`${this.identifier}:`
-              + ` importing service '${dataservice.sourceName}'`
-              + ` from ${dataservice.sourcePlugin}`
-              + ` as '${dataservice.localName}'`);
-        } else if ((dataservice.type == 'nodeService')
-            || (dataservice.type === 'router')) {
-          if ((dataservice.serviceLookupMethod == 'internal')
-              || !dataservice.dependenciesIncluded) {
-            bootstrapLogger.warn(`${this.identifier}:`
-                + ` loading dataservice ${dataservice.name} failed, declaration invalid`);
-            continue;
-          }
-          if (dataservice.type === 'router') {
-            bootstrapLogger.info(`${this.identifier}: `
-                + `found router '${dataservice.name}'`);
-            this.dataServicesGrouped.router.push(dataservice);
-          } else {
-            bootstrapLogger.info(`${this.identifier}: `
-                + `found legacy node service '${dataservice.name}'`);
-            this.dataServicesGrouped.node.push(dataservice);
-          }
-          if (this.dynamicallyCreated) {
-            const nodeModule = requireFromString(dataservice.source);
-            dataservice.nodeModule = nodeModule;
-          } else {
-            // Quick fix before MVD-947 is merged
-            var fileLocation = ""
-            if (dataservice.filename) {
-              fileLocation = path.join(this.location, 'lib', dataservice.filename);
-            }
-            else if (dataservice.fileName) {
-              fileLocation = path.join(this.location, 'lib', dataservice.fileName);
-            }
-            else {
-              throw new Error (`No file name for data service`)
-            }
-            // Make the relative path clear. process.cwd() is zlux-example-server/bin/
-            if (!path.isAbsolute(fileLocation)) {
-              fileLocation = path.join(process.cwd(),fileLocation);
-            }
-            const nodeModule = require(fileLocation);
-            dataservice.nodeModule = nodeModule;
-          }
-        } else if (dataservice.type == 'external') {
-          this.dataServicesGrouped.external.push(dataservice);
-          bootstrapLogger.info(`${this.identifier}: `
-              + `found external service '${dataservice.name}'`);
+              + `found router '${dataservice.name}'`);
+          addService(dataservice, dataservice.name, this.dataServicesGrouped);
         } else {
-          bootstrapLogger.warn(`${this.identifier}: `
-              + `invalid service type '${dataservice.name}'`);
+          bootstrapLogger.info(`${this.identifier}: `
+              + `found legacy node service '${dataservice.name}'`);
+          addService(dataservice, dataservice.name, this.dataServicesGrouped);
+        }
+        filteredDataServices.push(dataservice);
+      } else if (dataservice.type == 'external') {
+        addService(dataservice, dataservice.name, this.dataServicesGrouped);
+        bootstrapLogger.info(`${this.identifier}: `
+            + `found external service '${dataservice.name}'`);
+        filteredDataServices.push(dataservice);
+      } else {
+        bootstrapLogger.warn(`${this.identifier}: `
+            + `invalid service type '${dataservice.name}'`);
+      }
+    }
+    this.dataServices = filteredDataServices;
+    this._validateLocalVersionRequirements()
+  },
+  
+  _validateLocalVersionRequirements() {
+    for (let service of this.dataServices) {
+      if (!service.versionRequirements) {
+        continue;
+      }
+      for (let serviceName of Object.keys(service.versionRequirements)) {
+        const allVersions = this.dataServicesGrouped[serviceName] 
+            || this.importsGrouped[serviceName];
+        if (!allVersions) {
+          throw new Error(`${this.identifier}::${service.name} `
+              + "Required local service missing: " + serviceName)
+        }
+        const requiredVersion = service.versionRequirements[serviceName];
+        let found = null;
+        for (let availableVersion of Object.keys(allVersions.versions)) {
+          if (semver.satisfies(availableVersion, requiredVersion)) {
+            found = availableVersion;
+            break;
+          }
+        }
+        if (!found) {
+          throw new Error(`${this.identifier}::${service.name} `
+              + `Could not find a version to satisfy local dependency `
+              + `${serviceName}@${requiredVersion}`)
+        } else {
+          bootstrapLogger.debug(`${this.identifier}::${service.name}: found `
+              + `${serviceName}@${found}`)
+          //replace the mask in the def with an actual version to make the life 
+          // simpler
+          service.versionRequirements[serviceName] = found;
         }
       }
     }
+  },
+  
+  getApiCatalog(productCode) {
+    return makeSwaggerCatalog(this, productCode)
   }
+  
 };
 
-function LibraryPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function LibraryPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 LibraryPlugIn.prototype = {
   __proto__: Plugin.prototype,
@@ -365,40 +374,40 @@ LibraryPlugIn.prototype = {
   }
 };
 
-function ApplicationPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function ApplicationPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 ApplicationPlugIn.prototype = {
   __proto__: Plugin.prototype,
   constructor: ApplicationPlugIn,
 };
 
-function WindowManagerPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function WindowManagerPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 WindowManagerPlugIn.prototype = {
   constructor: WindowManagerPlugIn,
   __proto__: Plugin.prototype,
 };
 
-function BootstrapPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function BootstrapPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 BootstrapPlugIn.prototype = {
   constructor: BootstrapPlugIn,
   __proto__: Plugin.prototype,
 };
 
-function DesktopPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function DesktopPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 DesktopPlugIn.prototype = {
   constructor: DesktopPlugIn,
   __proto__: Plugin.prototype,
 };
 
-function NodeAuthenticationPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function NodeAuthenticationPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
 }
 NodeAuthenticationPlugIn.prototype = {
   constructor: NodeAuthenticationPlugIn,
@@ -443,8 +452,8 @@ NodeAuthenticationPlugIn.prototype = {
   }
 };
 
-function ProxyConnectorPlugIn(def, configuration, location) {
-  Plugin.call(this, def, configuration, location);
+function ProxyConnectorPlugIn(def, configuration) {
+  Plugin.call(this, def, configuration);
   const remoteConfig = configuration.getContents(["remote.json"]);
   if (remoteConfig) {
     if (!this.host) {
@@ -463,15 +472,15 @@ ProxyConnectorPlugIn.prototype = {
     if (!(super.isValid(context) && this.host && this.port)) {
       return false;
     }
-    //we should not load authentication types that are 
-    //not requested by the administrator
-    if (!context.authManager.authPluginRequested(this.identifier,
-      this.authenticationCategory)) {
-      bootstrapLogger.warn("Authentication plugin was found which was not requested in "
-          + "the server configuration file's dataserviceAuthentication object. "
-          + "Skipping load of this plugin");
-      return false;
-    }
+//    //we should not load authentication types that are 
+//    //not requested by the administrator
+//    if (!context.authManager.authPluginRequested(this.identifier,
+//      this.authenticationCategory)) {
+//      bootstrapLogger.warn("Authentication plugin was found which was not requested in "
+//          + "the server configuration file's dataserviceAuthentication object. "
+//          + "Skipping load of this plugin");
+//      return false;
+//    }
     return true;
   },
 };
@@ -486,7 +495,7 @@ const plugInConstructorsByType = {
   "proxyConnector": ProxyConnectorPlugIn
 };
 
-function makePlugin(def, pluginConfiguration, basePath) {
+function makePlugin(def, pluginConfiguration, pluginContext, dynamicallyCreated) {
   const pluginConstr = plugInConstructorsByType[def.pluginType];
   if (!pluginConstr) {
     throw new Error(`${def.identifier}: pluginType ${def.pluginType} is unknown`); 
@@ -495,16 +504,26 @@ function makePlugin(def, pluginConfiguration, basePath) {
   // "class" referred to by `proto`. Create an instance and inject the
   // de-serialized instance data there.
   // (We don't need an extra indirection level, e.g. self.definition = def)
-  const self = new pluginConstr(def, pluginConfiguration, basePath);
+  const self = new pluginConstr(def, pluginConfiguration);
+  self.dynamicallyCreated = dynamicallyCreated;
+  if (!self.isValid(pluginContext)) {
+    bootstrapLogger.warn(`${def.location} points to an`
+        + " invalid plugin definition, skipping");
+    throw new Error(`Plugin ${def.identifier} invalid`)
+  }
+  self.initDataServices(pluginContext);
+  if (!dynamicallyCreated) {
+    self.initStaticWebDependencies();
+  }
+  self.init(pluginContext);
   return self;
 };
 
 function PluginLoader(options) {
   EventEmitter.call(this);
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
-  this.plugins = null;
+  this.plugins = [];
   this.pluginMap = {};
-  this.unresolvedImports = new ExternalImports();
 };
 PluginLoader.prototype = {
   constructor: PluginLoader,
@@ -512,17 +531,7 @@ PluginLoader.prototype = {
   options: null,
   plugins: null,
   pluginMap: null,
-  unresolvedImports: null,
 
-  _emitPluginEurekaInfo(pluginDef) {
-    this.emit('updateEurekaMetadata', {
-      id: pluginDef.identifier,
-      pluginVersion: pluginDef.pluginVersion,
-      webContent: pluginDef.webContent,
-      dataServices: pluginDef.dataServices
-    });
-  },
-  
   _readPluginDef(pluginDescriptorFilename) {
     const pluginPtrPath = path.join(this.options.pluginsDir, 
         pluginDescriptorFilename);
@@ -533,6 +542,9 @@ PluginLoader.prototype = {
     const pluginPtrDef = jsonUtils.parseJSONWithComments(pluginPtrPath);
     bootstrapLogger.log(bootstrapLogger.FINER, util.inspect(pluginPtrDef));
     let pluginBasePath = pluginPtrDef.pluginLocation;
+    if (!path.isAbsolute(pluginBasePath)) {
+      pluginBasePath = path.join(process.cwd(), pluginBasePath);
+    }
     if (!fs.existsSync(pluginBasePath)) {
       throw new Error(`${pluginDescriptorFilename}: No plugin directory found at`
         + `${pluginPtrDef.pluginLocation}`);
@@ -554,107 +566,76 @@ PluginLoader.prototype = {
     }
     bootstrapLogger.info(`Read ${pluginBasePath}: found plugin type `
         + `'${pluginDef.pluginType}'`);
-    this._emitPluginEurekaInfo(pluginDef); // Emit Eureka info
-    const pluginConfiguration = configService.getPluginConfiguration(
-      pluginDef.identifier, this.options.serverConfig,
-      this.options.productCode);
-    bootstrapLogger.debug(`For plugin with id=${pluginDef.identifier}, internal config` 
-                          + ` found=\n${JSON.stringify(pluginConfiguration)}`);
-    return makePlugin(pluginDef, pluginConfiguration, pluginBasePath, 
-      this.options.productCode);
+    pluginDef.location = pluginBasePath;
+    return pluginDef;
   },
   
-  _toposortPlugins(plugins, pluginMap) {
-    const edges = [];
-    for (const plugin of plugins) {
-      if (!plugin.dataServicesGrouped) {
-        continue;
-      }
-      for (const service of plugin.dataServicesGrouped.import || []) {
-        const prereq = pluginMap[service.sourcePlugin];
-        //console.log("pushing [", prereq.identifier, ", ", plugin.identifier, "]")
-        edges.push([prereq, plugin]);
-      }
-    }
-    const sorted = toposort.array(plugins, edges);
-    //console.log("before sort: ", JSON.stringify(plugins, null, 2));
-    //console.log("after sort: ", JSON.stringify(sorted, null, 2));
-    return sorted;
-  },
-
-  loadPlugins() {
-    const pluginContext = {
-      productCode: this.options.productCode,
-      config: this.options.serverConfig,
-      plugins: [],
-      authManager: this.options.authManager
-    };
+  readPluginDefs() {
+    const defs = [];
     bootstrapLogger.log(bootstrapLogger.INFO,
       `Reading plugins dir ${this.options.pluginsDir}`);
     const pluginLocationJSONs = fs.readdirSync(this.options.pluginsDir)
-        .filter(function(value){
-          return value.match(/.*\.json/);
-        });
+      .filter(function(value){
+        return value.match(/.*\.json/);
+      });
     bootstrapLogger.log(bootstrapLogger.FINER, util.inspect(pluginLocationJSONs));
     for (const pluginDescriptorFilename of pluginLocationJSONs) {
       try {
         const plugin = this._readPluginDef(pluginDescriptorFilename);
-        if (!plugin.isValid(pluginContext)) {
-          bootstrapLogger.warn(`${pluginDescriptorFilename} points to an`
-              + " invalid plugin definition, skipping");
-          continue;
-        }
-        /*
-         * FIXME don't yet do the steps below! Toposort and find broken deps 
-         * first! If there's a broken dependency somewhere, the entire subtree of 
-         * plugins who indirectly depend on the broken plugin may need to be 
-         * skipped, we don't even want to load their stuff.
-         */
-        plugin.initStaticWebDependencies();
-        plugin.initWebServiceDependencies(this.unresolvedImports, pluginContext);
-        plugin.init(pluginContext);
-        plugin.loadTranslations();
-        pluginContext.plugins.push(plugin);
-        bootstrapLogger.log(bootstrapLogger.INFO,
-          `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
-        bootstrapLogger.debug(' Content:\n' + plugin.toString());
+        defs.push(plugin);
       } catch (e) {
         console.log(e);
         bootstrapLogger.warn(e)
         bootstrapLogger.log(bootstrapLogger.INFO,
           `Failed to load ${pluginDescriptorFilename}\n`);
       }
+    } 
+    return defs;
+  },
+  
+  loadPlugins() {
+    const defs = this.readPluginDefs();
+    this.installPlugins(defs);
+  },
+  
+  installPlugins(pluginDefs) {
+    const pluginContext = {
+      productCode: this.options.productCode,
+      config: this.options.serverConfig,
+      authManager: this.options.authManager
+    };
+    let successCount = 0;
+    const depgraph = new DependencyGraph(this.plugins);
+    for (const pluginDef of pluginDefs) {
+      depgraph.addPlugin(pluginDef);
     }
-    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
-      //TODO what do we want to do here?
-      // stop the server? 
-      // chug along with some plugins broken?
-      // leave only working plugins and not load the broken ones? 
-      const broken = this.unresolvedImports.getBrokenPlugins();
-      pluginContext.plugins = pluginContext.plugins.filter(
-        (p) => {
-          if (broken[p.identifier]) {
-            bootstrapLogger.warn(`Could not initialize plugin ${p.identifier}:`
-              + " unresolved imports: "
-              + Object.keys(broken[p.identifier]).join(', '));
-            return false;
-          }
-          return true;
-        });
-      this.unresolvedImports.reset();
+    const sortedAndRejectedPlugins = depgraph.processImports();
+    for (const rejectedPlugin of sortedAndRejectedPlugins.rejects) {
+      bootstrapLogger.warn(`Could not initialize plugin` 
+          + ` ${rejectedPlugin.pluginId}: `  
+          + rejectedPlugin.validationError.status);
     }
-    for (const plugin of pluginContext.plugins) {
-      zluxUtil.deepFreeze(plugin);
-      this.pluginMap[plugin.identifier] = plugin;
+    for (const pluginDef of sortedAndRejectedPlugins.plugins) { 
+      try {
+        const pluginConfiguration = configService.getPluginConfiguration(
+            pluginDef.identifier, this.options.serverConfig,
+            this.options.productCode);
+        bootstrapLogger.debug(`For plugin with id=${pluginDef.identifier}, internal config` 
+                                + ` found=\n${JSON.stringify(pluginConfiguration)}`);
+        const plugin = makePlugin(pluginDef, pluginConfiguration, pluginContext);
+        bootstrapLogger.log(bootstrapLogger.INFO,
+            `Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
+        bootstrapLogger.debug(' Content:\n' + plugin.toString());
+        this.plugins.push(zluxUtil.deepFreeze(plugin));
+        this.pluginMap[plugin.identifier] = plugin;
+        successCount++;
+      } catch (e) {
+        console.log(e);
+        //bootstrapLogger.warn(e)
+        bootstrapLogger.log(bootstrapLogger.INFO,
+          `Failed to load ${pluginDef.identifier}: ${e}`);
+      }
     }
-    this.plugins = this._toposortPlugins(pluginContext.plugins, this.pluginMap);
-//    bootstrapLogger.warn('pluginMap empty (plugin-loader.js line530)='
-//        + JSON.stringify(this.pluginMap));  
-    
-    // Share with index.js the amount of plugins that should load
-    this.emit('givePluginAmount', {
-      data: this.plugins.length
-    });  
     for (const plugin of this.plugins) {
       this.emit('pluginAdded', {
         data: plugin
@@ -669,21 +650,22 @@ PluginLoader.prototype = {
     const pluginContext = {
       productCode: this.options.productCode,
       config: this.options.serverConfig,
-      plugins: this.plugins,
       authManager: this.options.authManager
     };
+    //
+    //TODO resolving dependencies correctly
+    //see also: the FIXME note at the end of installPlugins()
+    //
     bootstrapLogger.info("Adding dynamic plugin " + pluginDef.identifier);
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, this.options.serverConfig,
       this.options.productCode);
-    const plugin = makePlugin(pluginDef, pluginConfiguration, '/dev/null' /*TODO*/);
-    plugin.dynamicallyCreated = true; /* TODO extra security */
-    plugin.initWebServiceDependencies(this.unresolvedImports, pluginContext);
-    plugin.init(pluginContext);
-    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
-      throw new Error('unresolved dependencies');
-      this.unresolvedImports.reset();
-    }
+    const plugin = makePlugin(pluginDef, pluginConfiguration, null, pluginContext,
+        true);
+//    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
+//      throw new Error('unresolved dependencies');
+//      this.unresolvedImports.reset();
+//    }
     zluxUtil.deepFreeze(plugin);
     this.plugins.push(plugin);
     this.pluginMap[plugin.identifier] = plugin;
@@ -694,44 +676,7 @@ PluginLoader.prototype = {
 };
 
 module.exports = PluginLoader;
-
-const _unitTest = false;
-function unitTest() {
-  var configData = {
-  "zssPort":31338,
-// All paths relative to ZLUX/node or ZLUX/bin
-// In real installations, these values will be configured during the install.
-  "rootDir":"../deploy",
-  "productDir":"../deploy/product",
-  "siteDir":"../deploy/site",
-  "instanceDir":"../deploy/instance",
-  "groupsDir":"../deploy/instance/groups",
-  "usersDir":"../deploy/instance/users",
-  "pluginsDir":"../deploy/instance/ZLUX/plugins",
-
-  "productCode": 'ZLUX',
-  "dataserviceAuthentication": {
-    //this specifies the default authentication type for dataservices that didn't specify which type to use. These dataservices therefore should not expect a particular type of authentication to be used.
-    "defaultAuthentication": "fallback",
-    
-    //each authentication type may have more than one implementing plugin. define defaults and fallbacks below as well
-    //any types that have no implementers are ignored, and any implementations specified here that are not known to the server are also ignored.
-    "implementationDefaults": {
-      //each type has an object which describes which implementation to use based on some criteria to find which is best for the task. For now, just "plugins" will
-      //be used to state that you want a particular plugin.
-      "fallback": {
-        "plugins": ["com.rs.auth.trivialAuth"]
-      }
-    }
-  }  
-  };
-  var pm = new PluginLoader(configData, process.cwd());
-  var pl = pm.loadPlugins();
-  console.log("plugins: ", pl);
-}
-if (_unitTest) {
-  unitTest()
-}
+PluginLoader.makePlugin = makePlugin;
 
 /*
   This program and the accompanying materials are

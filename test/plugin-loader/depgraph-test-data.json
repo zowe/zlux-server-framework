@@ -1,0 +1,330 @@
+{
+  "goodCase": [
+        {
+          "identifier": "org.zowe.consumer",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "~1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "^2.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.intermediary",
+              "sourceName": "something",
+              "versionRange": "1.0.0",
+              "localName": "something"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.loner",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "blah",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.provider",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.10"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "2.20.30"
+            },  
+            {
+              "type": "router",
+              "name": "bar",
+              "version": "1.2.3",
+              "fileName": "nop-router.js"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.intermediary",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+             {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "^1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "something",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+  ],
+    "brokenProvider": [
+        {
+          "identifier": "org.zowe.consumer",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.intermediary",
+              "sourceName": "something",
+              "versionRange": "1.0.0",
+              "localName": "something"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.loner",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "blah",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.provider",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "2.0.0"
+            },  
+            {
+              "type": "router",
+              "name": "bar",
+              "version": "1.2.3",
+              "fileName": "nop-router.js"
+            },
+             {
+              "type": "import",
+              "sourcePlugin": "nonexistent",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.intermediary",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+             {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "something",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+  ],
+  "versionMismatch": [
+        {
+          "identifier": "org.zowe.consumer",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "2.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.intermediary",
+              "sourceName": "something",
+              "versionRange": "1.0.0",
+              "localName": "something"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.loner",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "blah",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.provider",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "2.0.0"
+            },  
+            {
+              "type": "router",
+              "name": "bar",
+              "version": "1.2.3",
+              "fileName": "nop-router.js"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.intermediary",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+             {
+              "type": "import",
+              "sourcePlugin": "org.zowe.provider",
+              "sourceName": "foo",
+              "versionRange": "3.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "something",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+  ],
+  "cycle": [
+        {
+          "identifier": "org.zowe.a",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "0.0.0-zlux.version.replacement",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.b",
+              "sourceName": "foo",
+              "versionRange": "1.0.0",
+              "localName": "foo"
+            },
+            {
+              "type": "router",
+              "name": "bar",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        },
+        {
+          "identifier": "org.zowe.b",
+          "baseURI": "b",
+          "apiVersion": "1.0.0",
+          "pluginVersion": "1.0.0",
+          "pluginType": "application",
+          "dataServices": [
+            {
+              "type": "import",
+              "sourcePlugin": "org.zowe.a",
+              "sourceName": "bar",
+              "versionRange": "1.0.0",
+              "localName": "bar"
+            },
+            {
+              "type": "router",
+              "name": "foo",
+              "fileName": "nop-router.js",
+              "version": "1.0.0"
+            }
+          ]
+        }
+      ]
+}
