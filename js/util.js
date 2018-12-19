@@ -111,6 +111,12 @@ module.exports.readFilesToArray = function(fileList) {
   }
 };
 
+module.exports.concatIterables = function* concatIterables() {
+  for (let i=0; i < arguments.length; i++) {
+    yield *arguments[i];
+  }
+}
+
 /**
  * Makes sure that the invocations of an asynchronous event handler are properly
  * queued. Creates an event listener that wraps the asynchronous `listenerFun`
@@ -132,7 +138,6 @@ module.exports.asyncEventListener = function(listenerFun, logger) {
     });
   }
 }
-
 
 /*
   This program and the accompanying materials are

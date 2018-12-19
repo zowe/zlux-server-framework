@@ -10,7 +10,8 @@
       "initializerLookupMethod": "external",
       "fileName": "configService.js",
       "routerFactory": "configRouter",
-      "dependenciesIncluded": true
+      "dependenciesIncluded": true,
+      "version": "1.0.0"
     }
   ]
 }
