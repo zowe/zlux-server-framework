@@ -53,7 +53,8 @@ WebServer.prototype = {
   expressWsHttp: [],
 
   _setErrorLogger(server, type, ipAddress, port) {
-    //the server object will not tell the ipAddr & port unless it has successfully connected, making logging poor unless passed
+    //the server object will not tell the ipAddr & port unless it has successfully connected,
+    //making logging poor unless passed
     server.on('error',(e)=> {
       switch (e.code) {
       case 'EADDRINUSE':
@@ -63,7 +64,7 @@ WebServer.prototype = {
         break;
       case 'ENOTFOUND':
       case 'EADDRNOTAVAIL':
-        bootstrapLogger.severe(`Could not listen on address ${ipAddress}:${port}. Invalid IP format for NodeJS.`);
+        bootstrapLogger.severe(`Could not listen on address ${ipAddress}:${port}. Invalid IP for this system.`);
         //While I'd like to close the server here,
         //it seems that an exception is thrown that can't be caught, causing server to stop anyway
         break;
@@ -181,10 +182,10 @@ WebServer.prototype = {
             yield* makeHttpsServer(ipAddress[0], this.config.https.port);
           }
         } else {
-          makeHttpsServer('0.0.0.0', this.config.https.port);
+          yield* makeHttpsServer('0.0.0.0', this.config.https.port);
         }
       } else {
-        makeHttpsServer('0.0.0.0', this.config.https.port);
+        yield* makeHttpsServer('0.0.0.0', this.config.https.port);
       }
     }
     if (this.config.http && this.config.http.port) {
@@ -212,23 +213,30 @@ WebServer.prototype = {
   }),
 
   callListen(methodServer, methodName, methodNameForLogging, ipAddress, port) {
-    var addressForLogging = `${ipAddress}:${port}`;
-    var logFunction = function () {
+    const addressForLogging = `${ipAddress}:${port}`;
+    const logFunction = function () {
       bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  Listening on ${addressForLogging}`)
     };
-    bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  About to start listening on ${addressForLogging}`);
+    bootstrapLogger.log(bootstrapLogger.INFO,
+                        `(${methodNameForLogging})  About to start listening on ${addressForLogging}`);
     methodServer.listen(port, ipAddress, logFunction);
   },
 
   close() {
     this.httpServers.forEach((server)=> {
       let info = server.address();
-      bootstrapLogger.info(`(HTTP) Closing server ${info.address}:${info.port}`);
+      if (info) {
+        //could be undefined if there was an error binding, yet close() still works
+        bootstrapLogger.info(`(HTTP) Closing server ${info.address}:${info.port}`);
+      }
       server.close();      
     });
     this.httpsServers.forEach((server)=> {
       let info = server.address();
-      bootstrapLogger.info(`(HTTPS) Closing server ${info.address}:${info.port}`);
+      if (info) {
+        //could be undefined if there was an error binding, yet close() still works
+        bootstrapLogger.info(`(HTTPS) Closing server ${info.address}:${info.port}`);
+      }
       server.close();      
     });
   }
