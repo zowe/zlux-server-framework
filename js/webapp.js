@@ -915,8 +915,8 @@ WebApp.prototype = {
       //only push plugin if no exceptions were seen
       this.plugins.push(plugin);
     } catch (e) {
-      installLog.warn(`Exception occurred, plugin (${plugin.identifier}) installation skipped. Message: ${e.message}`);
-      installLog.debug(e.stack);
+      //index.js listens and logs, so dont log twice here
+      throw e;
     }
     this._resolveImports(plugin, urlBase);
     this.plugins.push(plugin);
