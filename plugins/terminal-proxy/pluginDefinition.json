@@ -28,7 +28,8 @@
       "initializerLookupMethod": "external",
       "filename": "terminalProxy.js",
       "routerFactory": "tn3270WebsocketRouter",
-      "dependenciesIncluded": true
+      "dependenciesIncluded": true,
+      "version": "1.0.0"
     },
     {
       "type": "router",
@@ -36,7 +37,8 @@
       "initializerLookupMethod": "external",
       "filename": "terminalProxy.js",
       "routerFactory": "tn5250WebsocketRouter",
-      "dependenciesIncluded": true
+      "dependenciesIncluded": true,
+      "version": "1.0.0"
     },
     {
       "type": "router",
@@ -44,7 +46,8 @@
       "initializerLookupMethod": "external",
       "filename": "terminalProxy.js",
       "routerFactory": "vtWebsocketRouter",
-      "dependenciesIncluded": true
+      "dependenciesIncluded": true,
+      "version": "1.0.0"
     }
   ]
 }

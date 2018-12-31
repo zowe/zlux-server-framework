@@ -1,0 +1,36 @@
+{
+  "identifier": "org.zowe.testplugin",
+  "apiVersion": "1.0.0",
+  "pluginVersion": "1.0.0",
+  "pluginType": "application",
+
+  "dataServices": [
+    {
+      "type": "router",
+      "name": "test-service",
+      "fileName": "test-router.js",
+      "version": "1.3.0"
+    },
+    {
+      "type": "router",
+      "name": "test-service",
+      "fileName": "test-router2.js",
+      "version": "2.1.0"
+    },
+    {
+      "type": "router",
+      "name": "caller",
+      "fileName": "caller.js",
+      "version": "1.0.0"
+    },
+    {
+      "type": "router",
+      "name": "caller-with-requirements",
+      "fileName": "caller.js",
+      "version": "1.0.0",
+      "versionRequirements" : {
+        "test-service": "^1.0.0"
+      }
+    }
+  ]
+}
