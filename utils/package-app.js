@@ -54,7 +54,7 @@ class YazlArchiver {
   addFile(filePath) {
     //filepath is absolute, zippath is relative to starting folder
     logger.debug(`AddFile: ${filePath}`);
-    this.zipfile.addFile(filePath, this.getZipPath(filePath));
+    this.zipfile.addFile(filePath, this.getZipPath(filePath), {mode:0o600});
     this.filesAdded++;
   }
   
