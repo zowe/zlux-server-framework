@@ -67,11 +67,14 @@ DataserviceContext.prototype = {
     return makeSubloggerFromDefinitions(this.plugin.pluginDef,
         this.serviceDefinition, name);
   },
+  
   addBodyParseMiddleware(router) {
     router.use(bodyParser.json({type:'application/json'}));
     router.use(bodyParser.text({type:'text/plain'}));
     router.use(bodyParser.text({type:'text/html'}));
-  }
+  },
+  
+  makeErrorObject: zluxUtil.makeErrorObject
 };
 
 function do404(URL, res, message) {
@@ -301,6 +304,7 @@ const commonMiddleware = {
       if (!req[`${UNP.APP_NAME}Data`]) {
         req[`${UNP.APP_NAME}Data`] = appData; 
       }
+      appData.makeErrorObject = zluxUtil.makeErrorObject; 
       if (!appData.webApp) {
         appData.webApp = {};
       } else {

@@ -15,6 +15,7 @@ const fs = require('fs');
 const jStreamer = require('./jsonStreamer.js');
 const pathModule = require('path');
 const jsonUtils = require('../../../js/jsonUtils.js');
+const proxyUtils = require('../../../js/util.js');
 const express = require('express');
 const Promise = require('bluebird');
 const bodyParser = require('body-parser');
@@ -69,14 +70,13 @@ const jsonFileReadOptions = {
 };
 
 function respondWithJsonError(response,error,code,resourceID) {
-  let jsonObj = {
-    "error":error,
-    "_objectType":MSG_TYPE_ERROR,
-    "_metadataVersion":CURRENT_JSON_VERSION
-  };
-  if (resourceID) {
-    jsonObj.resourceID = resourceID;
-  }
+  let jsonObj = proxyUtils.makeErrorObject({
+    messageTemplate: error,
+    messageParameters: {
+      resourceID
+    },
+    messageDetails: error
+  });
   response.status(code).json(jsonObj);
 }
 
