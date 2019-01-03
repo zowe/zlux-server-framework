@@ -182,14 +182,36 @@ const staticHandlers = {
  *  This is passed to every other service of the plugin, so that 
  *  the service can be called by other services under the plugin
  */
-function WebServiceHandle(urlPrefix, httpPort, httpsPort) {
+function WebServiceHandle(urlPrefix, serverConfig) {
   this.urlPrefix = urlPrefix;
-  if (httpsPort) {
-    this.port = httpsPort;
+  let getPreferredAddress = function(addresses) {
+    if (!addresses) {
+      return '127.0.0.1';
+    }
+    for (let i = 0; i < addresses.length; i++) {
+      let address = addresses[i];
+      if (address == '127.0.0.1' || address == 'localhost' || address == '0.0.0.0') {
+        return '127.0.0.1';
+      } else if (address == '::1' || address == '::'
+                 //actual madmen
+                 || address == '0000:0000:0000:0000:0000:0000:0000:0000'
+                 || address == '0000:0000:0000:0000:0000:0000:0000:0001') {
+        return '::1';
+      }
+    }
+    installLog.warn(`Loopback calls: localhost equivalent address not found in list`,addresses,
+                    `. Using first address (${addresses[0]})`);
+    return addresses[0];
+  }
+  
+  if (serverConfig.httpsPort) {
+    this.port = serverConfig.https.port
     this.isHttps = true;
+    this.host = getPreferredAddress(serverConfig.https.ipAddresses);
   } else {
-    this.port = httpPort;
+    this.port = serverConfig.http.port;
     this.isHttps = false;
+    this.host = getPreferredAddress(serverConfig.http.ipAddresses);
   }
 }
 WebServiceHandle.prototype = {
@@ -557,7 +579,7 @@ WebApp.prototype = {
             _router);
       }
       serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
-          this.options.httpPort, this.options.httpsPort);
+                                                    this.options.serverConfig);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
@@ -598,12 +620,12 @@ WebApp.prototype = {
         },
         this.auth.doLogout); 
     serviceHandleMap['auth'] = new WebServiceHandle('/auth', 
-        this.options.httpPort, this.options.httpsPort);
+                                                    this.options.serverConfig);
     this.expressApp.get('/plugins', 
         //this.auth.middleware, 
         staticHandlers.plugins(this.plugins));
     serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
-        this.options.httpPort, this.options.httpsPort);
+                                                       this.options.serverConfig);
     this.expressApp.get('/server/proxies', 
         this.auth.middleware, 
       (req, res) =>{
@@ -611,7 +633,7 @@ WebApp.prototype = {
         res.json({"zssServerHostName":this.options.proxiedHost,"zssPort":this.options.proxiedPort});
       }); 
     serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', 
-        this.options.httpPort, this.options.httpsPort);
+                                                              this.options.serverConfig);
     this.expressApp.get('/echo/*', 
       this.auth.middleware, 
       (req, res) =>{
@@ -619,7 +641,7 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort, this.options.httpsPort);
+                                                    this.options.serverConfig);
     this.expressApp.get('/echo/*',  
       this.auth.middleware, 
       (req, res) =>{
@@ -627,12 +649,12 @@ WebApp.prototype = {
         res.json(req.params);
       });
     serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort, this.options.httpsPort);
+                                                    this.options.serverConfig);
     this.expressApp.use('/apiManagement/', 
         this.auth.middleware, 
         staticHandlers.apiManagement(this));
     serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
-        this.options.httpPort, this.options.httpsPort);
+                                                             this.options.serverConfig);
     this.expressApp.use(staticHandlers.eureka());
   },
   
@@ -791,8 +813,7 @@ WebApp.prototype = {
       for (const version of Object.keys(group.versions)) {
         const service = group.versions[version];
         const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
-        const handle = new WebServiceHandle(subUrl, this.options.httpPort,
-            this.options.httpsPort);
+        const handle = new WebServiceHandle(subUrl, this.options.serverConfig);
         versionHandles[version] = handle;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
