@@ -416,6 +416,16 @@ const commonMiddleware = {
       req.on('data', onData).on('end', onEnd);
     }
   },
+
+  httpNoCacheHeaders() {
+    return function httpCachingHeaders(req, res, next) {
+      //service.httpCaching = false means
+      //"Cache-control: no-store" and "Pragma: no-cache"
+      res.set('Cache-control', 'no-store');
+      res.set('Pragma', 'no-cache');
+      next();
+    }
+  }
 }
 
 function makeSubloggerFromDefinitions(pluginDefinition, serviceDefinition, name) {
@@ -833,13 +843,19 @@ WebApp.prototype = {
         const service = group.versions[version];
         const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
         const router = yield* this._makeRouter(service, plugin, pluginContext, 
-            pluginChain); 
+                                               pluginChain);
         installLog.info(`${plugin.identifier}: installing router at ${subUrl}`);
-        this.pluginRouter.use(subUrl, router);
+        //Per-dataservice middleware to handle tls no-cache
+        let serviceMiddleware = [];
+        if (service.httpCaching !== true) {
+          serviceMiddleware.push(commonMiddleware.httpNoCacheHeaders());
+        }
+        this.pluginRouter.use(subUrl, ...serviceMiddleware, router);
+
         serviceRouters[version] = router;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
-          this.pluginRouter.use(defaultSubUrl, router);
+          this.pluginRouter.use(defaultSubUrl, ...serviceMiddleware, router);
           serviceRouters['_current'] = router;
         }
       }
@@ -861,7 +877,7 @@ WebApp.prototype = {
           [importedService.sourceName][importedService.version];
         if (!importedRouter) {
           throw new Error(
-            `Import ${importedService.sourcePlugin}:${implortedService.sourceName}`
+            `Import ${importedService.sourcePlugin}:${importedService.sourceName}`
             + " can't be satisfied");
         }
         installLog.info(`${plugin.identifier}: installing import`

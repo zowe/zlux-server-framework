@@ -29,7 +29,8 @@
       "fileName": "terminalProxy.js",
       "routerFactory": "tn3270WebsocketRouter",
       "dependenciesIncluded": true,
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "httpCaching":  false
     },
     {
       "type": "router",
@@ -38,7 +39,8 @@
       "fileName": "terminalProxy.js",
       "routerFactory": "tn5250WebsocketRouter",
       "dependenciesIncluded": true,
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "httpCaching":  false
     },
     {
       "type": "router",
@@ -47,7 +49,8 @@
       "fileName": "terminalProxy.js",
       "routerFactory": "vtWebsocketRouter",
       "dependenciesIncluded": true,
-      "version": "1.0.0"
+      "version": "1.0.0",
+      "httpCaching":  false
     }
   ]
 }
