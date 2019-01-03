@@ -158,9 +158,9 @@ Server.prototype = {
       return this.pluginLoaded(event.data).then(() => {
         installLogger.info('Installed plugin: ' + event.data.identifier);
       }, err => {
-        installLogger.warn('Failed to install plugin: ' 
-                           + event.data.identifier);
-        console.log(err);
+        installLogger.warn(`Exception occurred, plugin (${event.data.identifier}) installation skipped. `
+                           +`Message: ${err.message}`);
+        installLogger.debug(err.stack);
       });
     }, installLogger));
     this.pluginLoader.loadPlugins();
