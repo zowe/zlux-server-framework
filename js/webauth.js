@@ -12,7 +12,6 @@ const Promise = require('bluebird');
 const util = require('./util');
 const UNP = require('./unp-constants');
 
-
 const authLogger = util.loggers.authLogger;
 
 function getAuthHandler(req, authManager) {
@@ -40,6 +39,9 @@ function getAuthPluginSession(req, pluginID, dflt) {
 
 function setAuthPluginSession(req, pluginID, authPluginSession) {
   if (req.session) {
+    // FIXME Note that it does something only when req.session[pluginID] is 
+    // undefined. Otherwise it does nothing (see getAuthPluginSession()) 
+    // -- don't get confused
     req.session[pluginID] = authPluginSession;
   }
 }
@@ -168,11 +170,18 @@ module.exports = function(authManager) {
           const authPluginSession = getAuthPluginSession(req, pluginID, {});
           req[`${UNP.APP_NAME}Data`].plugin.services = 
             authServiceHandleMaps[pluginID];
-          const wasAuthenticate = authPluginSession.authenticated;
+          // FIXME This is a bug: in webauth.js we shouldn't make assumptions
+          // about the contents of the session. We only can look at the return 
+          // values of the method.
+          const wasAuthenticated = authPluginSession.authenticated;
           const handlerResult = yield handler.authenticate(req, 
               authPluginSession);
+          if (handlerResult.success) {
+            authLogger.debug(`${req.session.id}: Successful authenticate to auth ` 
+            + `handler ${pluginID}. Plugin response: ` + JSON.stringify(handlerResult));
+          }
           //do not modify session if not authenticated or deauthenticated
-          if (wasAuthenticate || authPluginSession.authenticated) {
+          if (wasAuthenticated || handlerResult.success) {
             setAuthPluginSession(req, pluginID, authPluginSession);
           }
           result.addHandlerResult(handlerResult, handler);
@@ -191,6 +200,7 @@ module.exports = function(authManager) {
       const handlers = getRelevantHandlers(authManager, req.body);
       for (const handler of handlers) {
         const pluginID = handler.pluginID;
+        authLogger.debug(`${req.session.id}: User logout for auth handler ${pluginID}`);
         delete req.session[pluginID];
       }
       res.status(200).send('');
