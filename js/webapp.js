@@ -177,7 +177,6 @@ const staticHandlers = {
   
   proxies(options) {
     return (req, res) => {
-      contentLogger.log(contentLogger.INFO, '/server/proxies\n' + util.inspect(req));      
       res.json({
         "zssServerHostName": options.proxiedHost,
         "zssPort": options.proxiedPort
