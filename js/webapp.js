@@ -935,7 +935,6 @@ WebApp.prototype = {
       this._installPluginStaticHandlers(plugin, urlBase);      
       //import resolution will be postponed until all non-import plugins are loaded
       //only push plugin if no exceptions were seen
-      this.plugins.push(plugin);
     } catch (e) {
       //index.js listens and logs, so dont log twice here
       throw e;
