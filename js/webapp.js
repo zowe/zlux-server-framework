@@ -175,12 +175,12 @@ const staticHandlers = {
     return router;
   },
   
-  proxies() {
+  proxies(options) {
     return (req, res) => {
       contentLogger.log(contentLogger.INFO, '/server/proxies\n' + util.inspect(req));      
       res.json({
-        "zssServerHostName": this.options.proxiedHost,
-        "zssPort": his.options.proxiedPort
+        "zssServerHostName": options.proxiedHost,
+        "zssPort": options.proxiedPort
       });
     }
   },
@@ -632,7 +632,7 @@ WebApp.prototype = {
         {needJson: false, needAuth: false, isPseudoSso: false});
     serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
         this.options.httpPort, this.options.httpsPort);
-    this._installRootService('/server/proxies', 'get', staticHandlers.proxies(),
+    this._installRootService('/server/proxies', 'get', staticHandlers.proxies(this.options),
         {needJson: false, needAuth: true, isPseudoSso: false});
     serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', 
         this.options.httpPort, this.options.httpsPort);
