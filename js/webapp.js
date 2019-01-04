@@ -933,11 +933,9 @@ WebApp.prototype = {
       yield *this._installDataServices(pluginContext, urlBase);
       this._installSwaggerCatalog(plugin, urlBase);
       this._installPluginStaticHandlers(plugin, urlBase);      
-      //import resolution will be postponed until all non-import plugins are loaded
-      //only push plugin if no exceptions were seen
-      this.plugins.push(plugin);
     } catch (e) {
       //index.js listens and logs, so dont log twice here
+      //throw so that plugin isnt pushed to list if there's something wrong with it
       throw e;
     }
     this._resolveImports(plugin, urlBase);
