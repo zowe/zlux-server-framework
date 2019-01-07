@@ -160,7 +160,7 @@ WebServer.prototype = {
             if (e.message == 'mac verify failure') {
               const r = reader();
               try {
-                t.httpsOptions.passphrase = yield reader.readPassword(
+                this.httpsOptions.passphrase = yield reader.readPassword(
                   'HTTPS key or PFX decryption failure. Please enter passphrase: ');
               } finally {
                 r.close();
