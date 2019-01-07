@@ -145,7 +145,7 @@ WebServer.prototype = {
   startListening: Promise.coroutine(function* (app) {
     if (this.config.https && this.config.https.port) {
       const port = this.config.https.port;
-      for (let ipAddress of this.config.http.ipAddresses) {
+      for (let ipAddress of this.config.https.ipAddresses) {
         let listening = false;
         let httpsServer;
         this._loadHttpsKeyData();
