@@ -151,7 +151,7 @@ WebServer.prototype = {
         this._loadHttpsKeyData();
         while (!listening) {
           try {
-            httpsServer = https.createServer(t.httpsOptions, app);
+            httpsServer = https.createServer(this.httpsOptions, app);
             this._setErrorLogger(httpsServer, 'HTTPS', ipAddress, port);
             this.httpsServers.push(httpsServer);
             this.expressWsHttps.push(expressWs(app, httpsServer, {maxPayload: 50000}));
