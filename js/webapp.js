@@ -199,11 +199,12 @@ const staticHandlers = {
  *  This is passed to every other service of the plugin, so that 
  *  the service can be called by other services under the plugin
  */
-function WebServiceHandle(urlPrefix, networkConfig) {
+function WebServiceHandle(urlPrefix) {
   this.urlPrefix = urlPrefix;
-  this.isHttps = networkConfig.isHttps;
-  this.port = networkConfig.port;
-  this.host = networkConfig.host;
+  if (!loopbackConfig.port) {
+    installLog.severe(`loopback configuration not valid,`,loopbackConfig,
+                      `loopback calls will fail!`);
+  }
 }
 WebServiceHandle.prototype = {
   constructor: WebServiceHandle,
@@ -230,15 +231,15 @@ WebServiceHandle.prototype = {
       }
       let rejectUnauthorized;
       let protocol;
-      if (this.isHttps) {
+      if (loopbackConfig.isHttps) {
         protocol = 'https:';
         rejectUnauthorized = false;
       } else {
         protocol = 'http:';
       }
       const requestOptions = {
-        hostname: this.host,
-        port: this.port,
+        hostname: loopbackConfig.host,
+        port: loopbackConfig.port,
         method: options.method || "GET",
         protocol: protocol,
         path: url,
@@ -272,7 +273,7 @@ WebServiceHandle.prototype = {
       if (Object.getOwnPropertyNames(headers).length > 0) {
         requestOptions.headers = headers;
       }
-      let httpOrHttps = this.isHttps ? https : http;
+      let httpOrHttps = loopbackConfig.isHttps ? https : http;
       const request = httpOrHttps.request(requestOptions, (response) => {
         var chunks = [];
         response.on('data',(chunk)=> {
@@ -463,44 +464,6 @@ ImportManager.prototype = {
   
 }
 
-function getLoopbackDefaults(webappOptions) {
-  //if this isn't here, throw
-  let nodeConfig = webappOptions.serverConfig.node;
-
-  let getPreferredAddress = function(addresses) {
-    if (!addresses) {
-      return '127.0.0.1';
-    }
-    for (let i = 0; i < addresses.length; i++) {
-      let address = addresses[i];
-      if (address == '127.0.0.1' || address == 'localhost' || address == '0.0.0.0') {
-        return '127.0.0.1';
-      } else if (address == '::1' || address == '::'
-                 //actual madmen
-                 || address == '0000:0000:0000:0000:0000:0000:0000:0000'
-                 || address == '0000:0000:0000:0000:0000:0000:0000:0001') {
-        return '::1';
-      }
-    }
-    installLog.warn(`Loopback calls: localhost equivalent address not found in list`,addresses,
-                    `. Using first address (${addresses[0]}); Verify firewall will allow this.`);
-    return addresses[0];
-  }
-  
-  if (nodeConfig.https) {
-    return {
-      port: nodeConfig.https.port,
-      isHttps: true,
-      host: getPreferredAddress(nodeConfig.https.ipAddresses)
-    }
-  } else {
-    return {
-      port: nodeConfig.http.port,
-      isHttps: false,
-      host: getPreferredAddress(nodeConfig.http.ipAddresses)
-    }
-  }
-}
 
 const defaultOptions = {
   httpPort: 0,
@@ -512,6 +475,12 @@ const defaultOptions = {
   rootServices: null,
   staticPlugins: null,
   newPluginHandler: null
+};
+
+const loopbackConfig = {
+  isHttps: true,
+  port: 0,
+  host: '127.0.0.1'
 };
 
 function WebApp(options){
@@ -534,7 +503,7 @@ function WebApp(options){
       maxAge: sessionTimeoutMs
     }
   }));
-  defaultOptions.loopback = getLoopbackDefaults(options);
+  loopbackConfig = zluxUtil.getLoopbackFromConfig(options);
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
   this.auth = options.auth;
   expressWs(this.expressApp);
@@ -651,8 +620,7 @@ WebApp.prototype = {
             this.auth.middleware,
             [commonMiddleware.logRootServiceCall(true, name), _router]);
       }
-      serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
-                                                    this.options.loopback);
+      serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
@@ -665,20 +633,19 @@ WebApp.prototype = {
         {needJson: true, needAuth: false, isPseudoSso: true});
     this._installRootService('/auth-logout', 'get', this.auth.doLogout, 
         {needJson: true, needAuth: false, isPseudoSso: true});
-    serviceHandleMap['auth'] = new WebServiceHandle('/auth', this.options.loopback);
+    serviceHandleMap['auth'] = new WebServiceHandle('/auth');
     this._installRootService('/plugins', 'get', staticHandlers.plugins(this.plugins), 
         {needJson: false, needAuth: false, isPseudoSso: false});
-    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', this.options.loopback);
+    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins');
     this._installRootService('/server/proxies', 'get', staticHandlers.proxies(this.options),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', this.options.loopback);
+    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies');
     this._installRootService('/echo/*', 'get', staticHandlers.echo(),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['echo'] = new WebServiceHandle('/echo', this.options.loopback);
+    serviceHandleMap['echo'] = new WebServiceHandle('/echo');
     this._installRootService('/apiManagement', 'use', staticHandlers.apiManagement(this),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
-                                                             this.options.loopback);
+    serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement');
     this.expressApp.use(staticHandlers.eureka());
   },
   
@@ -839,7 +806,7 @@ WebApp.prototype = {
       for (const version of Object.keys(group.versions)) {
         const service = group.versions[version];
         const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
-        const handle = new WebServiceHandle(subUrl, this.options.loopback);
+        const handle = new WebServiceHandle(subUrl);
         versionHandles[version] = handle;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
@@ -1002,8 +969,7 @@ WebApp.prototype = {
           } else {
               utilLog.debug(`Referrer proxying miss. Resource not found, sending`
                   + ` 404 because referrer (${referrer}) didn't match a plugin pattern`);               
-            return do404(req.url, res, this.options.productCode
-                         + ": unknown resource requested");
+            return do404(req.url, res, this.options.productCode + ": unknown resource requested");
           }
         } else {
           return do404(req.url, res, this.options.productCode

@@ -20,6 +20,7 @@ if (!global.COM_RS_COMMON_LOGGER) {
 const path = require('path');
 const fs = require('fs');
 const Promise = require('bluebird');
+const ipaddr = require('ipaddr.js');
 
 function compoundPathFragments(left, right) {
   return path.join(left, right).normalize();
@@ -33,7 +34,8 @@ const loggers = {
   utilLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.utils"),
   proxyLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.proxy"),
   installLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.install"),
-  apiml: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.apiml")
+  apiml: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.apiml"),
+  routing: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.routing")
 };
 
 module.exports.loggers = loggers;
@@ -159,6 +161,60 @@ module.exports.asyncEventListener = function(listenerFun, logger) {
     });
   }
 }
+
+/**
+   Extracts what listening address is closest to loopback. Returns 127.0.0.1 or equivalent
+   Ideally, or first hostname/IP in listening list otherwise.
+
+   Will throw if given an invalid config.
+*/
+module.exports.getLoopbackFromConfig = function(webappOptions) {
+  //if this isn't here, throw
+  let nodeConfig = webappOptions.serverConfig.node;
+
+  let getPreferredAddress = function(addresses) {
+    if (!addresses) {
+      return '127.0.0.1';
+    }
+    for (let i = 0; i < addresses.length; i++) {
+      let address = addresses[i];
+      if (address == 'localhost' || address == '0.0.0.0') {
+        return '127.0.0.1';
+      } else if (address == '::'
+                 //actual madmen
+                 || address == '0000:0000:0000:0000:0000:0000:0000:0000') {
+        return '::1';
+      } else {
+        try {
+          //ipaddr is not made for hostnames
+          if (ipaddr.process(address).range() == 'loopback') {
+            return '127.0.0.1';
+          } 
+        } catch (e) {
+          loggers.utilLogger.debug(`Couldn't process ${address} as IP`);
+        }
+      }
+    }
+    loggers.utilLogger.warn(`Loopback calls: localhost equivalent address not found in list`,addresses,
+                            `. Using first address (${addresses[0]}); Verify firewall will allow this.`);
+    return addresses[0];
+  }
+  
+  if (nodeConfig.https) {
+    return {
+      port: nodeConfig.https.port,
+      isHttps: true,
+      host: getPreferredAddress(nodeConfig.https.ipAddresses)
+    }
+  } else {
+    return {
+      port: nodeConfig.http.port,
+      isHttps: false,
+      host: getPreferredAddress(nodeConfig.http.ipAddresses)
+    }
+  }
+}
+
 
 /*
   This program and the accompanying materials are
