@@ -22,7 +22,7 @@ const fs = require('fs');
 const Promise = require('bluebird');
 const ipaddr = require('ipaddr.js');
 const dns = require('dns');
-const dnsLoopup = Promise.promisify(dns.lookup);
+const dnsLookup = Promise.promisify(dns.lookup);
 
 function compoundPathFragments(left, right) {
   return path.join(left, right).normalize();
@@ -173,7 +173,7 @@ module.exports.uniqueIps = Promise.coroutine(function *uniqueIps(hostnames) {
   let set = new Set();
   for (let hostname of hostnames) {
     try {
-      const ipAddress = yield dnsLoopup(hostname);
+      const ipAddress = yield dnsLookup(hostname);
       set.add(ipAddress);
     } catch (e) {
       loggers.network.warn(`Skipping invalid listener address=${hostname}`);
