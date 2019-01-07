@@ -440,7 +440,11 @@ NodeAuthenticationPlugIn.prototype = {
   },
   
   init(context) {
-    const filepath = path.join(this.location, 'lib', this.filename);
+    let filepath = path.join(this.location, 'lib', this.filename);
+	// Make the relative path clear. process.cwd() is zlux-example-server/bin/
+    if (!path.isAbsolute(filepath)) {
+      filepath = path.join(process.cwd(),filepath);
+    }
     bootstrapLogger.log(bootstrapLogger.INFO,
       `Auth plugin ${this.identifier}: loading auth handler module ${filepath}`)
     this.authenticationModule = require(filepath);

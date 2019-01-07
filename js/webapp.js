@@ -48,6 +48,7 @@ var contentLogger = zluxUtil.loggers.contentLogger;
 var bootstrapLogger = zluxUtil.loggers.bootstrapLogger;
 var installLog = zluxUtil.loggers.installLogger;
 var utilLog = zluxUtil.loggers.utilLogger;
+var routingLog = zluxUtil.loggers.routing;
 
 const jsonParser = bodyParser.json()
 const urlencodedParser = bodyParser.urlencoded({ extended: false })
@@ -175,6 +176,22 @@ const staticHandlers = {
       res.send('{"status":"UP"}');
     });
     return router;
+  },
+  
+  proxies(options) {
+    return (req, res) => {
+      res.json({
+        "zssServerHostName": options.proxiedHost,
+        "zssPort": options.proxiedPort
+      });
+    }
+  },
+  
+  echo() {
+    return (req, res) =>{
+      contentLogger.log(contentLogger.INFO, 'echo\n' + util.inspect(req));
+      res.json(req.params);
+    }
   }
 };
 
@@ -412,6 +429,23 @@ const commonMiddleware = {
       req.on('data', onData).on('end', onEnd);
     }
   },
+  
+  logRootServiceCall(proxied, serviceName) {
+    const type = proxied? "Proxied root" : "root"
+    return function logRouting(req, res, next) {
+      routingLog.debug(`${req.session.id}: ${type} service called: `
+          +`${serviceName}, ${req.method} ${req.url}`);
+      next();
+    }
+  },
+  
+  logServiceCall(pluginId, serviceName) {
+    return function logRouting(req, res, next) {
+      routingLog.debug(`${req.session.id}: Service called: `
+          +`${pluginId}::${serviceName}, ${req.method} ${req.url}`);
+      next();
+    }
+  }
 }
 
 function makeSubloggerFromDefinitions(pluginDefinition, serviceDefinition, name) {
@@ -490,6 +524,10 @@ function WebApp(options){
   this.expressApp.use(session({
     //TODO properly generate this secret
     secret: process.env.expressSessionSecret ? process.env.expressSessionSecret : 'whatever',
+    // FIXME: require magic is an anti-pattern. all require() calls should 
+    // be at the top of the file. TODO Ensure this can be safely moved to the
+    // top of the file: it must have no side effects and it must not depend
+    // on any global state
     store: require("./sessionStore").sessionStore,
     resave: true, saveUninitialized: false,
     cookie: {
@@ -575,6 +613,27 @@ WebApp.prototype = {
         this.appData));
   },
 
+  _installRootService(url, method, handler, {needJson, needAuth, isPseudoSso}) {
+    const handlers = [commonMiddleware.logRootServiceCall(false, url)];
+    if (needJson) {
+      handlers.push(jsonParser);
+    }
+    if (isPseudoSso) {
+      handlers.push((req, res, next) => {
+        //hack for pseudo-SSO
+        req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps = 
+          this.authServiceHandleMaps;
+        next();
+      })
+    }
+    if (needAuth) {
+      handlers.push(this.auth.middleware); 
+    }
+    handlers.push(handler);
+    installLog.info(`installing root service at ${url}`);
+    this.expressApp[method](url, handlers); 
+  },
+  
   installRootServices() {
     const serviceHandleMap = {};
     for (const proxiedRootService of this.options.rootServices || []) {
@@ -585,88 +644,39 @@ WebApp.prototype = {
       if (proxiedRootService.requiresAuth === false) {
         const _router = this.makeProxy(proxiedRootService.url, true);
         this.expressApp.use(proxiedRootService.url,
-            _router);
+            [commonMiddleware.logRootServiceCall(true, name), _router]);
       } else {
         const _router = this.makeProxy(proxiedRootService.url);
         this.expressApp.use(proxiedRootService.url,
             this.auth.middleware,
-            _router);
+            [commonMiddleware.logRootServiceCall(true, name), _router]);
       }
       serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
                                                     this.options.loopback);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
-    this.expressApp.post('/auth',
-        jsonParser,
-        (req, res, next) => {
-          //hack for pseudo-SSO
-          req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps = 
-            this.authServiceHandleMaps;
-          next();
-        },
-        this.auth.doLogin); 
-    this.expressApp.get('/auth',
-        jsonParser,
-        (req, res, next) => {
-          //hack for pseudo-SSO
-          req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps = 
-            this.authServiceHandleMaps;
-          next();
-        },
-        this.auth.getStatus); 
-    this.expressApp.post('/auth-logout',
-        jsonParser,
-        (req, res, next) => {
-          //hack for pseudo-SSO
-          req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps = 
-            this.authServiceHandleMaps;
-          next();
-        },
-        this.auth.doLogout); 
-    this.expressApp.get('/auth-logout',
-        jsonParser,
-        (req, res, next) => {
-          //hack for pseudo-SSO
-          req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps = 
-            this.authServiceHandleMaps;
-          next();
-        },
-        this.auth.doLogout); 
-    serviceHandleMap['auth'] = new WebServiceHandle('/auth', 
-                                                    this.options.loopback);
-    this.expressApp.get('/plugins', 
-        //this.auth.middleware, 
-        staticHandlers.plugins(this.plugins));
-    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
-                                                       this.options.loopback);
-    this.expressApp.get('/server/proxies', 
-        this.auth.middleware, 
-      (req, res) =>{
-        contentLogger.log(contentLogger.INFO, '/server/proxies\n' + util.inspect(req));      
-        res.json({"zssServerHostName":this.options.proxiedHost,"zssPort":this.options.proxiedPort});
-      }); 
-    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', 
-                                                              this.options.loopback);
-    this.expressApp.get('/echo/*', 
-      this.auth.middleware, 
-      (req, res) =>{
-        contentLogger.log(contentLogger.INFO, 'echo\n' + util.inspect(req));
-        res.json(req.params);
-      });
-    serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-                                                    this.options.loopback);
-    this.expressApp.get('/echo/*',  
-      this.auth.middleware, 
-      (req, res) =>{
-        contentLogger.log(contentLogger.INFO, 'echo\n' + util.inspect(req));
-        res.json(req.params);
-      });
-    serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-                                                    this.options.loopback);
-    this.expressApp.use('/apiManagement/', 
-        this.auth.middleware, 
-        staticHandlers.apiManagement(this));
+    
+    this._installRootService('/auth', 'post', this.auth.doLogin, 
+        {needJson: true, needAuth: false, isPseudoSso: true});
+    this._installRootService('/auth', 'get', this.auth.getStatus, 
+      {needJson: true, needAuth: false, isPseudoSso: true});
+    this._installRootService('/auth-logout', 'post', this.auth.doLogout, 
+        {needJson: true, needAuth: false, isPseudoSso: true});
+    this._installRootService('/auth-logout', 'get', this.auth.doLogout, 
+        {needJson: true, needAuth: false, isPseudoSso: true});
+    serviceHandleMap['auth'] = new WebServiceHandle('/auth', this.options.loopback);
+    this._installRootService('/plugins', 'get', staticHandlers.plugins(this.plugins), 
+        {needJson: false, needAuth: false, isPseudoSso: false});
+    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', this.options.loopback);
+    this._installRootService('/server/proxies', 'get', staticHandlers.proxies(this.options),
+        {needJson: false, needAuth: true, isPseudoSso: false});
+    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', this.options.loopback);
+    this._installRootService('/echo/*', 'get', staticHandlers.echo(),
+        {needJson: false, needAuth: true, isPseudoSso: false});
+    serviceHandleMap['echo'] = new WebServiceHandle('/echo', this.options.loopback);
+    this._installRootService('/apiManagement', 'use', staticHandlers.apiManagement(this),
+        {needJson: false, needAuth: true, isPseudoSso: false});
     serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
                                                              this.options.loopback);
     this.expressApp.use(staticHandlers.eureka());
@@ -772,6 +782,8 @@ WebApp.prototype = {
     serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
         service));
     serviceRouterWithMiddleware.push(this.auth.middleware);
+    serviceRouterWithMiddleware.push(commonMiddleware.logServiceCall(
+        plugin.identifier, service.name));
     let router;
     switch (service.type) {
     case "service":
@@ -950,11 +962,9 @@ WebApp.prototype = {
       yield *this._installDataServices(pluginContext, urlBase);
       this._installSwaggerCatalog(plugin, urlBase);
       this._installPluginStaticHandlers(plugin, urlBase);      
-      //import resolution will be postponed until all non-import plugins are loaded
-      //only push plugin if no exceptions were seen
-      this.plugins.push(plugin);
     } catch (e) {
       //index.js listens and logs, so dont log twice here
+      //throw so that plugin isnt pushed to list if there's something wrong with it
       throw e;
     }
     this._resolveImports(plugin, urlBase);
@@ -983,17 +993,17 @@ WebApp.prototype = {
               utilLog.debug("About to call myProxy");
               myProxy(req, res);
               utilLog.debug("After myProxy call");
-            }
-            else {
-              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match an existing proxy service`);
+            } else {
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending`
+                  + ` 404 because referrer (${referrer}) didn't match an existing proxy service`);
               return do404(req.url, res, this.options.productCode
-              + ": unknown resource requested");
+                  + ": unknown resource requested");
             }
-          }
-            else {
-              utilLog.debug(`Referrer proxying miss. Resource not found, sending 404 because referrer (${referrer}) didn't match a plugin pattern`);               
+          } else {
+              utilLog.debug(`Referrer proxying miss. Resource not found, sending`
+                  + ` 404 because referrer (${referrer}) didn't match a plugin pattern`);               
             return do404(req.url, res, this.options.productCode
-            + ": unknown resource requested");
+                         + ": unknown resource requested");
           }
         } else {
           return do404(req.url, res, this.options.productCode
