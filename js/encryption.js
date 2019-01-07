@@ -19,6 +19,11 @@ function encryptWithKey(text,key) {
   return encrypted;
 }
 
+function getKeyFromPasswordSync(password,salt,length) {
+  var rounds = 500;
+  return crypto.pbkdf2Sync(password,salt,rounds,length,'sha256');
+}
+
 function getKeyFromPassword(password,salt,length,callback) {
   var rounds = 500;
   crypto.pbkdf2(password,salt,rounds,length,'sha256',(error, derivedKey) => {
@@ -54,6 +59,7 @@ function decryptWithKeyAndIV(text,key,iv) {
 exports.encryptWithKeyAndIV = encryptWithKeyAndIV;
 exports.decryptWithKeyAndIV = decryptWithKeyAndIV;
 exports.getKeyFromPassword = getKeyFromPassword;
+exports.getKeyFromPasswordSync = getKeyFromPasswordSync;
 exports.encryptWithKey = encryptWithKey;
 exports.decryptWithKey = decryptWithKey;
 
