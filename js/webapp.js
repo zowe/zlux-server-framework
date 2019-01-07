@@ -199,15 +199,13 @@ const staticHandlers = {
  *  This is passed to every other service of the plugin, so that 
  *  the service can be called by other services under the plugin
  */
-function WebServiceHandle(urlPrefix, httpPort, httpsPort) {
+function WebServiceHandle(urlPrefix, environment) {
   this.urlPrefix = urlPrefix;
-  if (httpsPort) {
-    this.port = httpsPort;
-    this.isHttps = true;
-  } else {
-    this.port = httpPort;
-    this.isHttps = false;
+  if (!environment.loopbackConfig.port) {
+    installLog.severe(`loopback configuration not valid,`,loopbackConfig,
+                      `loopback calls will fail!`);
   }
+  this.environment = environment;
 }
 WebServiceHandle.prototype = {
   constructor: WebServiceHandle,
@@ -234,15 +232,15 @@ WebServiceHandle.prototype = {
       }
       let rejectUnauthorized;
       let protocol;
-      if (this.isHttps) {
+      if (this.environment.loopbackConfig.isHttps) {
         protocol = 'https:';
         rejectUnauthorized = false;
       } else {
         protocol = 'http:';
       }
       const requestOptions = {
-        hostname: "localhost",
-        port: this.port,
+        hostname: this.environment.loopbackConfig.host,
+        port: this.environment.loopbackConfig.port,
         method: options.method || "GET",
         protocol: protocol,
         path: url,
@@ -276,7 +274,7 @@ WebServiceHandle.prototype = {
       if (Object.getOwnPropertyNames(headers).length > 0) {
         requestOptions.headers = headers;
       }
-      let httpOrHttps = this.isHttps ? https : http;
+      let httpOrHttps = this.environment.loopbackConfig.isHttps ? https : http;
       const request = httpOrHttps.request(requestOptions, (response) => {
         var chunks = [];
         response.on('data',(chunk)=> {
@@ -467,6 +465,7 @@ ImportManager.prototype = {
   
 }
 
+
 const defaultOptions = {
   httpPort: 0,
   productCode: null,
@@ -478,6 +477,23 @@ const defaultOptions = {
   staticPlugins: null,
   newPluginHandler: null
 };
+
+function makeLoopbackConfig(nodeConfig) {
+  /* TODO do we really prefer loopback HTTPS? Why not simply choose HTTP? */
+  if (nodeConfig.https) {
+    return {
+      port: nodeConfig.https.port,
+      isHttps: true,
+      host: zluxUtil.getLoopbackAddress(nodeConfig.https.ipAddresses)
+    }
+  } else {
+    return {
+      port: nodeConfig.http.port,
+      isHttps: false,
+      host: zluxUtil.getLoopbackAddress(nodeConfig.http.ipAddresses)
+    }
+  }
+}
 
 function WebApp(options){
   this.expressApp = express();
@@ -499,6 +515,9 @@ function WebApp(options){
       maxAge: sessionTimeoutMs
     }
   }));
+  this.wsEnvironment = {
+    loopbackConfig: makeLoopbackConfig(options.serverConfig.node)
+  }
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
   this.auth = options.auth;
   expressWs(this.expressApp);
@@ -616,7 +635,7 @@ WebApp.prototype = {
             [commonMiddleware.logRootServiceCall(true, name), _router]);
       }
       serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
-          this.options.httpPort, this.options.httpsPort);
+          this.wsEnvironment);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
@@ -629,26 +648,21 @@ WebApp.prototype = {
         {needJson: true, needAuth: false, isPseudoSso: true});
     this._installRootService('/auth-logout', 'get', this.auth.doLogout, 
         {needJson: true, needAuth: false, isPseudoSso: true});
-    serviceHandleMap['auth'] = new WebServiceHandle('/auth', 
-        this.options.httpPort, this.options.httpsPort);
-    
+    serviceHandleMap['auth'] = new WebServiceHandle('/auth', this.wsEnvironment);
     this._installRootService('/plugins', 'get', staticHandlers.plugins(this.plugins), 
         {needJson: false, needAuth: false, isPseudoSso: false});
-    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', 
-        this.options.httpPort, this.options.httpsPort);
+    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', this.wsEnvironment);
     this._installRootService('/server/proxies', 'get', staticHandlers.proxies(this.options),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies', 
-        this.options.httpPort, this.options.httpsPort);
+    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies',
+        this.wsEnvironment);
     this._installRootService('/echo/*', 'get', staticHandlers.echo(),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['echo'] = new WebServiceHandle('/echo', 
-        this.options.httpPort, this.options.httpsPort);
+    serviceHandleMap['echo'] = new WebServiceHandle('/echo', this.wsEnvironment);
     this._installRootService('/apiManagement', 'use', staticHandlers.apiManagement(this),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    
     serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
-        this.options.httpPort, this.options.httpsPort);
+        this.wsEnvironment);
     this.expressApp.use(staticHandlers.eureka());
   },
   
@@ -809,8 +823,7 @@ WebApp.prototype = {
       for (const version of Object.keys(group.versions)) {
         const service = group.versions[version];
         const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
-        const handle = new WebServiceHandle(subUrl, this.options.httpPort,
-            this.options.httpsPort);
+        const handle = new WebServiceHandle(subUrl, this.wsEnvironment);
         versionHandles[version] = handle;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
@@ -973,8 +986,7 @@ WebApp.prototype = {
           } else {
               utilLog.debug(`Referrer proxying miss. Resource not found, sending`
                   + ` 404 because referrer (${referrer}) didn't match a plugin pattern`);               
-            return do404(req.url, res, this.options.productCode
-                  + ": unknown resource requested. Referrer="+referrer);
+            return do404(req.url, res, this.options.productCode + ": unknown resource requested");
           }
         } else {
           return do404(req.url, res, this.options.productCode
