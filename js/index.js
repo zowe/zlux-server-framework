@@ -33,7 +33,6 @@ function Server(appConfig, userConfig, startUpConfig) {
   unp.setProductCode(appConfig.productCode);
   util.deepFreeze(appConfig);
   util.resolveRelativePaths(process.cwd(), userConfig);
-  util.deepFreeze(userConfig);
   this.startUpConfig = startUpConfig;
   util.deepFreeze(startUpConfig);
   this.processManager = new ProcessManager(true);
@@ -97,7 +96,7 @@ Server.prototype = {
       }
     }
     const wsConfig = this.userConfig.node;
-    if (!this.webServer.isConfigValid(wsConfig)) {
+    if (!(yield this.webServer.validateAndPreprocessConfig(wsConfig))) {
       const httpsConfig = wsConfig.https;
       const httpConfig = wsConfig.http;
       bootstrapLogger.warn('Missing one or more parameters required to run.');
@@ -119,6 +118,7 @@ Server.prototype = {
           + ' JSON format');
       throw new Error("config invalid")
     }
+    util.deepFreeze(this.userConfig);
     this.webServer.setConfig(wsConfig);
     const webauth = WebAuth(this.authManager);
     let sessionTimeoutMs = null;

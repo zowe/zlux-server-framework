@@ -26,18 +26,7 @@ const crypto = require('crypto');
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const contentLogger = util.loggers.contentLogger;
 const childLogger = util.loggers.childLogger;
-
-function sanitizeIps(ipAddresses) {
-  let set = new Set();
-  ipAddresses.forEach((ipAddress)=> {
-    if (typeof ipAddress == 'string') {
-      set.add(ipAddress);
-    } else {
-      bootstrapLogger.warn(`Skipping invalid listener address=${ipAddress}`);
-    }
-  });
-  return set;
-}
+const networkLogger = util.loggers.network;
 
 function WebServer() {
   this.config = null;
@@ -58,19 +47,19 @@ WebServer.prototype = {
     server.on('error',(e)=> {
       switch (e.code) {
       case 'EADDRINUSE':
-        bootstrapLogger.severe(`Could not listen on address ${ipAddress}:${port}. It is already in use by another process.`);
+        networkLogger.severe(`Could not listen on address ${ipAddress}:${port}. It is already in use by another process.`);
         //While I'd like to close the server here,
         //it seems that an exception is thrown that can't be caught, causing server to stop anyway
         break;
       case 'ENOTFOUND':
       case 'EADDRNOTAVAIL':
-        bootstrapLogger.severe(`Could not listen on address ${ipAddress}:${port}. Invalid IP for this system.`);
+        networkLogger.severe(`Could not listen on address ${ipAddress}:${port}. Invalid IP for this system.`);
         //While I'd like to close the server here,
         //it seems that an exception is thrown that can't be caught, causing server to stop anyway
         break;
       default:
-        bootstrapLogger.warn(`Unexpected error on server ${ipAddress}:${port}. E=${e}. Stack trace follows.`);
-        bootstrapLogger.warn(e.stack);
+        networkLogger.warn(`Unexpected error on server ${ipAddress}:${port}. E=${e}. Stack trace follows.`);
+        networkLogger.warn(e.stack);
       }
     });
 
@@ -105,19 +94,31 @@ WebServer.prototype = {
     };
   },
 
-  isConfigValid(config) {
+  validateAndPreprocessConfig: Promise.coroutine(function *validateAndPreprocessConfig(config) {
     let canRun = false;
     if (config.http && config.http.port) {
-      canRun = true;
-    } else if (config.https && config.https.port) {
-      if (config.https.pfx) {
+      const uniqueIps = yield util.uniqueIps(config.http.ipAddresses);
+      if (uniqueIps.length > 0) {
         canRun = true;
-      } else if (config.https.certificates && config.https.keys) {
-        canRun = true;
+        networkLogger.info('HTTP config valid, will listen on: ' + uniqueIps);
       }
+      config.http.ipAddresses = uniqueIps;
+    } 
+    if (config.https && config.https.port) {
+      const uniqueIps =  yield util.uniqueIps(config.https.ipAddresses);
+      if (uniqueIps.length > 0) {
+        if (config.https.pfx) {
+          canRun = true;
+          networkLogger.info('HTTPS config valid, will listen on: ' + uniqueIps);
+        } else if (config.https.certificates && config.https.keys) {
+          canRun = true;
+          networkLogger.info('HTTPS config valid, will listen on: ' + uniqueIps);
+        }
+      }
+      config.https.ipAddresses = uniqueIps;
     }
     return canRun;
-  },
+  }),
 
   setConfig(config) {
     this.config = config;
@@ -142,24 +143,24 @@ WebServer.prototype = {
   },
 
   startListening: Promise.coroutine(function* (app) {
-    let t = this;
     if (this.config.https && this.config.https.port) {
-      let makeHttpsServer = function*(ipAddress, port) {
+      const port = this.config.https.port;
+      for (let ipAddress of this.config.https.ipAddresses) {
         let listening = false;
         let httpsServer;
-        t._loadHttpsKeyData();
+        this._loadHttpsKeyData();
         while (!listening) {
           try {
-            httpsServer = https.createServer(t.httpsOptions, app);
-            t._setErrorLogger(httpsServer, 'HTTPS', ipAddress, port);
-            t.httpsServers.push(httpsServer);
-            t.expressWsHttps.push(expressWs(app, httpsServer, {maxPayload: 50000}));
+            httpsServer = https.createServer(this.httpsOptions, app);
+            this._setErrorLogger(httpsServer, 'HTTPS', ipAddress, port);
+            this.httpsServers.push(httpsServer);
+            this.expressWsHttps.push(expressWs(app, httpsServer, {maxPayload: 50000}));
             listening = true;
           } catch (e) {
             if (e.message == 'mac verify failure') {
               const r = reader();
               try {
-                t.httpsOptions.passphrase = yield reader.readPassword(
+                this.httpsOptions.passphrase = yield reader.readPassword(
                   'HTTPS key or PFX decryption failure. Please enter passphrase: ');
               } finally {
                 r.close();
@@ -169,45 +170,17 @@ WebServer.prototype = {
             }
           }
         }
-        t.callListen(httpsServer, 'https', 'HTTPS', ipAddress, port);
-      };
-
-     
-      if (this.config.https.ipAddresses) {
-        let httpsIps = sanitizeIps(this.config.https.ipAddresses);
-        let len = httpsIps.size;
-        if (len > 0) {
-          const iterator = httpsIps.entries();
-          for (let ipAddress of iterator) {
-            yield* makeHttpsServer(ipAddress[0], this.config.https.port);
-          }
-        } else {
-          yield* makeHttpsServer('0.0.0.0', this.config.https.port);
-        }
-      } else {
-        yield* makeHttpsServer('0.0.0.0', this.config.https.port);
+        this.callListen(httpsServer, 'https', 'HTTPS', ipAddress, port);
       }
     }
     if (this.config.http && this.config.http.port) {
-      let makeHttpServer = function(ipAddress, port) {
+      const port = this.config.http.port;
+      for (let ipAddress of this.config.http.ipAddresses) {
         let httpServer = http.createServer(app);
-        t._setErrorLogger(httpServer, 'HTTP', ipAddress, port);
-        t.httpServers.push(httpServer);
-        t.expressWsHttp.push(expressWs(app, httpServer));
-        t.callListen(httpServer, 'http', 'HTTP', ipAddress, port);
-      }
-      
-      if (this.config.http.ipAddresses) {
-        let httpIps = sanitizeIps(this.config.http.ipAddresses);
-        if (httpIps.size > 0) {
-          httpIps.forEach((ipAddress)=> {
-            makeHttpServer(ipAddress, this.config.http.port);
-          });
-        } else {
-          makeHttpServer('0.0.0.0', this.config.http.port);
-        }
-      } else {
-        makeHttpServer('0.0.0.0', this.config.http.port);
+        this._setErrorLogger(httpServer, 'HTTP', ipAddress, port);
+        this.httpServers.push(httpServer);
+        this.expressWsHttp.push(expressWs(app, httpServer));
+        this.callListen(httpServer, 'http', 'HTTP', ipAddress, port);
       }
     }
   }),
@@ -215,10 +188,11 @@ WebServer.prototype = {
   callListen(methodServer, methodName, methodNameForLogging, ipAddress, port) {
     const addressForLogging = `${ipAddress}:${port}`;
     const logFunction = function () {
-      bootstrapLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  Listening on ${addressForLogging}`)
+      networkLogger.log(bootstrapLogger.INFO,`(${methodNameForLogging})  `
+          + `Listening on ${addressForLogging}`)
     };
-    bootstrapLogger.log(bootstrapLogger.INFO,
-                        `(${methodNameForLogging})  About to start listening on ${addressForLogging}`);
+    networkLogger.log(bootstrapLogger.INFO, `(${methodNameForLogging})  `
+        + `About to start listening on ${addressForLogging}`);
     methodServer.listen(port, ipAddress, logFunction);
   },
 
@@ -227,7 +201,7 @@ WebServer.prototype = {
       let info = server.address();
       if (info) {
         //could be undefined if there was an error binding, yet close() still works
-        bootstrapLogger.info(`(HTTP) Closing server ${info.address}:${info.port}`);
+        networkLogger.info(`(HTTP) Closing server ${info.address}:${info.port}`);
       }
       server.close();      
     });
@@ -235,7 +209,7 @@ WebServer.prototype = {
       let info = server.address();
       if (info) {
         //could be undefined if there was an error binding, yet close() still works
-        bootstrapLogger.info(`(HTTPS) Closing server ${info.address}:${info.port}`);
+        networkLogger.info(`(HTTPS) Closing server ${info.address}:${info.port}`);
       }
       server.close();      
     });
@@ -243,36 +217,6 @@ WebServer.prototype = {
 };
 
 module.exports = WebServer;
-
-const _unitTest = false;
-function unitTest() {
-  const config = {
-    "node": {
-      "http": {
-        "port": 31339,
-        "hostname": "127.0.0.1"
-      },
-      "https": {
-        "port": 31340,
-        "keys": ["../deploy/product/MVD/serverConfig/server.key"],
-        "certificates": ["../deploy/product/MVD/serverConfig/server.cert"]
-      }
-    }
-  };
-  const webServer = makeWebServer();
-  if (webServer.isConfigValid(config)) {
-    bootstrapLogger.info("Config valid");
-    webServer.setConfig(config);
-    const express = require('express');
-    webServer.startListening(express());
-  } else {
-     bootstrapLogger.warn("Config invalid");
-  }
-}
-if (_unitTest) {
-  unitTest();
-}
-  
 
 
 /*
