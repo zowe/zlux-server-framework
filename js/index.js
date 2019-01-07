@@ -33,7 +33,6 @@ function Server(appConfig, userConfig, startUpConfig) {
   unp.setProductCode(appConfig.productCode);
   util.deepFreeze(appConfig);
   util.resolveRelativePaths(process.cwd(), userConfig);
-  util.deepFreeze(userConfig);
   this.startUpConfig = startUpConfig;
   util.deepFreeze(startUpConfig);
   this.processManager = new ProcessManager(true);
@@ -97,7 +96,7 @@ Server.prototype = {
       }
     }
     const wsConfig = this.userConfig.node;
-    if (!this.webServer.isConfigValid(wsConfig)) {
+    if (!(yield this.webServer.validateAndPreprocessConfig(wsConfig))) {
       const httpsConfig = wsConfig.https;
       const httpConfig = wsConfig.http;
       bootstrapLogger.warn('Missing one or more parameters required to run.');
@@ -119,7 +118,7 @@ Server.prototype = {
           + ' JSON format');
       throw new Error("config invalid")
     }
-    this.webServer.setConfig(wsConfig);
+    util.deepFreeze(this.userConfig);
     const webauth = WebAuth(this.authManager);
     let sessionTimeoutMs = null;
     try { 
@@ -127,11 +126,6 @@ Server.prototype = {
       //deeply nested structures and default values on all levels 
       sessionTimeoutMs = wsConfig.session.cookie.timeoutMS;
     } catch (nullReferenceError) { /* ignore */ }
-    if (process.platform !== 'os390') {
-      const host = this.startUpConfig.proxiedHost;
-      const port = this.startUpConfig.proxiedPort;
-      yield checkProxiedHost(host, port);
-    }
     const webAppOptions = {
       sessionTimeoutMs: sessionTimeoutMs,
       httpPort: wsConfig.http ? wsConfig.http.port : undefined,
@@ -152,7 +146,6 @@ Server.prototype = {
       auth: webauth
     };
     this.webApp = makeWebApp(webAppOptions);
-    this.webServer.startListening(this.webApp.expressApp);
     let pluginsLoaded = [];
     this.pluginLoader.on('pluginAdded', util.asyncEventListener(event => {
       return this.pluginLoaded(event.data).then(() => {
@@ -166,6 +159,13 @@ Server.prototype = {
     this.pluginLoader.loadPlugins();
     yield this.authManager.loadAuthenticators(this.userConfig);
     this.authManager.validateAuthPluginList();
+    this.webServer.setConfig(wsConfig);
+    if (process.platform !== 'os390') {
+      const host = this.startUpConfig.proxiedHost;
+      const port = this.startUpConfig.proxiedPort;
+      yield checkProxiedHost(host, port);
+    }
+    this.webServer.startListening(this.webApp.expressApp);
     this.processManager.addCleanupFunction(function() {
       this.webServer.close();
     }.bind(this));

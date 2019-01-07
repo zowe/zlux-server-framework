@@ -199,12 +199,13 @@ const staticHandlers = {
  *  This is passed to every other service of the plugin, so that 
  *  the service can be called by other services under the plugin
  */
-function WebServiceHandle(urlPrefix) {
+function WebServiceHandle(urlPrefix, environment) {
   this.urlPrefix = urlPrefix;
-  if (!loopbackConfig.port) {
+  if (!environment.loopbackConfig.port) {
     installLog.severe(`loopback configuration not valid,`,loopbackConfig,
                       `loopback calls will fail!`);
   }
+  this.environment = environment;
 }
 WebServiceHandle.prototype = {
   constructor: WebServiceHandle,
@@ -231,15 +232,15 @@ WebServiceHandle.prototype = {
       }
       let rejectUnauthorized;
       let protocol;
-      if (loopbackConfig.isHttps) {
+      if (this.environment.loopbackConfig.isHttps) {
         protocol = 'https:';
         rejectUnauthorized = false;
       } else {
         protocol = 'http:';
       }
       const requestOptions = {
-        hostname: loopbackConfig.host,
-        port: loopbackConfig.port,
+        hostname: this.environment.loopbackConfig.host,
+        port: this.environment.loopbackConfig.port,
         method: options.method || "GET",
         protocol: protocol,
         path: url,
@@ -273,7 +274,7 @@ WebServiceHandle.prototype = {
       if (Object.getOwnPropertyNames(headers).length > 0) {
         requestOptions.headers = headers;
       }
-      let httpOrHttps = loopbackConfig.isHttps ? https : http;
+      let httpOrHttps = this.environment.loopbackConfig.isHttps ? https : http;
       const request = httpOrHttps.request(requestOptions, (response) => {
         var chunks = [];
         response.on('data',(chunk)=> {
@@ -477,11 +478,22 @@ const defaultOptions = {
   newPluginHandler: null
 };
 
-const loopbackConfig = {
-  isHttps: true,
-  port: 0,
-  host: '127.0.0.1'
-};
+function makeLoopbackConfig(nodeConfig) {
+  /* TODO do we really prefer loopback HTTPS? Why not simply choose HTTP? */
+  if (nodeConfig.https) {
+    return {
+      port: nodeConfig.https.port,
+      isHttps: true,
+      host: zluxUtil.getLoopbackAddress(nodeConfig.https.ipAddresses)
+    }
+  } else {
+    return {
+      port: nodeConfig.http.port,
+      isHttps: false,
+      host: zluxUtil.getLoopbackAddress(nodeConfig.http.ipAddresses)
+    }
+  }
+}
 
 function WebApp(options){
   this.expressApp = express();
@@ -503,7 +515,9 @@ function WebApp(options){
       maxAge: sessionTimeoutMs
     }
   }));
-  loopbackConfig = zluxUtil.getLoopbackFromConfig(options);
+  this.wsEnvironment = {
+    loopbackConfig: makeLoopbackConfig(options.serverConfig.node)
+  }
   this.options = zluxUtil.makeOptionsObject(defaultOptions, options);
   this.auth = options.auth;
   expressWs(this.expressApp);
@@ -620,7 +634,8 @@ WebApp.prototype = {
             this.auth.middleware,
             [commonMiddleware.logRootServiceCall(true, name), _router]);
       }
-      serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url);
+      serviceHandleMap[name] = new WebServiceHandle(proxiedRootService.url, 
+          this.wsEnvironment);
     }
     this.expressApp.use(commonMiddleware.injectServiceHandles(serviceHandleMap,
         true));
@@ -633,19 +648,21 @@ WebApp.prototype = {
         {needJson: true, needAuth: false, isPseudoSso: true});
     this._installRootService('/auth-logout', 'get', this.auth.doLogout, 
         {needJson: true, needAuth: false, isPseudoSso: true});
-    serviceHandleMap['auth'] = new WebServiceHandle('/auth');
+    serviceHandleMap['auth'] = new WebServiceHandle('/auth', this.wsEnvironment);
     this._installRootService('/plugins', 'get', staticHandlers.plugins(this.plugins), 
         {needJson: false, needAuth: false, isPseudoSso: false});
-    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins');
+    serviceHandleMap['plugins'] = new WebServiceHandle('/plugins', this.wsEnvironment);
     this._installRootService('/server/proxies', 'get', staticHandlers.proxies(this.options),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies');
+    serviceHandleMap['server/proxies'] = new WebServiceHandle('/server/proxies',
+        this.wsEnvironment);
     this._installRootService('/echo/*', 'get', staticHandlers.echo(),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['echo'] = new WebServiceHandle('/echo');
+    serviceHandleMap['echo'] = new WebServiceHandle('/echo', this.wsEnvironment);
     this._installRootService('/apiManagement', 'use', staticHandlers.apiManagement(this),
         {needJson: false, needAuth: true, isPseudoSso: false});
-    serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement');
+    serviceHandleMap['apiManagement'] = new WebServiceHandle('/apiManagement', 
+        this.wsEnvironment);
     this.expressApp.use(staticHandlers.eureka());
   },
   
@@ -806,7 +823,7 @@ WebApp.prototype = {
       for (const version of Object.keys(group.versions)) {
         const service = group.versions[version];
         const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
-        const handle = new WebServiceHandle(subUrl);
+        const handle = new WebServiceHandle(subUrl, this.wsEnvironment);
         versionHandles[version] = handle;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
