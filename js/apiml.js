@@ -62,8 +62,10 @@ const MEDIATION_LAYER_INSTANCE_DEFAULTS = {
   }
 };
 
-function ApimlConnector({ hostName, ipAddr, httpPort, httpsPort, apimlConfig }) {
-  Object.assign(this, { hostName, ipAddr, httpPort, httpsPort, apimlConfig });
+function ApimlConnector({ hostName, ipAddr, httpPort, httpsPort, apimlConfig, 
+    tlsOptions }) {
+  Object.assign(this, { hostName, ipAddr, httpPort, httpsPort, apimlConfig, 
+    tlsOptions });
   this.vipAddress = hostName;
 }
 
@@ -128,7 +130,15 @@ ApimlConnector.prototype = {
   registerMainServerInstance() {
     const zluxProxyServerInstanceConfig = {
       instance: this._makeMainInstanceProperties(),
-      eureka: Object.assign({}, MEDIATION_LAYER_EUREKA_DEFAULTS)
+      eureka: Object.assign({}, MEDIATION_LAYER_EUREKA_DEFAULTS),
+      requestMiddleware: (requestOpts, done) => {
+        requestOpts.pfx = this.tlsOptions.pfx;
+        requestOpts.ca = this.tlsOptions.ca;
+        requestOpts.cert = this.tlsOptions.cert;
+        requestOpts.key = this.tlsOptions.key;
+        requestOpts.passphrase = this.tlsOptions.passphrase;
+        done(requestOpts);
+    }
     }
     log.debug("zluxProxyServerInstanceConfig: " 
         + JSON.stringify(zluxProxyServerInstanceConfig, null, 2))
