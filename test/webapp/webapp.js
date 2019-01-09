@@ -42,7 +42,12 @@ const webAppOptions = {
     }
 };
 
-const pl = new PluginLoader({ pluginsDir: process.cwd() });
+const pl = new PluginLoader({ 
+  pluginsDir: path.join(process.cwd(), 'test/webapp'),
+  relativePathResolver(p) {
+    return path.join(process.cwd(), 'test/webapp', p);
+  }
+});
 const def = pl._readPluginDef("org.zowe.testplugin.json");
 const plugin = makePlugin(def, {}, {
     productCode: "XXX",
