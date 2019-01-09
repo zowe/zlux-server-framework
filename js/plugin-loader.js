@@ -180,6 +180,7 @@ Plugin.prototype = {
   dataServices: null,
   dataServicesGrouped: null,
   configuration: null,
+  pluginPath: null, /* Don't return this back. This should be hidden. */
   //...
   
   toString() {
@@ -230,7 +231,7 @@ Plugin.prototype = {
   },
   
   initStaticWebDependencies() {
-    if (this.webContent) {
+    if (this.contentPath) {
       let contentPath = path.join(this.location, "web");
       if (!fs.existsSync(contentPath)) {
         bootstrapLogger.warn(`plugin ${this.identifier} has web content but `
@@ -238,7 +239,7 @@ Plugin.prototype = {
       } else {
         bootstrapLogger.info(`plugin ${this.identifier} `
             + `will serve static files from ${contentPath}`);
-        this.webContent.path = contentPath;
+        this.pluginPath = contentPath;
       }
     }
   },
