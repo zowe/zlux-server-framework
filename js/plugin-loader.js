@@ -231,7 +231,7 @@ Plugin.prototype = {
   },
   
   initStaticWebDependencies() {
-    if (this.contentPath) {
+    if (this.webContent) {
       let contentPath = path.join(this.location, "web");
       if (!fs.existsSync(contentPath)) {
         bootstrapLogger.warn(`plugin ${this.identifier} has web content but `
