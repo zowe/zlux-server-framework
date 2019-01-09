@@ -172,10 +172,14 @@ module.exports.uniqueIps = Promise.coroutine(function *uniqueIps(hostnames) {
   }
   let set = new Set();
   for (let hostname of hostnames) {
-    try {
-      const ipAddress = yield dnsLookup(hostname);
-      set.add(ipAddress);
-    } catch (e) {
+    if (typeof hostname == 'string') { //really... dnsLookup would not throw on a non-string such as false
+      try {
+        const ipAddress = yield dnsLookup(hostname);
+        set.add(ipAddress);
+      } catch (e) {
+        loggers.network.warn(`Skipping invalid listener address=${hostname}`);
+      }
+    } else {
       loggers.network.warn(`Skipping invalid listener address=${hostname}`);
     }
   }
