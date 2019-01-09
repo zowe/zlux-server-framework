@@ -582,6 +582,12 @@ PluginLoader.prototype = {
     for (const pluginDescriptorFilename of pluginLocationJSONs) {
       try {
         const plugin = this._readPluginDef(pluginDescriptorFilename);
+        for (var i = 0; i < defs.length; i++) {
+          if (defs[i].identifier == plugin.identifier) {
+            bootstrapLogger.log(bootstrapLogger.WARNING,
+              `Duplicate plugin identifier ` + plugin.identifier + ` found.`);
+          }
+        }
         defs.push(plugin);
       } catch (e) {
         console.log(e);
