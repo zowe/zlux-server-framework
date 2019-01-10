@@ -613,7 +613,8 @@ PluginLoader.prototype = {
     for (const rejectedPlugin of sortedAndRejectedPlugins.rejects) {
       bootstrapLogger.warn(`Could not initialize plugin` 
           + ` ${rejectedPlugin.pluginId}: `  
-          + rejectedPlugin.validationError.status);
+          + zluxUtil.formatErrorStatus(rejectedPlugin.validationError, 
+              DependencyGraph.statuses));
     }
     for (const pluginDef of sortedAndRejectedPlugins.plugins) { 
       try {

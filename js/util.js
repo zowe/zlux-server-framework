@@ -216,6 +216,18 @@ module.exports.getLoopbackAddress = function getLoopbackAddress(listenerAddresse
   return listenerAddresses[0];
 }
 
+module.exports.formatErrorStatus = function formatErrorStatus(err, descriptions) {
+  const description = (descriptions[err.status] || err.status) + ": ";
+  const keywords = [];
+  
+  for (let key of Object.keys(err)) {
+    if (key == "status") {
+      continue;
+    } 
+    keywords.push(`${key}: ${err[key]}`);
+  }
+  return description + keywords.join(', ');
+}
 
 
 /*
