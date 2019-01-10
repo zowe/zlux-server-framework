@@ -910,11 +910,10 @@ WebApp.prototype = {
 
   _installPluginStaticHandlers(plugin, urlBase) {
     installLog.info(`${plugin.identifier}: installing static file handlers...`);
-    if (plugin.webContent && plugin.webContent.path) {
+    if (plugin.webContent && plugin.location) {
       let url = `${urlBase}/web`;
       installLog.info(`${plugin.identifier}: serving static files at ${url}`);
-      //console.log(url, plugin.webContent.path);
-      this.pluginRouter.use(url, express.static(plugin.webContent.path));
+      this.pluginRouter.use(url, express.static(path.join(plugin.location, '/web')));
     }
     if (plugin.pluginType === "library") {
       let url = `/lib/${plugin.identifier}/${plugin.libraryVersion}`;
