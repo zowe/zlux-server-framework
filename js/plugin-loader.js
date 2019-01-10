@@ -229,16 +229,15 @@ Plugin.prototype = {
     }
   },
   
-  initStaticWebDependencies() {
+  verifyStaticWebContent() {
     if (this.webContent) {
       let contentPath = path.join(this.location, "web");
       if (!fs.existsSync(contentPath)) {
-        bootstrapLogger.warn(`plugin ${this.identifier} has web content but `
-            + `no web directory under ${this.location}`);
+        throw new Error(`plugin ${this.identifier} has web content but `
+            + `no web directory under ${this.location}`); 
       } else {
         bootstrapLogger.info(`plugin ${this.identifier} `
             + `will serve static files from ${contentPath}`);
-        this.webContent.path = contentPath;
       }
     }
   },
@@ -440,7 +439,11 @@ NodeAuthenticationPlugIn.prototype = {
   },
   
   init(context) {
-    const filepath = path.join(this.location, 'lib', this.filename);
+    let filepath = path.join(this.location, 'lib', this.filename);
+	// Make the relative path clear. process.cwd() is zlux-example-server/bin/
+    if (!path.isAbsolute(filepath)) {
+      filepath = path.join(process.cwd(),filepath);
+    }
     bootstrapLogger.log(bootstrapLogger.INFO,
       `Auth plugin ${this.identifier}: loading auth handler module ${filepath}`)
     this.authenticationModule = require(filepath);
@@ -509,7 +512,7 @@ function makePlugin(def, pluginConfiguration, pluginContext, dynamicallyCreated)
   }
   self.initDataServices(pluginContext);
   if (!dynamicallyCreated) {
-    self.initStaticWebDependencies();
+    self.verifyStaticWebContent();
   }
   self.init(pluginContext);
   return self;
@@ -560,8 +563,9 @@ PluginLoader.prototype = {
       throw new Error(`No plugin type found for ${pluginDef.identifier} `
       + `found at ${pluginBasePath}, skipping`)
     }
-    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin type `
-        + `'${pluginDef.pluginType}'`);
+    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin id = ${pluginDef.identifier}, `
+        + `type = ${pluginDef.pluginType}`);
+        
     pluginDef.location = pluginBasePath;
     return pluginDef;
   },
