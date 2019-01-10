@@ -180,7 +180,6 @@ Plugin.prototype = {
   dataServices: null,
   dataServicesGrouped: null,
   configuration: null,
-  pluginPath: null, /* Don't return this back. This should be hidden. */
   //...
   
   toString() {
@@ -230,16 +229,15 @@ Plugin.prototype = {
     }
   },
   
-  initStaticWebDependencies() {
+  verifyStaticWebContent() {
     if (this.webContent) {
       let contentPath = path.join(this.location, "web");
       if (!fs.existsSync(contentPath)) {
-        bootstrapLogger.warn(`plugin ${this.identifier} has web content but `
-            + `no web directory under ${this.location}`);
+        throw new Error(`plugin ${this.identifier} has web content but `
+            + `no web directory under ${this.location}`); 
       } else {
         bootstrapLogger.info(`plugin ${this.identifier} `
             + `will serve static files from ${contentPath}`);
-        this.pluginPath = contentPath;
       }
     }
   },
@@ -514,7 +512,7 @@ function makePlugin(def, pluginConfiguration, pluginContext, dynamicallyCreated)
   }
   self.initDataServices(pluginContext);
   if (!dynamicallyCreated) {
-    self.initStaticWebDependencies();
+    self.verifyStaticWebContent();
   }
   self.init(pluginContext);
   return self;
