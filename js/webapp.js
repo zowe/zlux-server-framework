@@ -764,6 +764,10 @@ WebApp.prototype = {
     serviceRouterWithMiddleware.push(this.auth.middleware);
     serviceRouterWithMiddleware.push(commonMiddleware.logServiceCall(
         plugin.identifier, service.name));
+    if (service.httpCaching !== true) {
+      //Per-dataservice middleware to handle tls no-cache
+      serviceRouterWithMiddleware.push(commonMiddleware.httpNoCacheHeaders());
+    }    
     let router;
     switch (service.type) {
     case "service":
@@ -863,17 +867,12 @@ WebApp.prototype = {
         const router = yield* this._makeRouter(service, plugin, pluginContext, 
                                                pluginChain);
         installLog.info(`${plugin.identifier}: installing router at ${subUrl}`);
-        //Per-dataservice middleware to handle tls no-cache
-        let serviceMiddleware = [];
-        if (service.httpCaching !== true) {
-          serviceMiddleware.push(commonMiddleware.httpNoCacheHeaders());
-        }
-        this.pluginRouter.use(subUrl, ...serviceMiddleware, router);
+        this.pluginRouter.use(subUrl, router);
 
         serviceRouters[version] = router;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
-          this.pluginRouter.use(defaultSubUrl, ...serviceMiddleware, router);
+          this.pluginRouter.use(defaultSubUrl, router);
           serviceRouters['_current'] = router;
         }
       }
