@@ -26,6 +26,9 @@ DependencyGraph.prototype = {
   
   addPlugin(plugin) {
     logger.debug(`Adding plugin ${plugin.identifier}`);
+    if (this.pluginsById[plugin.identifier]) {
+      logger.warn(`Duplicate plugin identifier ` + plugin.identifier + ` found.`);
+    }
     this.pluginsById[plugin.identifier] = plugin;
   },
   

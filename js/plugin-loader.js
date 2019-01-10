@@ -564,8 +564,9 @@ PluginLoader.prototype = {
       throw new Error(`No plugin type found for ${pluginDef.identifier} `
       + `found at ${pluginBasePath}, skipping`)
     }
-    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin type `
-        + `'${pluginDef.pluginType}'`);
+    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin id = ${pluginDef.identifier}, `
+        + `type = ${pluginDef.pluginType}`);
+        
     pluginDef.location = pluginBasePath;
     return pluginDef;
   },
