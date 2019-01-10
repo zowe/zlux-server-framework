@@ -564,8 +564,9 @@ PluginLoader.prototype = {
       throw new Error(`No plugin type found for ${pluginDef.identifier} `
       + `found at ${pluginBasePath}, skipping`)
     }
-    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin type `
-        + `'${pluginDef.pluginType}'`);
+    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin id = ${pluginDef.identifier}, `
+        + `type = ${pluginDef.pluginType}`);
+        
     pluginDef.location = pluginBasePath;
     return pluginDef;
   },
@@ -582,12 +583,6 @@ PluginLoader.prototype = {
     for (const pluginDescriptorFilename of pluginLocationJSONs) {
       try {
         const plugin = this._readPluginDef(pluginDescriptorFilename);
-        for (var i = 0; i < defs.length; i++) {
-          if (defs[i].identifier == plugin.identifier) {
-            bootstrapLogger.log(bootstrapLogger.WARNING,
-              `Duplicate plugin identifier ` + plugin.identifier + ` found.`);
-          }
-        }
         defs.push(plugin);
       } catch (e) {
         console.log(e);
