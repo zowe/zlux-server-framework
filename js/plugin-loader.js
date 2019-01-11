@@ -192,7 +192,7 @@ Plugin.prototype = {
   },
   
   init(context) {
-    //Nothing here anymore: startup checks for validity will be superceeded by https://github.com/zowe/zlux-proxy-server/pull/18 and initialization concept has not manifested for many plugin types, so a warning is not needed.
+    //Nothing here anymore: startup checks for validity will be superceeded by https://github.com/zowe/zlux-server-framework/pull/18 and initialization concept has not manifested for many plugin types, so a warning is not needed.
   },
   
   exportDef() {
@@ -434,7 +434,7 @@ NodeAuthenticationPlugIn.prototype = {
   
   init(context) {
     let filepath = path.join(this.location, 'lib', this.filename);
-	// Make the relative path clear. process.cwd() is zlux-example-server/bin/
+	// Make the relative path clear. process.cwd() is zlux-app-server/bin/
     if (!path.isAbsolute(filepath)) {
       filepath = path.join(process.cwd(),filepath);
     }

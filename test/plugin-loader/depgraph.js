@@ -1,7 +1,7 @@
 const assert = require('assert')
 const Depgraph = require('depgraph')
 const depTestData = require('./depgraph-test-data')
-const pd = "..\..\..\\zlux-example-server\\deploy\\product"
+const pd = "..\..\..\\zlux-app-server\\deploy\\product"
   
 describe('degpraph', function() {
   it('should correctly install plugins with valid deps', function() {
