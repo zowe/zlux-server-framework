@@ -51,12 +51,6 @@ function Service(def, configuration, plugin) {
   //don't do this here: avoid circular structures:
   //this.plugin = plugin; 
   Object.assign(this, def);
-  if (this.version === undefined) {
-    //FIXME temporary hack until everyone has fixed their plugin defs.
-    bootstrapLogger.warn(`Service ${plugin.identifier}::${this.name} doesn't` 
-      + ` specify a version. Resorting to the plugin's API version ${plugin.apiVersion}`);
-    this.version = plugin.apiVersion;
-  }
 }
 Service.prototype = {
   constructor: Service,
