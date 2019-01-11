@@ -5,6 +5,15 @@ const semver = require('semver');
 const zluxUtil = require('./util');
 
 module.exports = DependencyGraph;
+// TODO translation
+module.exports.statuses = {
+  "REQUIRED_PLUGIN_FAILED_TO_LOAD": "Required plugin failed to load",
+  "REQUIRED_PLUGIN_NOT_FOUND": "Required plugin not found",
+  "INVALID_REQUIRED_VERSION_RANGE": "Invalid required version range",
+  "IMPORTED_SERVICE_IS_AN_IMPORT": "Imported service is itself an import",
+  "REQUIRED_SERVICE_VERSION_NOT_FOUND": "Required service version not found",
+  "REQUIRED_SERVICE_NOT_FOUND": "Required service version not found"
+}
 
 const logger = zluxUtil.loggers.bootstrapLogger
 
@@ -235,6 +244,13 @@ function validateDep(dep, providerPlugin) {
       status: "REQUIRED_PLUGIN_NOT_FOUND",
       pluginId: dep.provider
     }
+  } else if (!semver.validRange(dep.requiredVersionRange)) {
+    valid = false;
+    validationError = {
+      status: "INVALID_REQUIRED_VERSION_RANGE",
+      pluginId: dep.provider,
+      requiredVersion: dep.requiredVersionRange
+    }
   } else {
     let found = false;
     let foundAtDifferentVersion = false;
@@ -248,6 +264,8 @@ function validateDep(dep, providerPlugin) {
           }
           found = true;
           break;
+        } else if (!semver.valid(service.version)) {
+          foundAtDifferentVersion = true;
         } else if (!semver.satisfies(service.version, dep.requiredVersionRange)) {
           foundAtDifferentVersion = true;
         } else {

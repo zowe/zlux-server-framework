@@ -480,7 +480,7 @@ const defaultOptions = {
 
 function makeLoopbackConfig(nodeConfig) {
   /* TODO do we really prefer loopback HTTPS? Why not simply choose HTTP? */
-  if (nodeConfig.https) {
+  if (nodeConfig.https && nodeConfig.https.enabled) {
     return {
       port: nodeConfig.https.port,
       isHttps: true,
@@ -892,7 +892,7 @@ WebApp.prototype = {
           [importedService.sourceName][importedService.version];
         if (!importedRouter) {
           throw new Error(
-            `Import ${importedService.sourcePlugin}:${implortedService.sourceName}`
+            `Import ${importedService.sourcePlugin}:${importedService.sourceName}`
             + " can't be satisfied");
         }
         installLog.info(`${plugin.identifier}: installing import`
