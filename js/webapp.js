@@ -431,6 +431,16 @@ const commonMiddleware = {
       req.on('data', onData).on('end', onEnd);
     }
   },
+
+  httpNoCacheHeaders() {
+    return function httpCachingHeaders(req, res, next) {
+      //service.httpCaching = false means
+      //"Cache-control: no-store" and "Pragma: no-cache"
+      res.set('Cache-control', 'no-store');
+      res.set('Pragma', 'no-cache');
+      next();
+    }
+  },
   
   logRootServiceCall(proxied, serviceName) {
     const type = proxied? "Proxied root" : "root"
@@ -768,6 +778,10 @@ WebApp.prototype = {
     serviceRouterWithMiddleware.push(this.auth.middleware);
     serviceRouterWithMiddleware.push(commonMiddleware.logServiceCall(
         plugin.identifier, service.name));
+    if (service.httpCaching !== true) {
+      //Per-dataservice middleware to handle tls no-cache
+      serviceRouterWithMiddleware.push(commonMiddleware.httpNoCacheHeaders());
+    }    
     let router;
     switch (service.type) {
     case "service":
@@ -864,9 +878,10 @@ WebApp.prototype = {
         const service = group.versions[version];
         const subUrl = urlBase + zLuxUrl.makeServiceSubURL(service);
         const router = yield* this._makeRouter(service, plugin, pluginContext, 
-            pluginChain); 
+                                               pluginChain);
         installLog.info(`${plugin.identifier}: installing router at ${subUrl}`);
         this.pluginRouter.use(subUrl, router);
+
         serviceRouters[version] = router;
         if (version === group.highestVersion) {
           const defaultSubUrl = urlBase + zLuxUrl.makeServiceSubURL(service, true);
