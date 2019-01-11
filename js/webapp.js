@@ -552,7 +552,6 @@ WebApp.prototype = {
   
   makeProxy(urlPrefix, noAuth) {
     const r = express.Router();
-   // console.log("makeProxy", this.options)
     r.use(proxy.makeSimpleProxy(this.options.proxiedHost, this.options.proxiedPort, 
     {
       urlPrefix, 

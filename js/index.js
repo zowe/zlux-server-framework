@@ -160,7 +160,6 @@ Server.prototype = {
       }, err => {
         installLogger.warn(`Exception occurred, plugin (${event.data.identifier}) installation skipped. `
                            +`Message: ${err.message}`);
-        console.log(err)
         installLogger.debug(err.stack);
       });
     }, installLogger));
