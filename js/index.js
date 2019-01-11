@@ -132,7 +132,7 @@ Server.prototype = {
       However, zlux may be run without one, so if both are undefined then don't check for connection.
     */
     if (process.platform !== 'os390' &&
-        ((this.startupConfig.proxiedHost !== undefined) || (this.startupConfig.proxiedPort !== undefined))) {
+        ((this.startUpConfig.proxiedHost !== undefined) || (this.startUpConfig.proxiedPort !== undefined))) {
       const host = this.startUpConfig.proxiedHost;
       const port = this.startUpConfig.proxiedPort;
       yield checkProxiedHost(host, port);
