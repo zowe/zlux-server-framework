@@ -51,12 +51,6 @@ function Service(def, configuration, plugin) {
   //don't do this here: avoid circular structures:
   //this.plugin = plugin; 
   Object.assign(this, def);
-  if (this.version === undefined) {
-    //FIXME temporary hack until everyone has fixed their plugin defs.
-    bootstrapLogger.warn(`Service ${plugin.identifier}::${this.name} doesn't` 
-      + ` specify a version. Resorting to the plugin's API version ${plugin.apiVersion}`);
-    this.version = plugin.apiVersion;
-  }
 }
 Service.prototype = {
   constructor: Service,
@@ -229,16 +223,15 @@ Plugin.prototype = {
     }
   },
   
-  initStaticWebDependencies() {
+  verifyStaticWebContent() {
     if (this.webContent) {
       let contentPath = path.join(this.location, "web");
       if (!fs.existsSync(contentPath)) {
-        bootstrapLogger.warn(`plugin ${this.identifier} has web content but `
-            + `no web directory under ${this.location}`);
+        throw new Error(`plugin ${this.identifier} has web content but `
+            + `no web directory under ${this.location}`); 
       } else {
         bootstrapLogger.info(`plugin ${this.identifier} `
             + `will serve static files from ${contentPath}`);
-        this.webContent.path = contentPath;
       }
     }
   },
@@ -513,7 +506,7 @@ function makePlugin(def, pluginConfiguration, pluginContext, dynamicallyCreated)
   }
   self.initDataServices(pluginContext);
   if (!dynamicallyCreated) {
-    self.initStaticWebDependencies();
+    self.verifyStaticWebContent();
   }
   self.init(pluginContext);
   return self;
@@ -564,8 +557,9 @@ PluginLoader.prototype = {
       throw new Error(`No plugin type found for ${pluginDef.identifier} `
       + `found at ${pluginBasePath}, skipping`)
     }
-    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin type `
-        + `'${pluginDef.pluginType}'`);
+    bootstrapLogger.info(`Read ${pluginBasePath}: found plugin id = ${pluginDef.identifier}, `
+        + `type = ${pluginDef.pluginType}`);
+        
     pluginDef.location = pluginBasePath;
     return pluginDef;
   },
@@ -613,7 +607,8 @@ PluginLoader.prototype = {
     for (const rejectedPlugin of sortedAndRejectedPlugins.rejects) {
       bootstrapLogger.warn(`Could not initialize plugin` 
           + ` ${rejectedPlugin.pluginId}: `  
-          + rejectedPlugin.validationError.status);
+          + zluxUtil.formatErrorStatus(rejectedPlugin.validationError, 
+              DependencyGraph.statuses));
     }
     for (const pluginDef of sortedAndRejectedPlugins.plugins) { 
       try {

@@ -33,7 +33,6 @@ function Server(appConfig, userConfig, startUpConfig) {
   unp.setProductCode(appConfig.productCode);
   util.deepFreeze(appConfig);
   util.resolveRelativePaths(process.cwd(), userConfig);
-  util.deepFreeze(userConfig);
   this.startUpConfig = startUpConfig;
   util.deepFreeze(startUpConfig);
   this.processManager = new ProcessManager(true);
@@ -97,7 +96,7 @@ Server.prototype = {
       }
     }
     const wsConfig = this.userConfig.node;
-    if (!this.webServer.isConfigValid(wsConfig)) {
+    if (!(yield this.webServer.validateAndPreprocessConfig(wsConfig))) {
       const httpsConfig = wsConfig.https;
       const httpConfig = wsConfig.http;
       bootstrapLogger.warn('Missing one or more parameters required to run.');
@@ -119,6 +118,7 @@ Server.prototype = {
           + ' JSON format');
       throw new Error("config invalid")
     }
+    util.deepFreeze(this.userConfig);
     this.webServer.setConfig(wsConfig);
     const webauth = WebAuth(this.authManager);
     let sessionTimeoutMs = null;
@@ -127,7 +127,12 @@ Server.prototype = {
       //deeply nested structures and default values on all levels 
       sessionTimeoutMs = wsConfig.session.cookie.timeoutMS;
     } catch (nullReferenceError) { /* ignore */ }
-    if (process.platform !== 'os390') {
+    /*
+      if either proxiedHost or proxiedPort were specified, then there is intent to connect to an agent.
+      However, zlux may be run without one, so if both are undefined then don't check for connection.
+    */
+    if (process.platform !== 'os390' &&
+        ((this.startUpConfig.proxiedHost !== undefined) || (this.startUpConfig.proxiedPort !== undefined))) {
       const host = this.startUpConfig.proxiedHost;
       const port = this.startUpConfig.proxiedPort;
       yield checkProxiedHost(host, port);
