@@ -62,10 +62,10 @@ const MEDIATION_LAYER_INSTANCE_DEFAULTS = {
   }
 };
 
-function ApimlConnector({ hostName, ipAddr, httpPort, httpsPort, apimlConfig, 
-    tlsOptions }) {
-  Object.assign(this, { hostName, ipAddr, httpPort, httpsPort, apimlConfig, 
-    tlsOptions });
+function ApimlConnector({ hostName, ipAddr, httpPort, httpsPort, apimlHost, 
+    apimlPort, tlsOptions }) {
+  Object.assign(this, { hostName, ipAddr, httpPort, httpsPort, apimlHost, 
+    apimlPort, tlsOptions });
   this.vipAddress = hostName;
 }
 
@@ -142,17 +142,12 @@ ApimlConnector.prototype = {
     }
     log.debug("zluxProxyServerInstanceConfig: " 
         + JSON.stringify(zluxProxyServerInstanceConfig, null, 2))
-    const proto = this.apimlConfig.server.isHttps? 'https' : 'http';
-    const userNameAndPassword = this.apimlConfig.server.username?
-        `${this.apimlConfig.server.username}:${this.apimlConfig.server.password}`
-          : '';
+    const url = `https://${this.apimlHost}:${this.apimlPort}/eureka/apps`
     zluxProxyServerInstanceConfig.eureka.serviceUrls = {
       'default': [
-        `${proto}://${userNameAndPassword}@${this.apimlConfig.server.hostname}`
-          + `:${this.apimlConfig.server.port}/eureka/apps`
+        url
       ]};
-    log.info(`Registering at ${proto}://${this.apimlConfig.server.hostname}:`
-        + `${this.apimlConfig.server.port}/eureka/apps...`);
+    log.info(`Registering at ${url}...`);
     const zluxServerEurekaClient = new eureka(zluxProxyServerInstanceConfig);
     //zluxServerEurekaClient.logger.level('debug');
     this.zluxServerEurekaClient = zluxServerEurekaClient;
