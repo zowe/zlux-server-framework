@@ -190,7 +190,7 @@ Server.prototype = {
         httpsPort: webAppOptions.httpsPort, 
         apimlHost: apimlConfig.server.hostname,
         apimlPort: apimlConfig.server.port,
-        tlsOptions
+        tlsOptions: apimlTlsOptions
       });
       yield this.apiml.registerMainServerInstance();
     }
