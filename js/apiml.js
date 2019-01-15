@@ -132,11 +132,8 @@ ApimlConnector.prototype = {
       instance: this._makeMainInstanceProperties(),
       eureka: Object.assign({}, MEDIATION_LAYER_EUREKA_DEFAULTS),
       requestMiddleware: (requestOpts, done) => {
-        requestOpts.pfx = this.tlsOptions.pfx;
-        requestOpts.ca = this.tlsOptions.ca;
-        requestOpts.cert = this.tlsOptions.cert;
-        requestOpts.key = this.tlsOptions.key;
-        requestOpts.passphrase = this.tlsOptions.passphrase;
+        const { pfx, ca, cert, key, passphrase } = this.tlsOptions;
+        Object.assign(requestOpts, { pfx, ca, cert, key, passphrase });
         done(requestOpts);
     }
     }

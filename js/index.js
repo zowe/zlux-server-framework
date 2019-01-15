@@ -179,8 +179,7 @@ Server.prototype = {
       let apimlTlsOptions;
       if (apimlConfig.tlsOptions != null) {
         apimlTlsOptions = {};
-        WebServer.readTlsOptionsFromConfig(
-            apimlConfig.tlsOptions, apimlTlsOptions); 
+        WebServer.readTlsOptionsFromConfig(apimlConfig.tlsOptions, apimlTlsOptions); 
       } else {
         apimlTlsOptions = this.webServer.getTlsOptions();
       }
