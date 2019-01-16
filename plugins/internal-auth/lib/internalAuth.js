@@ -12,8 +12,8 @@
 
 'use strict';
 const fs = require('fs');
-var jsonUtils = require('../../../NODEPROXY/js/jsonUtils.js');
-const encryption = require('../../../NODEPROXY/js/encryption.js');
+var jsonUtils = require('../../../lib/jsonUtils.js');
+const encryption = require('../../../lib/encryption.js');
 const internalKey = "kGk3CfvnbqkIEyPEnrNe6fDllVByfneolThLZ47PRwgKLB";
 
 /*
