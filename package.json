@@ -1,5 +1,5 @@
 {
-  "name": "zlux-proxy-server",
+  "name": "zlux-server-framework",
   "version": "0.0.0-zlux.version.replacement",
   "description": "A Server for zLUX Plugins, Dataservices, and Proxying to other Servers.",
   "license": "private",
