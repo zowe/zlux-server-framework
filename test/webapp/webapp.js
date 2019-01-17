@@ -203,7 +203,7 @@ describe('WebApp', function() {
     })
   
     after(() => {
-      process.exit(0)
+      //process.exit(0)
     })
   })
 });
