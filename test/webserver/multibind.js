@@ -1,5 +1,5 @@
 const assert = require('assert')
-const zluxUtil = require('../../js/util.js')
+const zluxUtil = require('../../lib/util.js')
 const pd = "..\..\..\\zlux-app-server\\deploy\\product"
   
 global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.network", 5);
