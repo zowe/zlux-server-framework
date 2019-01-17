@@ -1,12 +1,13 @@
 const assert = require('assert')
+const path = require('path');
 const http = require('http');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 chai.use(chaiHttp);
 const should = chai.should();
-const PluginLoader = require('plugin-loader')
+const PluginLoader = require('../../lib/plugin-loader')
 const makePlugin = PluginLoader.makePlugin
-const makeWebApp = require('webapp').makeWebApp;
+const makeWebApp = require('../../lib/webapp').makeWebApp;
 
 // start with uncommenting these once a test fails 
 global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.install", 0);
@@ -27,6 +28,10 @@ const webAppOptions = {
     rootRedirectURL: "",
     rootServices: [],
     serverConfig: {
+      node: {
+        https: {},
+        http: { port: 31337 }
+      }
     },
     staticPlugins: {
       list: [],
@@ -42,7 +47,12 @@ const webAppOptions = {
     }
 };
 
-const pl = new PluginLoader({ pluginsDir: process.cwd() });
+const pl = new PluginLoader({ 
+  pluginsDir: path.join(process.cwd(), 'test/webapp'),
+  relativePathResolver(p) {
+    return path.join(process.cwd(), 'test/webapp', p);
+  }
+});
 const def = pl._readPluginDef("org.zowe.testplugin.json");
 const plugin = makePlugin(def, {}, {
     productCode: "XXX",
@@ -70,15 +80,18 @@ describe('WebApp', function() {
     let server;
    
     beforeEach(function()  {
-      webApp = null;
-      webApp = makeWebApp(webAppOptions);
-      return webApp.installPlugin(pluginContext);
+      try {
+        webApp = null;
+        webApp = makeWebApp(webAppOptions);
+        return webApp.installPlugin(pluginContext);
+      } catch (e) {
+        console.log(e);
+        throw e;
+      } 
     }) 
     
     beforeEach(function(done)  {
-      try {
-        console.log("\n\n\n")
-       // console.log("webApp", webApp)
+      try {       
         server = http.createServer(webApp.expressApp)
        // console.log("server", server)
         let x = server.listen(webAppOptions.httpPort, "localhost")
@@ -88,7 +101,7 @@ describe('WebApp', function() {
         server.on('error', e => done(e));
       } catch (e) {
         console.log(e)
-        //throw e
+        done(e);
       }
     }) 
     
@@ -190,7 +203,7 @@ describe('WebApp', function() {
     })
   
     after(() => {
-      process.exit(0)
+      //process.exit(0)
     })
   })
 });

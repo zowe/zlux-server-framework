@@ -1,5 +1,5 @@
 const assert = require('assert')
-const Depgraph = require('depgraph')
+const Depgraph = require('../../lib/depgraph')
 const depTestData = require('./depgraph-test-data')
 const pd = "..\..\..\\zlux-app-server\\deploy\\product"
   

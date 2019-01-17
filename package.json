@@ -1,5 +1,5 @@
 {
-  "name": "zlux-proxy-server",
+  "name": "zlux-server-framework",
   "version": "0.0.0-zlux.version.replacement",
   "description": "A Server for zLUX Plugins, Dataservices, and Proxying to other Servers.",
   "license": "private",
@@ -13,6 +13,11 @@
       "email": "sgrady@rocketsoftware.com"
     }
   ],
+  "main": "lib/index.js",
+  "scripts": {
+    "build": "exit 0",
+    "test": "mocha --recursive --exit test"
+  },
   "dependencies": {
     "accept-language-parser": "~1.5.0",
     "bluebird": "~3.5.1",
@@ -27,5 +32,9 @@
     "require-from-string": "~2.0.2",
     "semver": "~5.5.1",
     "ws": "~5.2.0"
+  },
+  "devDependencies": {
+    "chai": "^4.2.0",
+    "chai-http": "^4.2.0"
   }
 }
