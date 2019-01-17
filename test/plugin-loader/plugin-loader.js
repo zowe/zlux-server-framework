@@ -1,7 +1,10 @@
 const assert = require('assert')
+const path = require('path')
 const PluginLoader = require('../../lib/plugin-loader')
 const makePlugin = PluginLoader.makePlugin
   
+const PLUGIN_PATH = path.join(process.cwd(), "test/plugin-loader");
+
 describe('Plugin', function() {
   const pluginContext = {
     productCode: "XYZ",
@@ -66,7 +69,8 @@ describe('Plugin', function() {
             "fileName": "nop-router.js",
             "version": "4.4.4"
           }
-        ]
+        ],
+        "location": PLUGIN_PATH
       };
       const p = makePlugin(testPluginDef, {}, pluginContext, false);
       assert(p.dataServicesGrouped)
@@ -105,7 +109,8 @@ describe('Plugin', function() {
             "version": "1.0.0",
             "localName": "something"
           }
-        ]
+        ],
+        "location": PLUGIN_PATH
       };
       const p = makePlugin(testPluginDef, {}, pluginContext, false);
       assert(p.importsGrouped['blah'])
@@ -144,7 +149,8 @@ describe('Plugin', function() {
               "foo": "^4.0.0"
             }
           }
-        ]
+        ],
+        "location": PLUGIN_PATH
       };
       const twoVersionsOfAnImport = {
           "identifier": "org.zowe.testplugin",
@@ -177,13 +183,15 @@ describe('Plugin', function() {
                 "foo": "^4.0.0"
               }
             }
-          ]
+          ],
+          "location": PLUGIN_PATH
         };
       const requiredServiceMissing = {
           "identifier": "org.zowe.testplugin",
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
+          "location": PLUGIN_PATH,
           "dataServices": [
             {
               "type": "router",
@@ -201,6 +209,7 @@ describe('Plugin', function() {
           "apiVersion": "1.0.0",
           "pluginVersion": "1.0.0",
           "pluginType": "application",
+          "location": PLUGIN_PATH,
           "dataServices": [
             {
               "type": "router",

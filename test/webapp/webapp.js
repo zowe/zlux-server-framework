@@ -28,6 +28,10 @@ const webAppOptions = {
     rootRedirectURL: "",
     rootServices: [],
     serverConfig: {
+      node: {
+        https: {},
+        http: { port: 31337 }
+      }
     },
     staticPlugins: {
       list: [],
@@ -76,15 +80,18 @@ describe('WebApp', function() {
     let server;
    
     beforeEach(function()  {
-      webApp = null;
-      webApp = makeWebApp(webAppOptions);
-      return webApp.installPlugin(pluginContext);
+      try {
+        webApp = null;
+        webApp = makeWebApp(webAppOptions);
+        return webApp.installPlugin(pluginContext);
+      } catch (e) {
+        console.log(e);
+        throw e;
+      } 
     }) 
     
     beforeEach(function(done)  {
-      try {
-        console.log("\n\n\n")
-       // console.log("webApp", webApp)
+      try {       
         server = http.createServer(webApp.expressApp)
        // console.log("server", server)
         let x = server.listen(webAppOptions.httpPort, "localhost")
@@ -94,7 +101,7 @@ describe('WebApp', function() {
         server.on('error', e => done(e));
       } catch (e) {
         console.log(e)
-        //throw e
+        done(e);
       }
     }) 
     
