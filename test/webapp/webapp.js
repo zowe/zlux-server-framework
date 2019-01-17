@@ -4,9 +4,9 @@ const chai = require('chai');
 const chaiHttp = require('chai-http');
 chai.use(chaiHttp);
 const should = chai.should();
-const PluginLoader = require('plugin-loader')
+const PluginLoader = require('../../lib/plugin-loader')
 const makePlugin = PluginLoader.makePlugin
-const makeWebApp = require('webapp').makeWebApp;
+const makeWebApp = require('../../lib/webapp').makeWebApp;
 
 // start with uncommenting these once a test fails 
 global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.install", 0);
