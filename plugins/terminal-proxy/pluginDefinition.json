@@ -30,7 +30,7 @@
       "routerFactory": "tn3270WebsocketRouter",
       "dependenciesIncluded": true,
       "version": "1.0.0",
-      "httpCaching":  false
+      "httpCaching": false
     },
     {
       "type": "router",
@@ -40,7 +40,7 @@
       "routerFactory": "tn5250WebsocketRouter",
       "dependenciesIncluded": true,
       "version": "1.0.0",
-      "httpCaching":  false
+      "httpCaching": false
     },
     {
       "type": "router",
@@ -50,7 +50,7 @@
       "routerFactory": "vtWebsocketRouter",
       "dependenciesIncluded": true,
       "version": "1.0.0",
-      "httpCaching":  false
+      "httpCaching": false
     }
   ]
 }

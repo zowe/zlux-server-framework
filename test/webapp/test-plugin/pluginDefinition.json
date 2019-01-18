@@ -3,7 +3,6 @@
   "apiVersion": "1.0.0",
   "pluginVersion": "1.0.0",
   "pluginType": "application",
-
   "dataServices": [
     {
       "type": "router",
@@ -28,7 +27,7 @@
       "name": "caller-with-requirements",
       "fileName": "caller.js",
       "version": "1.0.0",
-      "versionRequirements" : {
+      "versionRequirements": {
         "test-service": "^1.0.0"
       }
     }
