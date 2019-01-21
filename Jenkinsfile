@@ -1,64 +1,29 @@
-def customParameters = []
-for (param in ["PR_EXPLORER_SERVER_AUTH", "PR_SAMPLE_ANGULAR_APP", "PR_SAMPLE_IFRAME_APP",
-        "PR_SAMPLE_REACT_APP", "PR_TN3270_NG2", "PR_VT_NG2", "PR_ZLUX_APP_MANAGER",
-        "PR_ZLUX_APP_SERVER", "PR_ZLUX_BUILD", "PR_ZLUX_EDITOR", "PR_ZLUX_NG2", "PR_ZLUX_PLATFORM",
-        "PR_ZLUX_SHARED", "PR_ZLUX_WORKFLOW", "PR_ZLUX_WORKFLOW", "PR_ZOS_SUBSYSTEMS",
-        "PR_ZOSMF_AUTH", "PR_ZSS_AUTH"]) {
-    customParameters.push(
-        string(
-            name: param,
-            defaultValue: "",
-            description: "Pull request number",
-            trim: true
-        )
-    )
-}
 properties([
-    buildDiscarder(logRotator(numToKeepStr: "25")),
-    parameters(customParameters)
+    buildDiscarder(logRotator(numToKeepStr: "25"))
 ])
 node('docker/rsqa/base') {
     currentBuild.result = "SUCCESS"
     try {
         stage('Checkout') {
             sh """
-                git clone https://github.com/zowe/zlux.git
-                cd zlux
-                # We don't want to install ssh key into container
-                sed -i 's/git@github.com:zowe/https:\\/\\/github.com\\/zowe/' .gitmodules
-                git submodule update --init --recursive --force --remote
-                git submodule foreach "git checkout master"
-                rm -rf zlux-server-framework
+                git clone https://github.com/zowe/zlux-shared.git
+                git clone https://github.com/zowe/zlux-platform.git
             """
-            params.each {
-                key, value ->
-                if (key.startsWith("PR_") && value) {
-                    sh """
-                        cd zlux/${key[3..-1].toLowerCase().replaceAll('_', '-')}
-                        git fetch origin pull/${value}/head:pr
-                        git checkout pr
-                    """
-                }
-            }
-            dir('zlux/zlux-server-framework'){
+            dir('zlux-server-framework'){
                 checkout scm
             }
         }
         stage('Build') {
             sh """
-                cd zlux
-                # We still don't want to install ssh key into container
-                sed -i 's/git+ssh:\\/\\/git@github.com\\/zowe/https:\\/\\/github.com\\/zowe/' sample-angular-app/webClient/package.json
-                sed -i 's/git+ssh:\\/\\/git@github.com\\/zowe/https:\\/\\/github.com\\/zowe/' sample-angular-app/webClient/package-lock.json
-                sed -i 's/git+ssh:\\/\\/git@github.com:zowe/https:\\/\\/github.com\\/zowe/' zlux-workflow/webClient/package.json
-                cd zlux-build
-                ./build.sh
+                cd zlux-shared/src/logging
+                npm install && npm run build
             """
         }
         stage('Test') {
             ansiColor('xterm') {
                 sh """
-                    cd zlux/zlux-server-framework
+                    cd zlux-server-framework
+                    npm install
                     npm test -- \\
                         --reporter mochawesome \\
                         --reporter-options reportDir=reports,reportFilename=index,html=true,json=true,quiet=true
@@ -86,7 +51,7 @@ node('docker/rsqa/base') {
                         <title>Build report</title>
                     </head>
                     <body>
-                        <p>{env.JOB_NAME} [${env.BUILD_NUMBER}]: <b>${currentBuild.result}</b></p>
+                        <p><b>${currentBuild.result}</b></p>
                         <hr/>
                         <ul>
                             <li>Duration: ${currentBuild.durationString[0..-14]}</li>
@@ -102,7 +67,7 @@ node('docker/rsqa/base') {
                 allowMissing: true,
                 alwaysLinkToLastBuild: true,
                 keepAll: false,
-                reportDir: 'zlux/zlux-server-framework/reports',
+                reportDir: 'zlux-server-framework/reports',
                 reportFiles: 'index.html',
                 reportName: 'Report',
                 reportTitles: ''
