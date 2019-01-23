@@ -24,7 +24,7 @@ const bodyParser = require('body-parser');
 
 ConfigService.pluginId = '';
 
-var logger = global.COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.bootstrap.config"); //replaced after startup
+var logger = global.COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.bootstrap.config"); //replaced after startup
 var accessLogger;
 
 const AGGREGATION_POLICY_NONE = 0;
