@@ -20,9 +20,9 @@ const makePlugin = PluginLoader.makePlugin
 const makeWebApp = require('../../lib/webapp').makeWebApp;
 
 // start with uncommenting these once a test fails 
-global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.install", 0);
-global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.utils", 0);
-global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.bootstrap", 0);
+global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_zsf.install", 0);
+global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_zsf.utils", 0);
+global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_zsf.bootstrap", 0);
 
 const webAppOptions = {
     sessionTimeoutMs: 60  * 60 * 1000,

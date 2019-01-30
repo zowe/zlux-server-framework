@@ -12,7 +12,7 @@ const assert = require('assert')
 const zluxUtil = require('../../lib/util.js')
 const pd = "..\..\..\\zlux-app-server\\deploy\\product"
   
-global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_unp.network", 5);
+global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_zsf.network", 5);
 
 describe('uniqueIps', function() {
   
