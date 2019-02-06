@@ -1486,7 +1486,14 @@ function replaceOrCreateFile(response, filename, directories, scope, relativePat
     if (!error) {
       var offset = 0;
       var contentLength = content.length;
-      var buff = Buffer.from(content,'utf8');
+      let buff;
+      try {
+        buff = Buffer.from(content,'utf8');
+      } catch (e) {
+        respondWithJsonError(response,"Internal error on replace or create file",
+                             HTTP_STATUS_INTERNAL_SERVER_ERROR,location);
+        return;
+      }
       var writeCallback = function(err,writtenLength,buffer) {
         contentLength -= writtenLength;
         offset += writtenLength;
@@ -1499,7 +1506,7 @@ function replaceOrCreateFile(response, filename, directories, scope, relativePat
           try {
             fs.fstat(fd,(err,stats)=> {
               if (err) {
-                respondWithJsonError(response,"Failed to stat item.",HTTP_STATUS_INTERNAL_SERVER_ERROR,location);                
+                respondWithJsonError(response,"Failed to stat item.",HTTP_STATUS_INTERNAL_SERVER_ERROR,location);
               } else {
                 let maccess = -1;
                 if (stats.mtimeMs) {
