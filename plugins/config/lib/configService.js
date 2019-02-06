@@ -1499,7 +1499,7 @@ function replaceOrCreateFile(response, filename, directories, scope, relativePat
           try {
             fs.fstat(fd,(err,stats)=> {
               if (err) {
-                respondWithJsonError(response,"Failed to stat item.",HTTP_STATUS_INTERNAL_SERVER_ERROR,location);                
+                respondWithJsonError(response,"Failed to stat item.",HTTP_STATUS_INTERNAL_SERVER_ERROR,location);
               } else {
                 let maccess = -1;
                 if (stats.mtimeMs) {
@@ -2524,37 +2524,52 @@ function ConfigService(context) {
       respondWithJsonError(response,"Cannot update a non-leaf resource",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
       return 1;
     }
-    else if (!request.body) {
+
+    if (typeof request.body == 'string') {
+      try {
+        //We only support JSON storage for now.
+        //If we attempt to write out a string that isnt JSON, retrieval will be broken.
+        //This also handles the case in which body was just empty...
+        const bodyTest = JSON.parse(request.body);
+        let b64 = request.query.b64;
+        let isB64 = b64 ? (b64.toLowerCase() == 'true') : false;
+        let timestamp = request.query.lastmod;
+        /* NOTE: here, scope only indicates where to place the files. aggregation policy is ignored */
+        if (!request.currentResourceList && itemName.length>0) {
+          //Replace or create one file
+          accessLogger.debug(`Configuration service handling element write request. `
+                             +`Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
+          restCheckModifiedTimestamp(itemName,request.directories,request.scope,lastPath,timestamp).then(()=> {
+            replaceOrCreateFile(response, itemName, request.directories,
+                                request.scope,lastPath, request.resourceURL, request.body, request.body.length);
+          }, (err)=> {
+            if (err && err.message === 'Timestamp mismatch'){
+              logger.warn(`Could not delete resource due to timestamp mismatch. `
+                          +`Resource=${request.resourceURL}, Element=${itemName}`);
+              respondWithJsonError(response,`Timestamp mismatch`,HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+            } else {  
+              logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, `
+                          +`Element=${itemName}, Err=${err.stack}`);
+              respondWithJsonError(response,`Timestamp check failure`,
+                                   HTTP_STATUS_INTERNAL_SERVER_ERROR,request.resourceURL);
+            }
+          });
+        }
+        else {
+          //this also means deleting files that were previously there and not listed.
+          respondWithJsonError(response,"Response type not implemented.",
+                               HTTP_STATUS_NOT_IMPLEMENTED,request.resourceURL);
+          /*
+            replaceOrCreateDirectoryFiles(response,itemName,request.currentResourceObject,
+                                          request.currentResourceList,request.directories,
+            request.scope,lastPath,request.resourceURL);
+          */
+        }        
+      } catch (e) {
+        respondWithJsonError(response,"PUT body is not JSON.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+      }
+    } else {
       respondWithJsonError(response,"Could not access PUT body.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
-    }
-    else {
-      let b64 = request.query.b64;
-      let isB64 = b64 ? (b64.toLowerCase() == 'true') : false;
-      let timestamp = request.query.lastmod;
-      /* NOTE: here, scope only indicates where to place the files. aggregation policy is ignored */
-      if (!request.currentResourceList && itemName.length>0) {
-        //Replace or create one file
-        accessLogger.debug(`Configuration service handling element write request. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
-        restCheckModifiedTimestamp(itemName,request.directories,request.scope,lastPath,timestamp).then(()=> {
-          replaceOrCreateFile(response, itemName, request.directories,request.scope,lastPath, request.resourceURL, request.body, request.body.length);
-        }, (err)=> {
-          if (err && err.message === 'Timestamp mismatch'){
-            logger.warn(`Could not delete resource due to timestamp mismatch. Resource=${request.resourceURL}, Element=${itemName}`);
-            respondWithJsonError(response,`Timestamp mismatch`,HTTP_STATUS_BAD_REQUEST,request.resourceURL);
-          } else {  
-            logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, Element=${itemName}, Err=${err.stack}`);
-            respondWithJsonError(response,`Timestamp check failure`,HTTP_STATUS_INTERNAL_SERVER_ERROR,request.resourceURL);
-          }
-        });
-      }
-      else {
-        //this also means deleting files that were previously there and not listed.
-        respondWithJsonError(response,"Response type not implemented.",HTTP_STATUS_NOT_IMPLEMENTED,request.resourceURL);
-        /*
-          replaceOrCreateDirectoryFiles(response,itemName,request.currentResourceObject,request.currentResourceList,request.directories,
-          request.scope,lastPath,request.resourceURL);
-        */
-      }
     }
     return 0;
   };
