@@ -13,6 +13,7 @@ const fs = require('graceful-fs');
 const Promise = require('bluebird');
 const path = require('path');
 const packagingUtils = require('./packaging-utils');
+const serverUtils = require('../js/util');
 const logger = packagingUtils.coreLogger.makeComponentLogger("package-app"); //should only need one for this program
 
 const argParser = require('../js/argumentParser.js');
@@ -37,7 +38,7 @@ if (!userInput.inputDir) {
 if (userInput.verbose) {
   packagingUtils.coreLogger.setLogLevelForComponentName('package-app', logger.FINE);
 }
-userInput.inputDir = packagingUtils.normalizePath(userInput.inputDir);
+userInput.inputDir = serverUtils.normalizePath(userInput.inputDir);
 
 class YazlArchiver {
   constructor(baseDir, destination) {
@@ -131,7 +132,7 @@ function normalizeDestination(pluginID, requestedOutputPath) {
   if (!requestedOutputPath) {
     return path.join(process.cwd(),pluginID+'.zapp');
   } else {
-    requestedOutputPath = packagingUtils.normalizePath(requestedOutputPath);
+    requestedOutputPath = serverUtils.normalizePath(requestedOutputPath);
   }
   try {
     let stat = fs.statSync(requestedOutputPath);

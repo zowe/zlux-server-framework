@@ -24,17 +24,6 @@ exports.setComponentLogger = function(componentLogger) {
   logger = componentLogger;
 }
 
-exports.normalizePath = function(oldPath) {
-  let normalized = oldPath;
-  if (!path.isAbsolute(oldPath)) {
-    normalized = path.normalize(path.join(process.cwd(),oldPath));
-  }
-  if (normalized.endsWith(path.sep)) {
-    normalized = normalized.substring(0,normalized.length-1);
-  }
-  return normalized;
-}
-
 function mkdirp(dir, options) {
   return new Promise((resolve, reject) => {
     if (dir == '.') {
