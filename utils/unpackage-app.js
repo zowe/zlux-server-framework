@@ -117,7 +117,7 @@ function addToServer() {
   try {
     let pluginDefinition = JSON.parse(fs.readFileSync(path.join(appDir,'pluginDefinition.json')));
     logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
-    let locatorJSONString = `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir}"\n}`;
+    let locatorJSONString = `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir.replace('\\','\\\\')}"\n}`;
     let destination = path.join(pluginsDir, pluginDefinition.identifier+'.json');
     logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
     fs.writeFile(destination, locatorJSONString, {mode: FILE_WRITE_MODE}, (err)=> {
