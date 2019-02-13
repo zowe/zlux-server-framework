@@ -13,6 +13,7 @@ const fs = require('graceful-fs');
 const Promise = require('bluebird');
 const path = require('path');
 const packagingUtils = require('./packaging-utils');
+const serverUtils = require('../js/util');
 const rmrf = require('rimraf');
 
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
@@ -49,8 +50,8 @@ if (userInput.verbose) {
   packagingUtils.coreLogger.setLogLevelForComponentName('unpackage-app', logger.FINE);
 }
 
-userInput.inputApp = packagingUtils.normalizePath(userInput.inputApp);
-userInput.outputDir = packagingUtils.normalizePath(userInput.outputDir);
+userInput.inputApp = serverUtils.normalizePath(userInput.inputApp);
+userInput.outputDir = serverUtils.normalizePath(userInput.outputDir);
 
 function endWithMessage(message) {
   logger.severe(message);
@@ -59,9 +60,9 @@ function endWithMessage(message) {
 
 let pluginsDir;
 if (userInput.pluginsDir) {
-  pluginsDir = packagingUtils.normalizePath(userInput.pluginsDir); 
+  pluginsDir = serverUtils.normalizePath(userInput.pluginsDir); 
 } else {
-  userInput.zluxConfig = packagingUtils.normalizePath(userInput.zluxConfig);
+  userInput.zluxConfig = serverUtils.normalizePath(userInput.zluxConfig);
   pluginsDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).pluginsDir;
   if (!path.isAbsolute(pluginsDir)){
     //zluxconfig paths relative to whereever that file is
