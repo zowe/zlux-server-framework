@@ -13,13 +13,13 @@ const fs = require('graceful-fs');
 const Promise = require('bluebird');
 const path = require('path');
 const packagingUtils = require('./packaging-utils');
-const serverUtils = require('../js/util');
+const serverUtils = require('../lib/util');
 const rmrf = require('rimraf');
 
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
 const logger = packagingUtils.coreLogger.makeComponentLogger("unpackage-app"); //should only need one for this program
 
-const argParser = require('../js/argumentParser.js');
+const argParser = require('../lib/argumentParser');
 const usage = 'Usage: --inputApp | -i INPUTAPP --outputDir | -o OUTPUTDIR --pluginsDir | -p PLUGINSDIR '
       + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v] [--overwrite | -w]';
 
