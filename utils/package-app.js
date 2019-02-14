@@ -13,10 +13,10 @@ const fs = require('graceful-fs');
 const Promise = require('bluebird');
 const path = require('path');
 const packagingUtils = require('./packaging-utils');
-const serverUtils = require('../js/util');
+const serverUtils = require('../lib/util');
 const logger = packagingUtils.coreLogger.makeComponentLogger("package-app"); //should only need one for this program
 
-const argParser = require('../js/argumentParser.js');
+const argParser = require('../lib/argumentParser');
 const usage = 'Usage: --inputDir | -i INPUTDIRECTORY [--outputPath | -o OUTPUTPATH]';
 
 const OPTION_ARGS = [
