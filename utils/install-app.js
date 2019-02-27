@@ -14,6 +14,7 @@ const Promise = require('bluebird');
 const path = require('path');
 const packagingUtils = require('./packaging-utils');
 const serverUtils = require('../lib/util');
+const jsonUtils = require('../lib/jsonUtils');
 const rmrf = require('rimraf');
 
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
@@ -63,7 +64,10 @@ if (userInput.pluginsDir) {
   pluginsDir = serverUtils.normalizePath(userInput.pluginsDir); 
 } else {
   userInput.zluxConfig = serverUtils.normalizePath(userInput.zluxConfig);
-  pluginsDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).pluginsDir;
+  const zluxConfig = jsonUtils.parseJSONWithComments(userInput.zluxConfig);
+  pluginsDir = serverUtils.normalizePath(
+    zluxConfig.pluginsDir,
+    process.cwd());
   if (!path.isAbsolute(pluginsDir)){
     //zluxconfig paths relative to whereever that file is
     path.normalize(userInput.zluxConfig,pluginsDir);
