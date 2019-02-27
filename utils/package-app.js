@@ -220,7 +220,9 @@ function compressApp(pluginDefinition, userInput) {
         let needLib = false;
         for (let i = 0; i < pluginDefinition.dataServices.length; i++) {
           let type = pluginDefinition.dataServices[i].type;
-          if (type != 'import' && type != 'external') {
+          let lookupMethod = pluginDefinition.dataServices[i].initializerLookupMethod;
+          //import and external have no logic
+          if (type != 'import' && type != 'external' && lookupMethod != "internal") {
             //a dataservice which needs content to be packaged is found
             needLib = true;
             break;
