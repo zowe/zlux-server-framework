@@ -91,7 +91,7 @@ class YazlArchiver {
           this.finished = true;
           resolve();
         } catch (e) {
-          endWithMessage(`Could not rename temp file to final destination (${this.destination}), Error=${e.message}`);
+          packagingUtils.endWithMessage(`Could not rename temp file to final destination (${this.destination}), Error=${e.message}`);
         }
       });
       //finalSize can be given before pipe close, but may be -1 safely due to circumstances (read yazl doc)
@@ -110,7 +110,7 @@ class YazlArchiver {
           fs.unlinkSync(this.destination+'.temp');
           resolve();
         } catch (e) {
-          endWithMessage(`Could not perform cleanup of temp file (${this.destination+'.temp'}), Error=${e.message}`);
+          packagingUtils.endWithMessage(`Could not perform cleanup of temp file (${this.destination+'.temp'}), Error=${e.message}`);
         }
       });      
       this.zipfile.end();
@@ -150,13 +150,13 @@ function normalizeDestination(pluginID, requestedOutputPath) {
       //does the parent folder exist?
       let parentStat = fs.statSync(path.dirname(requestedOutputPath));
       if (!parentStat.isDirectory()) {
-        endWithMessage(`Output destination ${requestedOutputPath} is invalid, `
+        packagingUtils.endWithMessage(`Output destination ${requestedOutputPath} is invalid, `
                        +`${path.dirname(requestedOutputPath)} is a file`);
       } else {
         return requestedOutputPath;
       }
     } catch (e) {
-      endWithMessage(`Output path contains missing directory, ${path.dirname(requestedOutputPath)}`);
+      packagingUtils.endWithMessage(`Output path contains missing directory, ${path.dirname(requestedOutputPath)}`);
     }
   }
   return requestedOutputPath;
@@ -167,14 +167,9 @@ function normalizeDestination(pluginID, requestedOutputPath) {
    if it says it has dataservices, does it? if it says it has web content, does it?
    this should really be done by json schema.
 */
-const pluginDefinition = validatePluginInDirectory(userInput.inputDir);
+const pluginDefinition = packagingUtils.validatePluginInDirectory(userInput.inputDir);
+userInput.outputPath = normalizeDestination(pluginDefinition.identifier, userInput.outputPath);
 compressApp(pluginDefinition, userInput);
-
-
-function endWithMessage(message) {
-  logger.severe(message);
-  process.exit(1);
-}
 
 /*
   post validation: we should be able to package according to a scheme now
@@ -189,7 +184,7 @@ function compressApp(pluginDefinition, userInput) {
       });
     }).catch((err)=> {
       archiver.failureCleanup().then(()=> {
-        endWithMessage(`Error processing dir=${userInput.inputDir}, Error=${err.message}`);
+        packagingUtils.endWithMessage(`Error processing dir=${userInput.inputDir}, Error=${err.message}`);
       });
     });
   } else {
@@ -236,7 +231,7 @@ function compressApp(pluginDefinition, userInput) {
             });
           }).catch((err)=> {
             archiver.failureCleanup().then(()=> {
-              endWithMessage(`Required /lib folder couldn't be read or missing. Error=${err.message}`);
+              packagingUtils.endWithMessage(`Required /lib folder couldn't be read or missing. Error=${err.message}`);
             });
           });
         } else {
@@ -257,7 +252,7 @@ function compressApp(pluginDefinition, userInput) {
           packageLib();
         }).catch((err)=>{
           archiver.failureCleanup().then(()=> {
-            endWithMessage(`Required /web folder couldn't be read or missing. Error=${err.message}`);
+            packagingUtils.endWithMessage(`Required /web folder couldn't be read or missing. Error=${err.message}`);
           });
         });
       } else {
@@ -294,7 +289,7 @@ function compressApp(pluginDefinition, userInput) {
         packageBuild();
       }).catch((err)=> {
         //this shouldn't happen, can't continue
-        endWithMessage(`App root directory ${userInput.inputDir} couldn't be read or missing. Error=${err.message}`);
+        packagingUtils.endWithMessage(`App root directory ${userInput.inputDir} couldn't be read or missing. Error=${err.message}`);
       });
     });
   }
@@ -426,31 +421,6 @@ function packageRoot(directory, archiver) {
     });
   });
 }
-
-function validatePluginInDirectory() {
-  try {
-    let inputStats = fs.statSync(userInput.inputDir); //no need to make code messy with async here
-    if (!inputStats.isDirectory()) {
-      endWithMessage('Input must be a directory');
-    }
-  } catch (e) {
-    endWithMessage(`Couldnt open input directory, ${userInput.inputDir}, e=${e}`);
-  }
-  let pluginDefinition;
-  try {
-    let pluginDefPath = path.join(userInput.inputDir,'pluginDefinition.json');
-    let pluginStat = fs.statSync(pluginDefPath); //no need to make code messy with async here
-    if (pluginStat.isDirectory()) {
-      endWithMessage(`pluginDefinition.json cannot be a directory`);
-    }
-    pluginDefinition = JSON.parse(fs.readFileSync(pluginDefPath));
-    //TODO much more validation needed.
-  } catch (e) {
-    endWithMessage(`Couldn't read pluginDefinition.json within ${userInput.inputDir}, e=${e}`);
-  }
-  userInput.outputPath = normalizeDestination(pluginDefinition.identifier, userInput.outputPath);
-  return pluginDefinition;
-};
 
 /*
  This program and the accompanying materials are
