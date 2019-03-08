@@ -1,3 +1,14 @@
+
+/*
+  This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License v2.0 which accompanies
+  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+  
+  SPDX-License-Identifier: EPL-2.0
+  
+  Copyright Contributors to the Zowe Project.
+*/
+
 import * as BBPromise from 'bluebird';
 import * as path from 'path';
 import { TomcatManager } from './tomcatManager';
@@ -8,25 +19,31 @@ const JAR_SERVICE_TYPE_NAME = 'java-jar';
 
 const DEFAULT_GROUPING = 'appserver';
 
+
 export class JavaManager {
   private ports: Array<number>;
   private servers: Array<any>;
+  private static supportedTypes: Array<string> = [WAR_SERVICE_TYPE_NAME, JAR_SERVICE_TYPE_NAME];
   constructor(private config: JavaConfig, private instanceDir: Path) {
     //process at this time, so that startAll() is ready to go
     this.config = config;
     this.processConfig();//validates & extracts... may throw
   }
+
+  public getSupportedTypes() : Array<string> {
+    return JavaManager.supportedTypes;
+  }
   
   public async startAll() {
     for (let i = 0; i < this.servers.length; i++) {
       //start each by each specific manager within
-      this.servers[i].start();
+      await this.servers[i].manager.start();
     }
   }
 
   public async stopAll() {
     for (let i = 0; i < this.servers.length; i++) {
-      this.servers[i].stop();
+      this.servers[i].manager.stop();
     }
   }
 
@@ -66,6 +83,19 @@ export class JavaManager {
       }
     }
     //TODO
+  }
+
+  private containsCompatibleService(services: Array<any>|undefined, type?:string): boolean {
+    const supportedTypes = type ? [type] : JavaManager.supportedTypes;
+    if (!services) {
+      return false;
+    }
+    for (let i = 0; i < services.length; i++) {
+      if (supportedTypes.indexOf(services[i].type) !=-1) {
+        return true;
+      }
+    }
+    return false;
   }
 
   private processPorts() {
@@ -125,7 +155,7 @@ export class JavaManager {
     case 'microservice':
       pluginKeys.forEach((key) => {
         const port = this.getPortOrThrow(portPos);
-        const group = [remainingPlugins[key]];
+        const group = [remainingPlugins[key].identifier];
         const server = this.makeServerFromGroup({plugins:group}, port, remainingPlugins);
         if (server) {
           this.servers.push(server);
@@ -138,7 +168,7 @@ export class JavaManager {
     case 'appserver':
       let group = [];
       pluginKeys.forEach((key) => {
-        group.push(remainingPlugins[key]);
+        group.push(remainingPlugins[key].identifier);
       });
       const port = this.getPortOrThrow(portPos);
       const server = this.makeServerFromGroup({plugins:group}, port, remainingPlugins);
@@ -162,6 +192,10 @@ export class JavaManager {
     return port;
   }
 
+  private makeJarManagerForPluginService(plugin: any, servicename: string): ServerRef | undefined {
+    return undefined;
+  }
+
   private makeServerFromGroup(group: JavaGroup, port: number, remainingPlugins: any): ServerRef | undefined {
     //Big TODO: whats the behavior of our throws... we should allow plugins to succeed if they are unaffected
     //by other plugins
@@ -179,11 +213,13 @@ export class JavaManager {
       for (let j = 0; j < plugins.length; j++) {
         let plugin = remainingPlugins[plugins[j]];
         if (plugin) {
-          groupArray.push(plugin);
+          if (this.containsCompatibleService(plugin.dataServices, WAR_SERVICE_TYPE_NAME)) {
+            groupArray.push(plugin);
+          }
           remainingPlugins[plugins[j]] = undefined;
         } else {
-          console.warn(`Services for plugin=${plugins[j]} could not be included in war grouping. `
-                       + `Plugin missing or already grouped`);          
+          console.warn(`Services in plugin=${plugins[j]} war grouping skipped. `
+                       + `Plugin missing or already grouped`);
         }
       }
       if (groupArray.length > 0) {
@@ -202,12 +238,12 @@ export class JavaManager {
     const serverConfigBase = this.config.war.javaAppServer;
     switch (serverConfigBase.type) {
     case 'tomcat':
-      let joinedConfig = (Object as any).assign({
+      let joinedConfig: any = Object.assign({
         shutdown: {port: -1},
         runtime: runtime,
         plugins: group,
       }, serverConfigBase);
-      joinedConfig.https.port = port;
+      joinedConfig.https = Object.assign({port: port}, joinedConfig.https);
       if (!joinedConfig.appRootDir) {
         //may need to be created later
         joinedConfig.appRootDir = path.join(this.instanceDir, 'ZLUX', 'languageManagers', 'java', 'tomcat');
@@ -247,3 +283,13 @@ export class JavaManager {
   }
 }
 
+
+/*
+  This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License v2.0 which accompanies
+  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+  
+  SPDX-License-Identifier: EPL-2.0
+  
+  Copyright Contributors to the Zowe Project.
+*/

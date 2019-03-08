@@ -1,3 +1,15 @@
+
+/*
+  This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License v2.0 which accompanies
+  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+  
+  SPDX-License-Identifier: EPL-2.0
+  
+  Copyright Contributors to the Zowe Project.
+*/
+
+
 /*
 catalina.bat start -config \conf\server_test.xml
 
@@ -36,18 +48,72 @@ port range: upper-level config needs a range of ports.
 */
 
 import { Path, TomcatConfig, TomcatShutdown, TomcatHttps, JavaServerManager, AppServerInfo } from './javaTypes';
-import * as BBPromise from 'bluebird';
 import * as fs from 'fs';
 import * as path from 'path';
+import * as mkdirp from 'mkdirp';
+import * as child_process from 'child_process';
+
+const spawn = child_process.spawn;
 
 export class TomcatManager implements JavaServerManager {
   private id: number;
+  private services: {[name:string]: Path} = {};
+  private status: string = "disconnected";
   constructor(private config: TomcatConfig) {
     this.id = (Date.now()+Math.random())*10000;//something simple but not ugly for a dir name
+    this.config.plugins.forEach((plugin)=> {
+      let services = plugin.dataServices;
+      services.forEach((service)=> {
+        if (service.type == 'java-war') {
+          let serviceid = plugin.identifier+':'+service.name;
+          let warpath = path.join(plugin.location,'lib',service.filename);
+          console.log(`Tomcat Manager found service=${serviceid}, war=${warpath}`);
+          this.services[serviceid] = warpath;
+        }
+      });
+    });
   }
 
-  public start() {
+  public start(): Promise<any> {
     //make folder, make links, start server
+    console.log(`Tomcat with id=${this.id} invoked to startup with config=`,this.config);
+    return new Promise<any>((resolve, reject) => {
+      mkdirp(path.join(this.config.appRootDir,''+this.id), (err)=> {
+        if (err) {
+          reject();
+        } else {
+          //TODO should probably extract rather than let tomcat do it, since its a bit dumb with versioning
+          //TODO what's the value of knowing the serviceid if the war can have a completely different name?
+          //TODO extract WEB-INF/web.xml from war, read display-name tag to find out its runtime name
+          Object.keys(this.services).forEach((key)=> {
+            await this.makeLink(this.services[key]);
+          });
+    var initExternalProcess = function() {
+      t.writeToLog('About to spawn class=' + TepQueryHandler.javaClassname
+          + ', with classpath=' + t.javaClasspath);
+      var queryServer = spawn('catalina.bat', [ 'start',  '-config', this.config.config]);
+      t.queryServer = queryServer;
+      queryServer.stdout.on('data', function(data) {
+        if (t.logJava) {
+          t.writeToLog('[class='+TepQueryHandler.javaClassname+' stdout]: '+data);
+        }
+      });
+
+      queryServer.stderr.on('data', function(data) {
+        if (t.logJava) {
+          t.writeToLog('[class='+TepQueryHandler.javaClassname+' stderr]: '+data);
+        }
+      });
+
+      queryServer.on('close', function(code) {
+        t.writeToLog('[class='+TepQueryHandler.javaClassname+'] exited, code: '+code);
+        t.writeToLog('shutting down process');
+        t.ready = false;
+        //TODO restart?
+      });          
+        }
+      });
+    });
   }
 
   public stop() {
@@ -60,9 +126,9 @@ export class TomcatManager implements JavaServerManager {
 
   public getServerInfo(): AppServerInfo {
     return {
-      status: 'disconnected',
+      status: this.status,
       rootUrl: this.getURL(),
-      services: []
+      services: Object.keys(this.services)
     };
   }
 
@@ -73,10 +139,10 @@ export class TomcatManager implements JavaServerManager {
   /* from given warpath to our appbase dir 
      warpath can be an extracted war dir, or a .war
   */
-  private makeLink(warpath: string) {
+  private makeLink(warpath: string): Promise<any> {
     let destination = this.config.appRootDir;
 
-    return BBPromise((resolve, reject)=> {
+    return Promise((resolve, reject)=> {
       fs.link(warpath, path.join(destination,path.basename(warpath)), (err)=> {
         if (err) {
           reject(err);
@@ -87,3 +153,13 @@ export class TomcatManager implements JavaServerManager {
     });
   }
 }
+
+/*
+  This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License v2.0 which accompanies
+  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+  
+  SPDX-License-Identifier: EPL-2.0
+  
+  Copyright Contributors to the Zowe Project.
+*/
