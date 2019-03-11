@@ -31,6 +31,15 @@ export type JavaDefinition = {
   //lib
 }
 
+export type JarConfig = {
+  port: number;
+  plugin: any; //whole plugindef needed for name, version, location
+  serviceName: string; //plugin needs to be sliced up
+  serviceSettings?: any; //from configservice _internal
+  runtime: JavaDefinition;
+  tempDir: Path; //for writing out config files if needed
+}
+
 export type WarConfig = {
   javaAppServer: AppServer;
   defaultGrouping?: string; // 'microservice', 'appserver'... determines 1-for-1 or many-for-1 tomcat grouping
@@ -82,6 +91,7 @@ export type TomcatHttps = {
 export type ServerRef = {
   type: string; //appserver, microservice
   url: string;
+  port: number;
   plugins: Array<any>; //which plugins were requested to be within? single for microservice
   manager: JavaServerManager;
 }
@@ -91,7 +101,7 @@ export interface JavaServerManager {
   getId(): number;
   start(): Promise<any>;
   stop(): Promise<any>;
-  getURL(pluginId, serviceName): string;
+  getURL(pluginId: string, serviceName: string): string;
   getServerInfo(): AppServerInfo;
 }
 
@@ -106,7 +116,7 @@ export interface LangManager {
   startAll(): Promise<any>;
   stopAll(): Promise<any>;
   registerPlugins(pluginDefs: any);
-  getConnectionInfo(pluginId, serviceName): any;
+  getConnectionInfo(pluginId: string, serviceName: string, serviceType: string): any;
   getSupportedTypes(): Array<string>;
   /* Future ideas
   addPlugin();

@@ -12,7 +12,8 @@
 import * as BBPromise from 'bluebird';
 import * as path from 'path';
 import { TomcatManager } from './tomcatManager';
-import { Path, JavaConfig, WarConfig, AppServer, HttpsConfig, TomcatConfig, TomcatShutdown, TomcatHttps, JavaServerManager, ServerRef, JavaGroup } from './javaTypes';
+import { Path, JavaConfig, WarConfig, AppServer, HttpsConfig, TomcatConfig, TomcatShutdown, TomcatHttps, JavaServerManager, ServerRef, JavaGroup, JavaDefinition } from './javaTypes';
+import { JarManager } from './jarManager';
 
 const WAR_SERVICE_TYPE_NAME = 'java-war';
 const JAR_SERVICE_TYPE_NAME = 'java-jar';
@@ -22,7 +23,8 @@ const DEFAULT_GROUPING = 'appserver';
 
 export class JavaManager {
   private ports: Array<number>;
-  private servers: Array<any>;
+  private portPos: number = 0;
+  private servers: Array<any> = new Array<any>();
   private static supportedTypes: Array<string> = [WAR_SERVICE_TYPE_NAME, JAR_SERVICE_TYPE_NAME];
   constructor(private config: JavaConfig, private instanceDir: Path) {
     //process at this time, so that startAll() is ready to go
@@ -49,12 +51,13 @@ export class JavaManager {
 
   public registerPlugins(pluginDefs: any) {
     this.processWarGrouping(pluginDefs);
+    this.processJars(pluginDefs);
   }
 
   /**
      Returns info about how to connect to the service, provided the service is known to us
    */
-  public getConnectionInfo(pluginId: string, serviceName: string) {
+  public getConnectionInfo(pluginId: string, serviceName: string, serviceType: string) {
 
     for (let i = 0; i < this.servers.length; i++) {
       let server = this.servers[i];
@@ -76,7 +79,7 @@ export class JavaManager {
             options: {
               isHttps: true
             },
-            port: server.https.port
+            port: server.port
           };
 
         }
@@ -118,6 +121,40 @@ export class JavaManager {
     }
   }
 
+  private processJars(pluginDefs: any) {
+    let jarRuntimes = this.config.jar.runtimeMapping;
+    let remainingPlugins = {};
+    const defaultRuntimeName = Object.keys(this.config.runtimes)[0];
+    const defaultRuntime = this.config.runtimes[defaultRuntimeName];
+    pluginDefs.forEach((pluginDef) => {
+      remainingPlugins[pluginDef.identifier] = pluginDef;
+    });
+    pluginDefs.forEach((plugin)=> {
+      if (plugin.dataServices) {
+        plugin.dataServices.forEach((service)=> {
+          if (service.type === JAR_SERVICE_TYPE_NAME) {
+            let runtimeName = jarRuntimes[plugin.identifier];
+            if (!runtimeName) {
+              const id = `${plugin.identifier}:${service.name}`;
+              runtimeName = jarRuntimes[id];
+              if (!runtimeName) {
+                runtimeName = defaultRuntimeName;
+              }
+            }
+            const port = this.getPortOrThrow();
+            const manager = this.makeJarManager(plugin, service.name, port,
+                                                this.config.runtimes[runtimeName]);
+            if (manager) {
+              this.portPos++;
+              this.servers.push({type:"microservice", url: manager.getServerInfo().rootUrl,
+                                plugins: [plugin], manager: manager, port: port});
+            }
+          }
+        });
+      }
+    });
+  }
+
   /**
      tolerates & warns on missing plugins, warns on plugin referenced without any war service within
   */
@@ -133,17 +170,15 @@ export class JavaManager {
       remainingPlugins[pluginDef.identifier] = pluginDef;
     });
     
-    this.servers = [];
-    let portPos = 0;
     if (groupingConfig && Array.isArray(groupingConfig) && groupingConfig.length > 0) {
       for (let i = 0; i < groupingConfig.length; i++) {
         const group = groupingConfig[i];
-        const port = this.getPortOrThrow(portPos);
+        const port = this.getPortOrThrow();
         const server = this.makeServerFromGroup(group, port, remainingPlugins);
         if (server) {
           console.info(`TEST: server info=`,server.manager.getServerInfo());
           this.servers.push(server);
-          portPos++;
+          this.portPos++;
         } else {
           console.warn(`No server returned for group=`,group);
         }
@@ -154,12 +189,12 @@ export class JavaManager {
     switch (defaultBehavior) {
     case 'microservice':
       pluginKeys.forEach((key) => {
-        const port = this.getPortOrThrow(portPos);
+        const port = this.getPortOrThrow();
         const group = [remainingPlugins[key].identifier];
         const server = this.makeServerFromGroup({plugins:group}, port, remainingPlugins);
         if (server) {
           this.servers.push(server);
-          portPos++;
+          this.portPos++;
         } else {
           console.warn(`No server returned for group=`,group);
         }      
@@ -170,11 +205,11 @@ export class JavaManager {
       pluginKeys.forEach((key) => {
         group.push(remainingPlugins[key].identifier);
       });
-      const port = this.getPortOrThrow(portPos);
+      const port = this.getPortOrThrow();
       const server = this.makeServerFromGroup({plugins:group}, port, remainingPlugins);
       if (server) {
         this.servers.push(server);
-        portPos++;
+        this.portPos++;
       } else {
         console.warn(`No server returned for group=`,group);
       }      
@@ -184,15 +219,37 @@ export class JavaManager {
     }
   }
 
-  private getPortOrThrow(pos: number) {
-    const port = this.ports[pos];
+  private getPortOrThrow() {
+    const port = this.ports[this.portPos];
     if (port === undefined) {
-      throw new Error(`Could not find port to use for configuration, at config position=${pos}`);
+      throw new Error(`Could not find port to use for configuration, at config position=${this.portPos}`);
     }
     return port;
   }
 
-  private makeJarManagerForPluginService(plugin: any, servicename: string): ServerRef | undefined {
+  //TODO how are we getting runtime info down to here, and at the high end should services really be allowed
+  //to depend on different runtimes, or is it plugin-wide?
+  private makeJarManager(plugin: any, serviceName: string,
+                         port: number, runtime: JavaDefinition): JavaServerManager {
+    if (!plugin.dataServices) return undefined;
+
+    let service;
+    for (let i = 0; i < plugin.dataServices.length; i++) {
+      if (plugin.dataServices[i].name == serviceName) {
+        service = plugin.dataServices[i];
+       }
+    }
+    
+    if (service) {
+      let config = {
+        port: port,
+        plugin: plugin,
+        serviceName: serviceName,
+        runtime: runtime,
+        tempDir: 'TODO'
+      }
+      return new JarManager(config);
+    }
     return undefined;
   }
 
@@ -225,7 +282,7 @@ export class JavaManager {
       if (groupArray.length > 0) {
         let serverManager = this.makeAppServer(groupArray, runtime, port);
         return {type:"appserver", url: serverManager.getServerInfo().rootUrl,
-                plugins: groupArray, manager:serverManager};
+                plugins: groupArray, manager:serverManager, port: port};
       }
     } else {
       console.warn(`Skipping invalid plugin group=`,plugins);
