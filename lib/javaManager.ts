@@ -43,7 +43,7 @@ export class JavaManager {
     }
   }
 
-  public async stopAll() {
+  public stopAll() {
     for (let i = 0; i < this.servers.length; i++) {
       this.servers[i].manager.stop();
     }
@@ -51,7 +51,7 @@ export class JavaManager {
 
   public registerPlugins(pluginDefs: any) {
     this.processWarGrouping(pluginDefs);
-    this.processJars(pluginDefs);
+//    this.processJars(pluginDefs);
   }
 
   /**

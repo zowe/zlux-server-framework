@@ -100,7 +100,7 @@ export type ServerRef = {
 export interface JavaServerManager {
   getId(): number;
   start(): Promise<any>;
-  stop(): Promise<any>;
+  stop();
   getURL(pluginId: string, serviceName: string): string;
   getServerInfo(): AppServerInfo;
 }
@@ -114,7 +114,7 @@ export type AppServerInfo = {
 
 export interface LangManager {
   startAll(): Promise<any>;
-  stopAll(): Promise<any>;
+  stopAll();
   registerPlugins(pluginDefs: any);
   getConnectionInfo(pluginId: string, serviceName: string, serviceType: string): any;
   getSupportedTypes(): Array<string>;

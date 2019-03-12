@@ -81,7 +81,7 @@ export class TomcatManager implements JavaServerManager {
   }
 
   private getIdString(): string {
-    return `Tomcat ID=${this.id}`;
+    return `Tomcat ID=${this.id}, PID=${this.tomcatProcess?this.tomcatProcess.pid:'N/A'}`;
   }
 
   private makeRoot():Promise<void> {
@@ -146,7 +146,7 @@ export class TomcatManager implements JavaServerManager {
                                 [ 'start',  '-config', this.config.config],
                                 {env: {
                                   "JAVA_OPTS":
-                                  `-Dshutdown.port=-1 -Dhttps.port=${this.config.https.port} `
+                                  `-Dshutdown.port=${this.config.https.port+1} -Dhttps.port=${this.config.https.port} `
                                     +`-Dhttps.key=${this.config.https.key} `
                                     +`-Dhttps.certificate=${this.config.https.certificate} `
                                     +`-Dappdir=${this.appdir}`,
@@ -168,11 +168,15 @@ export class TomcatManager implements JavaServerManager {
         console.log(`${this.getIdString()} stderr=${data}`);
       });
 
-      tomcatProcess.on('close', (code)=> {
+      tomcatProcess.on('exit', (code)=> {
         console.log(`${this.getIdString()} exited, code=${code}`);              
-        this.status = "stopped";
-        //TODO restart?
-      });          
+        this.tomcatProcess = null;
+      });
+
+      tomcatProcess.on('close', (code)=> {
+        console.log(`${this.getIdString()} closed, code=${code}`);
+        //TODO this just means we cant get stdout/stderr, but its still running... how to react?
+      });
     } else {
       console.log(`Tomcat for ID=${this.id} not starting, no services succeeded loading`);
     }
@@ -180,6 +184,47 @@ export class TomcatManager implements JavaServerManager {
 
   public stop() {
     //stop server, delete links, delete dir
+    /*
+    if (this.tomcatProcess) {
+      console.log(`${this.getIdString()} Issuing sigterm`);
+      this.tomcatProcess.on('error', (err)=> {
+        console.warn(`${this.getIdString()} Error when stopping, error=${err}`);
+      });
+      this.tomcatProcess.kill('SIGTERM');
+    }
+    */
+    console.log(`Going to stop, path=${this.config.path}, config=${this.config.config}, home=${this.config.runtime.home}, opts=`,this.config.https);
+    let stopProcess = spawn(path.join(this.config.path, 'bin',
+                                      TomcatManager.isWindows ? 'catalina.bat' : 'catalina.sh'),
+                            [ 'stop',  '-config', this.config.config],
+                            {env: {
+                              "JAVA_OPTS":
+                              `-Dshutdown.port=${this.config.https.port+1} -Dhttps.port=${this.config.https.port} `
+                                +`-Dhttps.key=${this.config.https.key} `
+                                +`-Dhttps.certificate=${this.config.https.certificate} `
+                                +`-Dappdir=${this.appdir}`,
+                              "CATALINA_BASE": this.config.path,
+                              "CATALINA_HOME": this.config.path,
+                              "JRE_HOME": this.config.runtime.home
+                            }});
+    stopProcess.stdout.on('data', (data)=> {
+      console.log(`${this.getIdString()} stdout=${data}`);
+    });
+
+    stopProcess.stderr.on('data', (data)=> {
+      console.log(`${this.getIdString()} stderr=${data}`);
+    });
+
+    stopProcess.on('exit', (code)=> {
+      console.log(`${this.getIdString()} exited, code=${code}`);              
+      this.status = "stopped";
+    });
+
+    stopProcess.on('close', (code)=> {
+      console.log(`${this.getIdString()} closed, code=${code}`);
+      //TODO this just means we cant get stdout/stderr, but its still running... how to react?
+    });
+
   }
 
   private getBaseURL(): string {
