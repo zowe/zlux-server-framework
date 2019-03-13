@@ -69,12 +69,14 @@ export type HttpsConfig = {
 export type TomcatConfig = {
   path: Path; //path to a tomcat... if not the one zowe includes
   config: Path; //path to a config.xml for tomcat.... this COULD be written in JSON and transformed into XML, but...
+  logProperties: Path;
   https: TomcatHttps;
   shutdown: TomcatShutdown;
   appRootDir: Path; //the dir in which "appBase" dirs will be made on the fly
   //list given by zlux app server already having determined
   plugins: Array<any>;//pluginDefinitions with location included
   runtime: JavaDefinition;
+
 }
 
 export type TomcatShutdown = {

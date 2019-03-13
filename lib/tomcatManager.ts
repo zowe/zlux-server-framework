@@ -96,6 +96,24 @@ export class TomcatManager implements JavaServerManager {
     });
   }
 
+  public async startForWindows() {
+              tomcatProcess = spawn(path.join(this.config.path, 'bin',
+                                          TomcatManager.isWindows ? 'catalina.bat' : 'catalina.sh'),
+                                [ 'start',  '-config', this.config.config],
+                                {env: {
+                                  "JAVA_OPTS":
+                                  `-Dshutdown.port=${this.config.https.port+1} -Dhttps.port=${this.config.https.port} `
+                                    +`-Dhttps.key=${this.config.https.key} `
+                                    +`-Dhttps.certificate=${this.config.https.certificate} `
+                                    +`-Dappdir=${this.appdir}`,
+                                  "CATALINA_BASE": this.config.path,
+                                  "CATALINA_HOME": this.config.path,
+                                  "JRE_HOME": this.config.runtime.home,
+                                  "CATALINA_PID": path.join(this.appdir,'tomcat.pid')
+                                }});
+
+  }
+
   public async start() {
     //make folder, make links, start server
     console.log(`Tomcat with id=${this.id} invoked to startup with config=`,this.config);
@@ -141,19 +159,7 @@ export class TomcatManager implements JavaServerManager {
       
       let tomcatProcess;
       try {
-          tomcatProcess = spawn(path.join(this.config.path, 'bin',
-                                          TomcatManager.isWindows ? 'catalina.bat' : 'catalina.sh'),
-                                [ 'start',  '-config', this.config.config],
-                                {env: {
-                                  "JAVA_OPTS":
-                                  `-Dshutdown.port=${this.config.https.port+1} -Dhttps.port=${this.config.https.port} `
-                                    +`-Dhttps.key=${this.config.https.key} `
-                                    +`-Dhttps.certificate=${this.config.https.certificate} `
-                                    +`-Dappdir=${this.appdir}`,
-                                  "CATALINA_BASE": this.config.path,
-                                  "CATALINA_HOME": this.config.path,
-                                  "JRE_HOME": this.config.runtime.home
-                                }});
+        tomcatProcess = TomcatManager.isWindows ? this.startForWindows() : this.startForUnix();
       } catch (e) {
         console.warn(`Could not start tomcat, error=`,e);
         return;
@@ -205,7 +211,8 @@ export class TomcatManager implements JavaServerManager {
                                 +`-Dappdir=${this.appdir}`,
                               "CATALINA_BASE": this.config.path,
                               "CATALINA_HOME": this.config.path,
-                              "JRE_HOME": this.config.runtime.home
+                              "JRE_HOME": this.config.runtime.home,
+                              "CATALINA_PID": path.join(this.appdir,'tomcat.pid')
                             }});
     stopProcess.stdout.on('data', (data)=> {
       console.log(`${this.getIdString()} stdout=${data}`);
