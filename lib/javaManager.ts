@@ -14,6 +14,9 @@ import * as path from 'path';
 import { TomcatManager } from './tomcatManager';
 import { Path, JavaConfig, WarConfig, AppServer, HttpsConfig, TomcatConfig, TomcatShutdown, TomcatHttps, JavaServerManager, ServerRef, JavaGroup, JavaDefinition } from './javaTypes';
 import { JarManager } from './jarManager';
+import * as utils from './util';
+
+const log = utils.loggers.langManager;
 
 const WAR_SERVICE_TYPE_NAME = 'java-war';
 const JAR_SERVICE_TYPE_NAME = 'java-jar';
@@ -43,9 +46,13 @@ export class JavaManager {
     }
   }
 
-  public stopAll() {
+  public async stopAll() {
     for (let i = 0; i < this.servers.length; i++) {
-      this.servers[i].manager.stop();
+      try {
+        await this.servers[i].manager.stop();
+      } catch (e) {
+        log.warn(`Could not stop manager, error=`,e);
+      }
     }
   }
 
@@ -63,7 +70,7 @@ export class JavaManager {
       let server = this.servers[i];
       for (let j = 0; j < server.plugins.length; j++) {
         if (server.plugins[j].identifier == pluginId) {
-          /*
+          /* TODO suppport HTTP, maybe.
           let port, isHttps;
           if (server.https) {
             port = server.https.port;
@@ -85,7 +92,6 @@ export class JavaManager {
         }
       }
     }
-    //TODO
   }
 
   private containsCompatibleService(services: Array<any>|undefined, type?:string): boolean {
@@ -176,11 +182,10 @@ export class JavaManager {
         const port = this.getPortOrThrow();
         const server = this.makeServerFromGroup(group, port, remainingPlugins);
         if (server) {
-          console.info(`TEST: server info=`,server.manager.getServerInfo());
           this.servers.push(server);
           this.portPos++;
         } else {
-          console.warn(`No server returned for group=`,group);
+          log.warn(`No server returned for group=`,group);
         }
       }
     }
@@ -190,32 +195,28 @@ export class JavaManager {
     case 'microservice':
       pluginKeys.forEach((key) => {
         const port = this.getPortOrThrow();
-        const group = [remainingPlugins[key].identifier];
+        const group = [key];
         const server = this.makeServerFromGroup({plugins:group}, port, remainingPlugins);
         if (server) {
           this.servers.push(server);
           this.portPos++;
         } else {
-          console.warn(`No server returned for group=`,group);
+          log.warn(`No server returned for group=`,group);
         }      
       });
       break;
     case 'appserver':
-      let group = [];
-      pluginKeys.forEach((key) => {
-        group.push(remainingPlugins[key].identifier);
-      });
       const port = this.getPortOrThrow();
-      const server = this.makeServerFromGroup({plugins:group}, port, remainingPlugins);
+      const server = this.makeServerFromGroup({plugins:pluginKeys}, port, remainingPlugins);
       if (server) {
         this.servers.push(server);
         this.portPos++;
       } else {
-        console.warn(`No server returned for group=`,group);
+        log.warn(`No server returned for group=`,pluginKeys);
       }      
       break;
     default:
-      console.warn(`Unknown default behavior=${defaultBehavior}`);
+      log.warn(`Unknown default behavior=${defaultBehavior}`);
     }
   }
 
@@ -254,15 +255,14 @@ export class JavaManager {
   }
 
   private makeServerFromGroup(group: JavaGroup, port: number, remainingPlugins: any): ServerRef | undefined {
-    //Big TODO: whats the behavior of our throws... we should allow plugins to succeed if they are unaffected
-    //by other plugins
-    if (!group.java) {
+    let java = group.java;
+    if (!java) {
       //TODO should this really be a map... for this reason?
-      group.java = Object.keys(this.config.runtimes)[0];
+      java = Object.keys(this.config.runtimes)[0];
     };
-    let runtime = this.config.runtimes[group.java];
+    let runtime = this.config.runtimes[java];
     if (!runtime) {
-      throw new Error(`Could not find runtime to satisfy group: ${group.java}`);
+      throw new Error(`Could not find runtime to satisfy group: ${java}`);
     }
     let plugins = group.plugins;
     if (Array.isArray(plugins) && plugins.length > 0) {
@@ -275,7 +275,7 @@ export class JavaManager {
           }
           remainingPlugins[plugins[j]] = undefined;
         } else {
-          console.warn(`Services in plugin=${plugins[j]} war grouping skipped. `
+          log.warn(`Services in plugin=${plugins[j]} war grouping skipped. `
                        + `Plugin missing or already grouped`);
         }
       }
@@ -285,7 +285,7 @@ export class JavaManager {
                 plugins: groupArray, manager:serverManager, port: port};
       }
     } else {
-      console.warn(`Skipping invalid plugin group=`,plugins);
+      log.warn(`Skipping invalid plugin group=`,plugins);
     }
   }
 

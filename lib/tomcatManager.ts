@@ -11,38 +11,11 @@
 
 
 /*
-set "JAVA_OPTS=-Dport.shutdown=8005 -Dport.http=8080"
-bin\startup.bat
-
-
 ideas:
-1. make a temp dir for an instance of tomcat to find wars in
-2. use symbolic links so that the dir that holds the war contents doesnt actually require any copying
 3. tomcat unpacks wars to some temp dir of their own if you allow it to. instead, let's have the zlux app installer
 unpack the wars ahead of time, so the symbolic links are the unpacked dirs
 4. disable tomcat rest apis for management so that the tomcat we have is secure (no room to add or remove services except by disk)
 5. one day, write a zss plugin to tomcat so that its rest apis for management use auth checks against saf through zss
-
-*/
-
-/*
-  grouping modes:
-1. default for those unspecified
-a. all-in-one
-b. all-individual
-
-2. for those specified
-b. allow for multiple groups
-ex.
-javaWarGroups: [
-  ["com.rs.a"],
-  ["com.rs.b","com.rs.c"]
-]
-
-a plugin cant be mentioned twice, and you can't split a plugin
-
-port range: upper-level config needs a range of ports. 
-
 */
 
 import { Path, TomcatConfig, TomcatShutdown, TomcatHttps, JavaServerManager, AppServerInfo } from './javaTypes';
@@ -52,8 +25,10 @@ import * as mkdirp from 'mkdirp';
 import * as child_process from 'child_process';
 //import * as xml2js from 'xml2js';
 import * as yazl from 'yazl';
+import * as utils from './util';
+import * as rimraf from 'rimraf';
 
-
+const log = utils.loggers.langManager;
 const spawn = child_process.spawn;
 
 export class TomcatManager implements JavaServerManager {
@@ -73,7 +48,7 @@ export class TomcatManager implements JavaServerManager {
         if (service.type == 'java-war') {
           let serviceid = plugin.identifier+':'+service.name;
           let warpath = path.join(plugin.location,'lib',service.filename);
-          console.log(`Tomcat Manager found service=${serviceid}, war=${warpath}`);
+          log.info(`Tomcat Manager ID=${this.id} found service=${serviceid}, war=${warpath}`);
           this.services[serviceid] = warpath;
         }
       });
@@ -81,7 +56,7 @@ export class TomcatManager implements JavaServerManager {
   }
 
   private getIdString(): string {
-    return `Tomcat ID=${this.id}, PID=${this.tomcatProcess?this.tomcatProcess.pid:'N/A'}`;
+    return `Tomcat PID=${this.tomcatProcess.pid}:`;
   }
 
   private makeRoot():Promise<void> {
@@ -96,27 +71,51 @@ export class TomcatManager implements JavaServerManager {
     });
   }
 
-  public async startForWindows() {
-              tomcatProcess = spawn(path.join(this.config.path, 'bin',
-                                          TomcatManager.isWindows ? 'catalina.bat' : 'catalina.sh'),
-                                [ 'start',  '-config', this.config.config],
-                                {env: {
-                                  "JAVA_OPTS":
-                                  `-Dshutdown.port=${this.config.https.port+1} -Dhttps.port=${this.config.https.port} `
-                                    +`-Dhttps.key=${this.config.https.key} `
-                                    +`-Dhttps.certificate=${this.config.https.certificate} `
-                                    +`-Dappdir=${this.appdir}`,
-                                  "CATALINA_BASE": this.config.path,
-                                  "CATALINA_HOME": this.config.path,
-                                  "JRE_HOME": this.config.runtime.home,
-                                  "CATALINA_PID": path.join(this.appdir,'tomcat.pid')
-                                }});
+  public startForUnix(DOptionsArray: Array<string>) {
+    const opts = '-D'+DOptionsArray.join(' -D');
+    return spawn(path.join(this.config.path, 'bin', 'catalina.sh'),
+                 [ 'start',  '-config', this.config.config],
+                 {env: {
+                   "JAVA_OPTS": opts,
+                   "CATALINA_BASE": this.config.path,
+                   "CATALINA_HOME": this.config.path,
+                   "JRE_HOME": this.config.runtime.home,
+                   "CATALINA_PID": path.join(this.appdir,'tomcat.pid')
+                 }});
+  }
 
+  public startForWindows(DOptionsArray: Array<string>) {
+    let seperator = (TomcatManager.isWindows ? ';' : ':');
+    let classPath = '"' + `${path.join(this.config.path, 'bin')}`
+      + seperator
+      + `${path.join(this.config.path, 'bin', 'bootstrap.jar')}`
+      + seperator
+      + `${path.join(this.config.path, 'bin', 'tomcat-juli.jar')}` + '"';
+    DOptionsArray = DOptionsArray.map(str => '-D'+str).concat(
+      [ '-Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager',
+        '-Djdk.tls.ephemeralDHKeySize=2048',
+        '-Djava.protocol.handler.pkgs=org.apache.catalina.webresources',
+        '-Dignore.endorsed.dirs=""',
+        '-classpath',
+        classPath,
+        'org.apache.catalina.startup.Bootstrap',
+        '-config', this.config.config, 'start']);
+    return spawn(path.join(this.config.runtime.home, 'bin', 'java'),
+                 DOptionsArray,
+                 {env: {
+                   "CLASSPATH": classPath,
+                   "CATALINA_BASE": this.config.path,
+                   "CATALINA_HOME": this.config.path,
+                   "JRE_HOME": this.config.runtime.home,
+                   "JAVA_HOME": this.config.runtime.home
+                 },
+                  cwd: path.join(this.config.path, 'bin')
+                 });
   }
 
   public async start() {
     //make folder, make links, start server
-    console.log(`Tomcat with id=${this.id} invoked to startup with config=`,this.config);
+    log.info(`Tomcat Manager with id=${this.id} invoked to startup with config=`,this.config);
     await this.makeRoot();
     //TODO should probably extract rather than let tomcat do it, since its a bit dumb with versioning
     //TODO what's the value of knowing the serviceid if the war can have a completely different name?
@@ -134,104 +133,137 @@ export class TomcatManager implements JavaServerManager {
           try {
             dir = await this.extractWar(warpath);
           } catch (e) {
-            console.warn(`Could not extract war for service=${key}, error=`,e);
+            log.warn(`Could not extract war for service=${key}, error=`,e);
           }
         } else {
           dir = warpath.substring(0,warpath.length-path.extname(warpath).length);
         }
       } catch (e) {
-        console.warn(`Could not access files to determine status for service=${key}, error=`,e);
+        log.warn(`Could not access files to determine status for service=${key}, error=`,e);
       }
       if (dir) {
         try {
-          let servletname = path.basename(dir);//await this.getWarName(dir);
-          console.log(`Service=${key} has Servlet name=${servletname}`);
+          let servletname = path.basename(dir);
+          log.info(`Service=${key} has Servlet name=${servletname}`);
           await this.makeLink(dir);
           successes++;
         } catch (e) {
-          console.warn(`Cannot add servlet for service=${key}, error=`,e);
+          log.warn(`Cannot add servlet for service=${key}, error=`,e);
         }
-      } else {console.warn(`Cannot add servlet for service=${key}`);}
+      } else {log.warn(`Cannot add servlet for service=${key}`);}
 
     }
     if (successes > 0) {
-      console.log(`About to tomcat, ID=${this.id}, URL=${this.getBaseURL()}`);
-      
+      log.info(`About to tomcat, ID=${this.id}, URL=${this.getBaseURL()}`);
+
+      let DOptionsArray = [
+        `shutdown.port=-1`,
+        `https.port=${this.config.https.port}`,
+        `https.key=${this.config.https.key}`,
+        `https.certificate=${this.config.https.certificate}`,
+        `appdir=${this.appdir}`,
+        `java.io.tmpdir=${this.appdir}`
+      ];
       let tomcatProcess;
       try {
-        tomcatProcess = TomcatManager.isWindows ? this.startForWindows() : this.startForUnix();
+        tomcatProcess = TomcatManager.isWindows ? this.startForWindows(DOptionsArray) : this.startForUnix(DOptionsArray);
       } catch (e) {
-        console.warn(`Could not start tomcat, error=`,e);
+        log.warn(`Could not start tomcat, error=`,e);
         return;
       }
       this.status = "running";
       this.tomcatProcess = tomcatProcess;
       tomcatProcess.stdout.on('data', (data)=> {
-        console.log(`${this.getIdString()} stdout=${data}`);
+        log.info(`${this.getIdString()} stdout=${data}`);
       });
 
       tomcatProcess.stderr.on('data', (data)=> {
-        console.log(`${this.getIdString()} stderr=${data}`);
+        log.info(`${this.getIdString()} stderr=${data}`);
       });
 
+      let onClose = (code)=> {
+        log.info(`${this.getIdString()} closed, code=${code}`);
+      };
+
+      tomcatProcess.on('close', onClose);
+
       tomcatProcess.on('exit', (code)=> {
-        console.log(`${this.getIdString()} exited, code=${code}`);              
+        log.info(`${this.getIdString()} exited, code=${code}`);
+        tomcatProcess.off('close', onClose);
         this.tomcatProcess = null;
       });
 
-      tomcatProcess.on('close', (code)=> {
-        console.log(`${this.getIdString()} closed, code=${code}`);
-        //TODO this just means we cant get stdout/stderr, but its still running... how to react?
-      });
+     
     } else {
-      console.log(`Tomcat for ID=${this.id} not starting, no services succeeded loading`);
+      log.info(`Tomcat for ID=${this.id} not starting, no services succeeded loading`);
     }
   }
 
-  public stop() {
-    //stop server, delete links, delete dir
-    /*
+  private stopForWindows(){
     if (this.tomcatProcess) {
-      console.log(`${this.getIdString()} Issuing sigterm`);
+      log.info(`${this.getIdString()} Manager issuing sigterm`);
       this.tomcatProcess.on('error', (err)=> {
-        console.warn(`${this.getIdString()} Error when stopping, error=${err}`);
+        log.warn(`${this.getIdString()} Error when stopping, error=${err}`);
       });
       this.tomcatProcess.kill('SIGTERM');
     }
-    */
-    console.log(`Going to stop, path=${this.config.path}, config=${this.config.config}, home=${this.config.runtime.home}, opts=`,this.config.https);
-    let stopProcess = spawn(path.join(this.config.path, 'bin',
-                                      TomcatManager.isWindows ? 'catalina.bat' : 'catalina.sh'),
-                            [ 'stop',  '-config', this.config.config],
-                            {env: {
-                              "JAVA_OPTS":
-                              `-Dshutdown.port=${this.config.https.port+1} -Dhttps.port=${this.config.https.port} `
-                                +`-Dhttps.key=${this.config.https.key} `
-                                +`-Dhttps.certificate=${this.config.https.certificate} `
-                                +`-Dappdir=${this.appdir}`,
-                              "CATALINA_BASE": this.config.path,
-                              "CATALINA_HOME": this.config.path,
-                              "JRE_HOME": this.config.runtime.home,
-                              "CATALINA_PID": path.join(this.appdir,'tomcat.pid')
-                            }});
+  }
+
+  private stopForUnix() {
+    let stopProcess;
+    try {
+      stopProcess = spawn(path.join(this.config.path, 'bin', 'catalina.sh'),
+            [ 'stop',  '-config', this.config.config],
+            {env: {
+              "JAVA_OPTS":
+              `-Dshutdown.port=-1 -Dhttps.port=${this.config.https.port} `
+                +`-Dhttps.key=${this.config.https.key} `
+                +`-Dhttps.certificate=${this.config.https.certificate} `
+                +`-Dappdir=${this.appdir}`,
+              "CATALINA_BASE": this.config.path,
+              "CATALINA_HOME": this.config.path,
+              "JRE_HOME": this.config.runtime.home,
+              "CATALINA_PID": path.join(this.appdir,'tomcat.pid')
+            }});
+    } catch (e) {
+      log.warn(`Could not stop tomcat, error=`,e);
+      return;
+    }
     stopProcess.stdout.on('data', (data)=> {
-      console.log(`${this.getIdString()} stdout=${data}`);
+      log.info(`${this.getIdString()} stdout=${data}`);
     });
 
     stopProcess.stderr.on('data', (data)=> {
-      console.log(`${this.getIdString()} stderr=${data}`);
+      log.info(`${this.getIdString()} stderr=${data}`);
     });
+    
+    let onClose = (code)=> {
+      log.info(`${this.getIdString()} closed, code=${code}`);
+    };
+    stopProcess.on('close', onClose);
 
     stopProcess.on('exit', (code)=> {
-      console.log(`${this.getIdString()} exited, code=${code}`);              
+      log.info(`${this.getIdString()} exited, code=${code}`);              
       this.status = "stopped";
+      stopProcess.off('close', onClose);
+      stopProcess = null;
     });
 
-    stopProcess.on('close', (code)=> {
-      console.log(`${this.getIdString()} closed, code=${code}`);
-      //TODO this just means we cant get stdout/stderr, but its still running... how to react?
-    });
+  }
 
+  public stop(): Promise<any> {
+    log.info(`Tomcat Manager ID=${this.id} stopping`);
+    TomcatManager.isWindows ? this.stopForWindows() : this.stopForUnix();
+    return new Promise((resolve, reject) => {
+      rimraf(this.appdir, (error)=> {
+        if (error) {
+          reject(error);
+        } else {
+          log.info(`Tomcat Manager ID=${this.id} cleanup successful`);
+          resolve();
+        }
+      })
+    }
   }
 
   private getBaseURL(): string {
@@ -239,7 +271,6 @@ export class TomcatManager implements JavaServerManager {
   }
 
   public getURL(pluginId: string, serviceName: string) {
-//    console.log(`Lookup of URL for`,pluginId,serviceName);
     let warpath = this.services[pluginId+':'+serviceName];
     if (warpath) {
       return this.getBaseURL()+path.basename(warpath,path.extname(warpath));
@@ -272,7 +303,7 @@ export class TomcatManager implements JavaServerManager {
             if (err) {
               reject(err);
             } else {
-//              console.log(`webxml looks like=`,result);
+//              log.info(`webxml looks like=`,result);
               resolve(result['web-app']['display-name'][0]);
 
             }
@@ -289,7 +320,6 @@ export class TomcatManager implements JavaServerManager {
 
   private isExtracted(warpath: Path): Promise<boolean> {
     let dir = warpath.substring(0,warpath.length-path.extname(warpath).length);
-//    console.log(`Lets lookup warpath=${warpath}, dir=${dir}`);
     return new Promise(function(resolve,reject) {
       fs.stat(dir, function(err, stats) {
         if (err) {
@@ -317,9 +347,9 @@ export class TomcatManager implements JavaServerManager {
   private makeLink(dir: Path): Promise<void> {
     let destination = this.appdir;
     if (TomcatManager.isWindows) {
-      console.log(`Making junction from ${dir} to ${destination}`);
+      log.info(`Making junction from ${dir} to ${destination}`);
     } else {
-      console.log(`Making symlink from ${dir} to ${destination}`);
+      log.info(`Making symlink from ${dir} to ${destination}`);
     }
     return new Promise((resolve, reject)=> {
       fs.symlink(dir, path.join(destination,path.basename(dir)),
