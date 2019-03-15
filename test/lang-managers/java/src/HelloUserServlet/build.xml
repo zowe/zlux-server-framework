@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- WARNING: Eclipse auto-generated file.
+              Any modifications will be overwritten.
+              To include a user specific buildfile here, simply create one in the same
+              directory with the processing instruction <?eclipse.ant.import?>
+              as the first entry and export the buildfile again. -->
+<project basedir="." default="build" name="HelloUserServlet">
+    <property environment="env"/>
+    <property name="target" value="1.8"/>
+    <property name="source" value="1.8"/>
+    <path id="HelloUserServlet.classpath">
+        <pathelement location="WEB-INF/classes"/>
+        <pathelement location="../../lib/javax.json-1.1.4.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/commons-codec-1.11.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/commons-logging-1.2.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/fluent-hc-4.5.7.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/httpclient-4.5.7.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/httpclient-cache-4.5.7.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/httpclient-osgi-4.5.7.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/httpclient-win-4.5.7.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/httpcore-4.4.11.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/httpmime-4.5.7.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/jna-4.5.2.jar"/>
+        <pathelement location="../../lib/httpcomponents-client-4.5.7/jna-platform-4.5.2.jar"/>
+        <pathelement location="../../../../../lib/java/apache-tomcat/lib/servlet-api.jar"/>
+    </path>
+    <target name="init">
+      <mkdir dir="WEB-INF/classes"/>
+      <mkdir dir="WEB-INF/lib"/>
+    </target>
+    <target name="package">
+
+      <zip destfile="HelloUserServlet.war"
+           basedir="."
+           includes="WEB-INF/**, META-INF/**">
+        <zipfileset prefix="WEB-INF/lib" dir="../../lib" includes="*.jar, LICENSE.*, LICENSE"/>
+        <zipfileset prefix="WEB-INF/lib" dir="../../lib/httpcomponents-client-4.5.7" includes="*.jar, LICENSE.*, LICENSE"/>
+        <zipfileset prefix="WEB-INF/lib" dir="../../../../../lib/java/apache-tomcat/lib/" includes="servlet-api.jar"/>
+      </zip>
+    </target>
+    <target name="clean">
+        <delete dir="WEB-INF/classes"/>
+    </target>
+    <target depends="init" name="build">
+        <echo message="${ant.project.name}: ${ant.file}"/>
+        <javac destdir="WEB-INF/classes" includeantruntime="false" source="${source}" target="${target}">
+            <src path="src"/>
+            <classpath refid="HelloUserServlet.classpath"/>
+        </javac>
+    </target>
+</project>
