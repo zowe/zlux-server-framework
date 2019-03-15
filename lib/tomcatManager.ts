@@ -80,7 +80,8 @@ export class TomcatManager implements JavaServerManager {
                    "CATALINA_BASE": this.config.path,
                    "CATALINA_HOME": this.config.path,
                    "JRE_HOME": this.config.runtime.home,
-                   "CATALINA_PID": path.join(this.appdir,'tomcat.pid')
+                   "CATALINA_PID": path.join(this.appdir,'tomcat.pid'),
+                   "ZOWE_ZLUX_URL": this.config.zluxUrl
                  }});
   }
 
@@ -107,7 +108,8 @@ export class TomcatManager implements JavaServerManager {
                    "CATALINA_BASE": this.config.path,
                    "CATALINA_HOME": this.config.path,
                    "JRE_HOME": this.config.runtime.home,
-                   "JAVA_HOME": this.config.runtime.home
+                   "JAVA_HOME": this.config.runtime.home,
+                   "ZOWE_ZLUX_URL": this.config.zluxUrl
                  },
                   cwd: path.join(this.config.path, 'bin')
                  });
@@ -145,7 +147,7 @@ export class TomcatManager implements JavaServerManager {
         try {
           let servletname = path.basename(dir);
           log.info(`Service=${key} has Servlet name=${servletname}`);
-          await this.makeLink(dir);
+          await this.makeLink(dir, key);
           successes++;
         } catch (e) {
           log.warn(`Cannot add servlet for service=${key}, error=`,e);
@@ -263,7 +265,7 @@ export class TomcatManager implements JavaServerManager {
           resolve();
         }
       })
-    }
+    });
   }
 
   private getBaseURL(): string {
@@ -271,9 +273,10 @@ export class TomcatManager implements JavaServerManager {
   }
 
   public getURL(pluginId: string, serviceName: string) {
-    let warpath = this.services[pluginId+':'+serviceName];
+    let key = pluginId+':'+serviceName;
+    let warpath = this.services[key];
     if (warpath) {
-      return this.getBaseURL()+path.basename(warpath,path.extname(warpath));
+      return this.getBaseURL()+key.replace(/:/g,"_")+"_"+path.basename(warpath,path.extname(warpath));
     } else {
       return null;
     }
@@ -344,7 +347,7 @@ export class TomcatManager implements JavaServerManager {
   /* from given dir to our appbase dir 
      dir is an extracted war dir
   */
-  private makeLink(dir: Path): Promise<void> {
+  private makeLink(dir: Path, pluginKey: string): Promise<void> {
     let destination = this.appdir;
     if (TomcatManager.isWindows) {
       log.info(`Making junction from ${dir} to ${destination}`);
@@ -352,7 +355,7 @@ export class TomcatManager implements JavaServerManager {
       log.info(`Making symlink from ${dir} to ${destination}`);
     }
     return new Promise((resolve, reject)=> {
-      fs.symlink(dir, path.join(destination,path.basename(dir)),
+      fs.symlink(dir, path.join(destination,pluginKey.replace(/:/g,'_')+'_'+path.basename(dir)),
                  TomcatManager.isWindows ? 'junction' : 'dir', (err)=> {
         if (err) {
           reject(err);

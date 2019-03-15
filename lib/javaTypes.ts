@@ -38,6 +38,7 @@ export type JarConfig = {
   serviceSettings?: any; //from configservice _internal
   runtime: JavaDefinition;
   tempDir: Path; //for writing out config files if needed
+  zluxUrl: string; //set by server at runtime
 }
 
 export type WarConfig = {
@@ -58,6 +59,7 @@ export type AppServer = {
   config: Path; //path to server config file... config.xml for tomcat for example
   https: HttpsConfig;
   //POSSIBLY need to determine shutdown port here. Open question on if we need this ability of tomcat or can disable it. Starting with disabling it.
+  zluxUrl: string; //set by server at runtime
 }
 
 export type HttpsConfig = {
@@ -76,7 +78,7 @@ export type TomcatConfig = {
   //list given by zlux app server already having determined
   plugins: Array<any>;//pluginDefinitions with location included
   runtime: JavaDefinition;
-
+  zluxUrl: string; //set by server at runtime
 }
 
 export type TomcatShutdown = {

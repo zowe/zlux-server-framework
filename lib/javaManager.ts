@@ -29,7 +29,7 @@ export class JavaManager {
   private portPos: number = 0;
   private servers: Array<any> = new Array<any>();
   private static supportedTypes: Array<string> = [WAR_SERVICE_TYPE_NAME, JAR_SERVICE_TYPE_NAME];
-  constructor(private config: JavaConfig, private instanceDir: Path) {
+  constructor(private config: JavaConfig, private instanceDir: Path, private zluxUrl: string) {
     //process at this time, so that startAll() is ready to go
     this.config = config;
     this.processConfig();//validates & extracts... may throw
@@ -200,9 +200,7 @@ export class JavaManager {
         if (server) {
           this.servers.push(server);
           this.portPos++;
-        } else {
-          log.warn(`No server returned for group=`,group);
-        }      
+        }    
       });
       break;
     case 'appserver':
@@ -211,9 +209,7 @@ export class JavaManager {
       if (server) {
         this.servers.push(server);
         this.portPos++;
-      } else {
-        log.warn(`No server returned for group=`,pluginKeys);
-      }      
+      }    
       break;
     default:
       log.warn(`Unknown default behavior=${defaultBehavior}`);
@@ -247,7 +243,8 @@ export class JavaManager {
         plugin: plugin,
         serviceName: serviceName,
         runtime: runtime,
-        tempDir: 'TODO'
+        tempDir: 'TODO',
+        zluxUrl: this.zluxUrl
       }
       return new JarManager(config);
     }
@@ -305,6 +302,7 @@ export class JavaManager {
         //may need to be created later
         joinedConfig.appRootDir = path.join(this.instanceDir, 'ZLUX', 'languageManagers', 'java', 'tomcat');
       }
+      joinedConfig.zluxUrl = this.zluxUrl;
       return new TomcatManager(joinedConfig);
     default:
       throw new Error(`Unknown java app server type=${serverConfigBase.type} specified in config. `
