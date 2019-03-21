@@ -17,7 +17,7 @@ TrivialAuthenticator.prototype = {
   getStatus(sessionState) {
     return {
       username: sessionState.username,
-      authenticated: sessionState.authenticated
+      authenticated: !!sessionState.username
     };
   },
     
@@ -34,10 +34,20 @@ TrivialAuthenticator.prototype = {
    * { success: true }. Should not reject the promise.
    */ 
   authenticate(request, sessionState) {
-    sessionState.username = request.body.username;
-    sessionState.authenticated = true;
-    return Promise.resolve({ success: true });
+    if (request.body && request.body.username) {
+      sessionState.username = request.body.username;
+      sessionState.authenticated = true;
+      return Promise.resolve({ success: true });
+    } else {
+      return Promise.resolve({ success: false });
+    }
   },
+  
+  refreshStatus(request, sessionState) {
+    const result = sessionState.username;
+    sessionState.authenticated = result;
+    return Promise.resolve({ success: true });
+  },  
 
   /**
    * Invoked for every service call by the middleware.
