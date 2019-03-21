@@ -32,6 +32,7 @@ exports.webAppOptions = {
       doLogin() {},
       getStatus() {},
       doLogout() {},
+      refreshStatus() {},
       middleware(r, re, next) { next() }
     }
 };
