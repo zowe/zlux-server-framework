@@ -44,9 +44,9 @@ TrivialAuthenticator.prototype = {
   },
   
   refreshStatus(request, sessionState) {
-    const result = sessionState.username;
+    const result = !!sessionState.username;
     sessionState.authenticated = result;
-    return Promise.resolve({ success: true });
+    return Promise.resolve({ success: result });
   },  
 
   /**
