@@ -11,6 +11,12 @@
 # dependencies
 /node_modules
 
+# Ignore Gradle project-specific cache directory
+.gradle
+
+# Ignore Gradle build output directory
+build
+
 # IDEs and editors
 /.idea
 .project

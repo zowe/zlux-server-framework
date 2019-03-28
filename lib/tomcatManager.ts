@@ -24,12 +24,14 @@ import * as path from 'path';
 import * as mkdirp from 'mkdirp';
 import * as child_process from 'child_process';
 //import * as xml2js from 'xml2js';
-import * as yazl from 'yazl';
+import * as yauzl from 'yauzl';
 import * as utils from './util';
 import * as rimraf from 'rimraf';
 
 const log = utils.loggers.langManager;
 const spawn = child_process.spawn;
+const FILE_WRITE_MODE = 0o600;
+const DIR_WRITE_MODE = 0o700;
 
 export class TomcatManager implements JavaServerManager {
   private id: number;
@@ -61,7 +63,7 @@ export class TomcatManager implements JavaServerManager {
 
   private makeRoot():Promise<void> {
     return new Promise((resolve,reject)=> {
-      mkdirp(this.appdir, (err)=> {
+      mkdirp(this.appdir, {mode: DIR_WRITE_MODE}, (err)=> {
         if (err) {
           reject(err);
         } else {
@@ -133,7 +135,7 @@ export class TomcatManager implements JavaServerManager {
         let preextracted = await this.isExtracted(warpath);
         if (!preextracted) {
           try {
-            dir = await this.extractWar(warpath);
+            dir = await this.extractWar(warpath, key);
           } catch (e) {
             log.warn(`Could not extract war for service=${key}, error=`,e);
           }
@@ -147,7 +149,15 @@ export class TomcatManager implements JavaServerManager {
         try {
           let servletname = path.basename(dir);
           log.info(`Service=${key} has Servlet name=${servletname}`);
-          await this.makeLink(dir, key);
+          const destination = path.join(this.appdir,
+                                        key.replace(/:/g,'_')+'_'+
+                                        path.basename(
+                                          warpath.substring(0,warpath.length-path.extname(warpath).length)));
+          if (dir != destination) {
+            await this.makeLink(dir, destination);
+          } else {
+            log.info(`Skipping linking for extracted war at dest=${destination}`);
+          }
           successes++;
         } catch (e) {
           log.warn(`Cannot add servlet for service=${key}, error=`,e);
@@ -317,8 +327,72 @@ export class TomcatManager implements JavaServerManager {
   }
   */
 
-  private extractWar(warpath: Path): Promise<any> {
-    throw new Error(`NYI`);
+  private extractWar(warpath: Path, pluginKey: string): Promise<any> {
+    return new Promise((resolve,reject)=> {
+      const destRoot = this.appdir;
+
+      yauzl.open(warpath, {autoClose: true, lazyEntries: true}, function(err, zipfile) {
+        if (err) {
+          zipfile.close();
+          reject(err);
+        } else {
+          let error = undefined;
+          const destPath = path.join(destRoot,
+                                     pluginKey.replace(/:/g,'_')+'_'+
+                                     path.basename(
+                                       warpath.substring(0,warpath.length-path.extname(warpath).length)));
+
+          zipfile.on("close", function() {
+            log.info(`Extracted war to ${destPath}`);
+            if (error) {
+              reject(error);
+            } else {
+              resolve(destPath);
+            }
+          });  
+          zipfile.readEntry();
+          zipfile.on("entry", function(entry) {
+            if (entry.fileName.endsWith('/')) {
+              //directory
+              mkdirp(path.join(destPath,entry.fileName), {mode: DIR_WRITE_MODE}, (err)=> {
+                if (err) {
+                  error = err;                  
+                  zipfile.close();
+                } else {
+                  zipfile.readEntry();
+                }
+              });
+            } else if (entry.fileName == '.') {
+              zipfile.readEntry(); //TODO is it correct to skip this?
+            } else {
+              //file
+              mkdirp(path.join(destPath,path.dirname(entry.fileName)), {mode: DIR_WRITE_MODE}, (err)=> {
+                if (err) {
+                  error = err;
+                  zipfile.close();
+                } else {
+                  zipfile.openReadStream(entry, function(err, readStream) {
+                    if (err) {
+                      error = err;
+                      zipfile.close();
+                    } else {
+                      log.debug(`Writing: ${entry.fileName}, Size=${entry.uncompressedSize}`);
+                      let writeStream = fs.createWriteStream(
+                        path.join(destPath,entry.fileName), {mode: FILE_WRITE_MODE});
+                      writeStream.on("close", ()=> {
+                        log.debug(`Wrote: ${entry.fileName}`);
+                        zipfile.readEntry();
+                      });
+                      readStream.pipe(writeStream);
+                    }
+                  });
+                }
+              });
+            }
+          });
+        }
+      });
+    });
   }
 
   private isExtracted(warpath: Path): Promise<boolean> {
@@ -326,7 +400,11 @@ export class TomcatManager implements JavaServerManager {
     return new Promise(function(resolve,reject) {
       fs.stat(dir, function(err, stats) {
         if (err) {
-          return reject(err); 
+          if (err.code == 'ENOENT') {
+            return resolve(false); 
+          } else {
+            return reject(err);
+          }
         } else if (stats.isDirectory()) {
           fs.stat(path.join(dir, 'WEB-INF', 'web.xml'), function(err, stats) {
             if (err) {
@@ -347,15 +425,14 @@ export class TomcatManager implements JavaServerManager {
   /* from given dir to our appbase dir 
      dir is an extracted war dir
   */
-  private makeLink(dir: Path, pluginKey: string): Promise<void> {
-    let destination = this.appdir;
+  private makeLink(dir: Path, destination: string): Promise<void> {
     if (TomcatManager.isWindows) {
-      log.info(`Making junction from ${dir} to ${destination}`);
+      log.info(`Making junction from ${dir} to ${this.appdir}`);
     } else {
-      log.info(`Making symlink from ${dir} to ${destination}`);
+      log.info(`Making symlink from ${dir} to ${this.appdir}`);
     }
     return new Promise((resolve, reject)=> {
-      fs.symlink(dir, path.join(destination,pluginKey.replace(/:/g,'_')+'_'+path.basename(dir)),
+      fs.symlink(dir, destination,
                  TomcatManager.isWindows ? 'junction' : 'dir', (err)=> {
         if (err) {
           reject(err);
