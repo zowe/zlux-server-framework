@@ -175,14 +175,20 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
 
       websocket.on('message',(msg)=>{t.handleWebsocketMessage(msg);});
       websocket.on('close',(code,reason)=>{t.handleWebsocketClosed(code,reason);});
+      websocket.on('error', (error) => {
+        /* TODO handle the error, close the host connection, etc */
+        t.logger.warn("websocket error", error) 
+      });
       
       t.configured = true;
     }
     else {
+      /* TODO any cleanup needed? close the client websocket? */
       this.logger.warn('Terminal websocket proxy was not supplied with valid message config description');
     }
   }
   else {
+    /* TODO any cleanup needed? close the client websocket? */
     this.logger.warn('Terminal websocket proxy was not supplied with valid message config description');
   }
 }
