@@ -51,12 +51,6 @@ export function decryptWithKeyAndIV(text: any,key: any,iv: any) {
   decrypted += cipher.final('utf8');
   return decrypted;
 }
-// exports.encryptWithKeyAndIV = encryptWithKeyAndIV;
-// exports.decryptWithKeyAndIV = decryptWithKeyAndIV;
-// exports.getKeyFromPassword = getKeyFromPassword;
-// exports.encryptWithKey = encryptWithKey;
-// exports.decryptWithKey = decryptWithKey;
-
 
 /*
   This program and the accompanying materials are

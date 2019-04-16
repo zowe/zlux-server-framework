@@ -100,7 +100,7 @@ export class WebServer{
     };
   }
 
-  validateAndPreprocessConfig(){
+  validateAndPreprocessConfig =
   BBPromise.coroutine(function *validateAndPreprocessConfig(config: any) {
     let canRun = false;
     if (config.http && config.http.port) {
@@ -133,8 +133,8 @@ export class WebServer{
       config.https.ipAddresses = uniqueIps;
     }
     return canRun;
-  })
-}
+  });
+
 
   setConfig(config: any) {
     this.config = config;
@@ -158,7 +158,7 @@ export class WebServer{
     }
   }
 
-  startListening(){
+  startListening =
   BBPromise.coroutine(function* (app: any) {
     if (this.config.https && this.config.https.port) {
       const port = this.config.https.port;
@@ -201,7 +201,6 @@ export class WebServer{
       }
     }
   })
-}
 
   callListen(methodServer: any, methodName: any, methodNameForLogging: any, ipAddress: any, port: any) {
     const addressForLogging = `${ipAddress}:${port}`;

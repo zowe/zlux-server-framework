@@ -10,7 +10,7 @@
 
 'use strict';
 const path = require('path');
-const jsonUtils = require('./jsonUtils.ts');
+const jsonUtils = require('./jsonUtils');
 const glob = require('glob');
 const zluxUtil = require('./util');
 const acceptLanguageParser = require('accept-language-parser');
@@ -119,12 +119,6 @@ function translateObject(object: any, translationMap: any) {
     }
   }
 }
-
-// module.exports = {
-//   getAcceptLanguageFromCookies,
-//   loadTranslations,
-//   translate
-// };
 
 const _unitTest = false;
 function unitTest() {

@@ -13,6 +13,10 @@
 export const ARG_TYPE_FLAG = 1
 export const ARG_TYPE_VALUE = 2
 
+export const constants = {
+  ARG_TYPE_FLAG: 1,
+  ARG_TYPE_VALUE: 2
+}
 
 export function CLIArgument(longName: any, shortName: any, type: any) {
   if (!longName || (type != exports.constants.ARG_TYPE_FLAG && type != exports.constants.ARG_TYPE_VALUE)) {

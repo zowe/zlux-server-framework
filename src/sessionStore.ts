@@ -12,8 +12,6 @@
 //based on description from https://www.npmjs.com/package/express-session
 
 const util = require('util');
-// import * as util from 'util'
-// import util from 'util';
 const events = require('events');
 const expressSession = require('express-session');
 const superstore = expressSession.Store || expressSession.session.Store;

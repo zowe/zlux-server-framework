@@ -15,7 +15,7 @@
   ],
   "main": "lib/index.js",
   "scripts": {
-    "build": "node_modules/.bin/webpack --config webpack.config.js",
+    "build": "tsc",
     "test": "mocha --recursive --exit test"
   },
   "dependencies": {

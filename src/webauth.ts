@@ -12,6 +12,7 @@ const BBPromise = require('bluebird');
 const util = require('./util');
 const UNP = require('./unp-constants');
 
+const bootstrapLogger = util.loggers.bootstrapLogger;
 const authLogger = util.loggers.authLogger;
 
 function getAuthHandler(req: any, authManager: any) {
@@ -47,8 +48,14 @@ function setAuthPluginSession(req: any, pluginID: any, authPluginSession: any) {
 }
 
 function getRelevantHandlers(authManager: any, body: any) {
+  bootstrapLogger.warn("get dem handles")
+  bootstrapLogger.warn(authManager)
+  bootstrapLogger.warn(body)
   let handlers = authManager.getAllHandlers();
+  bootstrapLogger.warn(handlers)
+  bootstrapLogger.warn(body.categories)
   if (body && body.categories) {
+    bootstrapLogger.warn("never gonna get here yayeet")
     const authCategories: any = {};
     body.categories.map((t: any) => authCategories[t] = true);
     handlers = handlers.filter((h: any) => 

@@ -16,7 +16,7 @@ const util = require('util');
 const url = require('url');
 const expressWs = require('express-ws');
 const path = require('path');
-const Promise = require('bluebird');
+const BBPromise = require('bluebird');
 const http = require('http');
 const https = require('https');
 const bodyParser = require('body-parser');
@@ -971,8 +971,8 @@ export class WebApp{
     this.expressApp.use(this.pluginRouter);
   }
   
-  installPlugin(){
-    Promise.coroutine(function*(pluginContext: any) {
+  installPlugin =
+    BBPromise.coroutine(function*(pluginContext: any) {
       const plugin = pluginContext.pluginDef;
       const urlBase = zLuxUrl.makePluginURL(this.options.productCode, 
         plugin.identifier);
@@ -988,8 +988,8 @@ export class WebApp{
       }
       this._resolveImports(plugin, urlBase);
       this.plugins.push(plugin);
-    })
-  }
+    });
+  // }
 
 
   installErrorHanders() {

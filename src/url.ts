@@ -34,11 +34,6 @@ export function join(baseUrl: any, relativePath: any) {
   return baseUrl + relativePath;
 }
 
-// module.exports = {
-//   makePluginURL,
-//   makeServiceSubURL,
-//   join
-// }
 
 /*
   This program and the accompanying materials are
