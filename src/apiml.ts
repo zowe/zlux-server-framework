@@ -77,28 +77,52 @@ export class ApimlConnector {
   public ipAddr: any;
   public httpPort: any;
   public httpsPort: any;
-  public apimlConfig: any;
+  public apimlHost: any;
+  public apimlPort: any;
   public vipAddress: any;
   public zluxServerEurekaClient: any;
+  public tlsOptions: any;
 
-  constructor({ hostName, ipAddr, httpPort, httpsPort, apimlConfig }: any){
-    Object.assign(this, { hostName, ipAddr, httpPort, httpsPort, apimlConfig });
+  constructor({ hostName, ipAddr, httpPort, httpsPort, apimlHost, apimlPort, tlsOptions }: any){
+    Object.assign(this, { hostName, ipAddr, httpPort, httpsPort, apimlHost, apimlPort, tlsOptions });
     this.vipAddress = hostName;
   }
 
   _makeMainInstanceProperties(overrides?: any) {
     const instance = Object.assign({}, MEDIATION_LAYER_INSTANCE_DEFAULTS);
     Object.assign(instance, overrides);
-    const isHttps = this.httpsPort? true : false;
-    let port;
-    let proto;
-    if (false && isHttps) {
-      port = this.httpsPort;
-      proto = 'https';
+    const protocolObject = {
+      httpPort: this.httpPort,
+      httpsPort: this.httpsPort,
+      httpEnabled: false,
+      httpsEnabled: false
+    };
+
+    let mlHttpPort;
+    if(this.httpPort) {
+      protocolObject.httpEnabled = true;
+      mlHttpPort = Number(this.httpPort);
     } else {
-      port = this.httpPort;
-      proto = 'http';
+      protocolObject.httpEnabled = false;
+      // This is a workaround for routing issues in the API ML
+      // If the HTTP port is set to 0 then the API ML doesn't load zlux
+      mlHttpPort = Number(this.httpsPort);
     }
+
+    let proto, port;
+    if(this.httpsPort) {
+      protocolObject.httpsEnabled = true;
+      proto = 'https';
+      port = this.httpsPort;
+    } else {
+      protocolObject.httpsEnabled = false;
+      proto = 'http';
+      port = this.httpsPort;
+    }
+
+    log.debug("Protocol:", proto, "Port", port);
+    log.debug("Protocol Object:", JSON.stringify(protocolObject));
+
     Object.assign(instance,  {
        instanceId: `${this.hostName}:zlux:${port}`,
        hostName:  this.hostName,
@@ -108,31 +132,39 @@ export class ApimlConnector {
        healthCheckUrl: `${proto}://${this.hostName}:${port}/server/eureka/health`,
        homePageUrl: `${proto}://${this.hostName}:${port}/`,
        port: {
-         "$": Number(port),
-         "@enabled": true
+         "$": mlHttpPort, // This is a workaround for the mediation layer
+         "@enabled": protocolObject.httpEnabled
+       },
+       securePort: {
+         "$": Number(protocolObject.httpsPort),
+         "@enabled": protocolObject.httpsEnabled
        }
      });
+     
+     log.debug("API ML registration settings:", JSON.stringify(instance));
+
     return instance;
   }
 
   registerMainServerInstance() {
     const zluxProxyServerInstanceConfig = {
       instance: this._makeMainInstanceProperties(),
-      eureka: Object.assign({}, MEDIATION_LAYER_EUREKA_DEFAULTS)
+      eureka: Object.assign({}, MEDIATION_LAYER_EUREKA_DEFAULTS),
+      requestMiddleware: (requestOpts: any, done: any) => {
+        const { pfx, ca, cert, key, passphrase } = this.tlsOptions;
+        Object.assign(requestOpts, { pfx, ca, cert, key, passphrase });
+        done(requestOpts);
+      }
     }
     log.debug("zluxProxyServerInstanceConfig: " 
         + JSON.stringify(zluxProxyServerInstanceConfig, null, 2))
-    const proto = this.apimlConfig.server.isHttps? 'https' : 'http';
-    const userNameAndPassword = this.apimlConfig.server.username?
-        `${this.apimlConfig.server.username}:${this.apimlConfig.server.password}`
-          : '';
-    (zluxProxyServerInstanceConfig.eureka as any).serviceUrls = {
+    const url: any = `https://${this.apimlHost}:${this.apimlPort}/eureka/apps`
+    (zluxProxyServerInstanceConfig.eureka) as any).serviceUrls = {
       'default': [
-        `${proto}://${userNameAndPassword}@${this.apimlConfig.server.hostname}`
-          + `:${this.apimlConfig.server.port}/eureka/apps`
+        url
       ]};
-    log.info(`Registering at ${proto}://${this.apimlConfig.server.hostname}:`
-        + `${this.apimlConfig.server.port}/eureka/apps...`);
+      log.info(`Registering at ${url}...`);
+      log.debug(`zluxProxyServerInstanceConfig ${JSON.stringify(zluxProxyServerInstanceConfig)}`)
     const zluxServerEurekaClient = new eureka(zluxProxyServerInstanceConfig);
     //zluxServerEurekaClient.logger.level('debug');
     this.zluxServerEurekaClient = zluxServerEurekaClient;
@@ -145,7 +177,6 @@ export class ApimlConnector {
           log.info('Eureka Client Registered');
           resolve();
         }
-       
       });
     });
   }

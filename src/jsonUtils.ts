@@ -13,7 +13,7 @@
 const fs = require('fs');
 const util = require('./util');
 
-export const log = (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.json");
+export const log = (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.json");
 
 export class JSONUtils {
   constructor(){

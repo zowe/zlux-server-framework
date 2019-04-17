@@ -186,13 +186,24 @@ export class Server {
         this.webServer.close();
       }.bind(this));
       if (this.userConfig.node.mediationLayer.enabled) {
+        const apimlConfig = this.userConfig.node.mediationLayer;
+        let apimlTlsOptions;
+        if (apimlConfig.tlsOptions != null) {
+          apimlTlsOptions = {};
+          WebServer.readTlsOptionsFromConfig(apimlConfig.tlsOptions, apimlTlsOptions); 
+        } else {
+          apimlTlsOptions = this.webServer.getTlsOptions();
+        }
+        installLogger.info('The http port given to the APIML is: ', webAppOptions.httpPort);
+        installLogger.info('The https port given to the APIML is: ', webAppOptions.httpsPort);
         this.apiml = new ApimlConnector({
           hostName: 'localhost',
           ipAddr: '127.0.0.1',
           httpPort: webAppOptions.httpPort, 
           httpsPort: webAppOptions.httpsPort, 
-          apimlConfig: this.userConfig.node.mediationLayer
-        });
+          apimlHost: apimlConfig.server.hostname,
+          apimlPort: apimlConfig.server.port,
+          tlsOptions: apimlTlsOptions        });
         yield this.apiml.registerMainServerInstance();
       }
   })

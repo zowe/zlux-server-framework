@@ -23,7 +23,6 @@ const bodyParser = require('body-parser');
 const cookieParser = require('cookie-parser')
 const session = require('express-session');
 const zluxUtil = require('./util');
-// import * as zluxUtil from './util';
 const configService = require('../plugins/config/lib/configService.js');
 const proxy = require('./proxy');
 const zLuxUrl = require('./url');
@@ -86,6 +85,11 @@ export class DataserviceContext {
 
 function do404(URL: any, res: any, message: any) {
   contentLogger.debug("404: "+message+", url="+URL);
+  if (URL.indexOf('<')!=-1) {
+    //sender didn't URI encode (browsers generally do)
+    //Not a catch-all for missed encoding - specifically to prevent HTML tag insertion
+    URL = encodeURI(URL);
+  }
   res.statusMessage = message;
   res.status(404).send("<h1>Resource not found, URL: "+URL+"</h1></br><h2>Additional info: "+message+"</h2>");
 }
@@ -791,7 +795,6 @@ export class WebApp{
     return router;
   }
 
-  // Is this right?
   *_makeRouter(service: any, plugin: any, pluginContext: any, pluginChain: any) {
     const serviceRouterWithMiddleware = pluginChain.slice();
     serviceRouterWithMiddleware.push(commonMiddleware.injectServiceDef(
@@ -989,7 +992,6 @@ export class WebApp{
       this._resolveImports(plugin, urlBase);
       this.plugins.push(plugin);
     });
-  // }
 
 
   installErrorHanders() {

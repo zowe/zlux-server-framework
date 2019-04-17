@@ -86,7 +86,13 @@ AuthResponse.prototype = {
     });
     if (handlerResult[this.keyField]) {
       authCategoryResult[this.keyField] = true;
-    } 
+    }
+    //alert client of when this session expires one way or another
+    if (handlerResult.authenticated && !handlerResult.expms) {
+      //handler may only know expiration time due to login process, as a response,
+      //or may know ahead of time due to set value or retrievable server config.
+      handlerResult.expms = handler.sessionExpirationMS;
+    }
     authCategoryResult.plugins[pluginID] = handlerResult;
   },
   
@@ -130,12 +136,58 @@ StatusResponse.prototype = {
   __proto__: AuthResponse.prototype,
   
   keyField: "authenticated"
+  
 }
 
+const SESSION_ACTION_TYPE_AUTHENTICATE = 1;
+const SESSION_ACTION_TYPE_REFRESH = 2;
 /*
  * Assumes req.session is there and behaves as it should
  */
 module.exports = function(authManager: any) {
+  const _authenticateOrRefresh = Promise.coroutine(function*(req, res, type) {
+    let functionName;
+    if (type == SESSION_ACTION_TYPE_AUTHENTICATE) {
+      functionName = 'authenticate';
+    } else if (type == SESSION_ACTION_TYPE_REFRESH) {
+      functionName = 'refreshStatus';
+    } else {
+      res.status(500).json({error: "Invalid session action type attempted"});
+      return;
+    }
+
+    try {
+      const result = new LoginResult();
+      const handlers = getRelevantHandlers(authManager, req.body);
+      const authServiceHandleMaps = 
+            req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps;
+      for (const handler of handlers) {
+        const pluginID = handler.pluginID;
+        const authPluginSession = getAuthPluginSession(req, pluginID, {});
+        req[`${UNP.APP_NAME}Data`].plugin.services = 
+          authServiceHandleMaps[pluginID];
+        const wasAuthenticated = handler.getStatus(authPluginSession).authenticated;
+        const handlerResult = yield handler[functionName](req,
+                                                          authPluginSession);
+        if (handlerResult.success) {
+          authLogger.info(`${req.session.id}: Session security call ${functionName} succesful for auth ` 
+                          + `handler ${pluginID}. Plugin response: ` + JSON.stringify(handlerResult));
+        }          
+        //do not modify session if not authenticated or deauthenticated
+        if (wasAuthenticated || handlerResult.success) {
+          setAuthPluginSession(req, pluginID, authPluginSession);
+        }
+        result.addHandlerResult(handlerResult, handler);
+      }
+      result.updateStatus();
+      res.status(result.success? 200 : 401).json(result);
+    } catch (e) {
+      console.warn(e)
+      res.status(500).send(e.message);
+      return;
+    }
+  });
+
   return {
     
     addProxyAuthorizations(req1: any, req2Options: any) {
@@ -166,41 +218,14 @@ module.exports = function(authManager: any) {
       res.status(200).json(result);
     },
     
-    doLogin: BBPromise.coroutine(function*(req: any, res: any) {
-      try {
-        const result = new (LoginResult as any)();
-        const handlers = getRelevantHandlers(authManager, req.body);
-        const authServiceHandleMaps = 
-          req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps;
-        for (const handler of handlers) {
-          const pluginID = handler.pluginID;
-          const authPluginSession = getAuthPluginSession(req, pluginID, {});
-          req[`${UNP.APP_NAME}Data`].plugin.services = 
-            authServiceHandleMaps[pluginID];
-          // FIXME This is a bug: in webauth.js we shouldn't make assumptions
-          // about the contents of the session. We only can look at the return 
-          // values of the method.
-          const wasAuthenticated = authPluginSession.authenticated;
-          const handlerResult = yield handler.authenticate(req, 
-              authPluginSession);
-          if (handlerResult.success) {
-            authLogger.debug(`${req.session.id}: Successful authenticate to auth ` 
-            + `handler ${pluginID}. Plugin response: ` + JSON.stringify(handlerResult));
-          }
-          //do not modify session if not authenticated or deauthenticated
-          if (wasAuthenticated || handlerResult.success) {
-            setAuthPluginSession(req, pluginID, authPluginSession);
-          }
-          result.addHandlerResult(handlerResult, handler);
-        }
-        result.updateStatus();
-        res.status(result.success? 200 : 401).json(result);
-      } catch (e) {
-        console.warn(e)
-        res.status(500).send(e.message);
-        return;
-      }
-    }),
+    refreshStatus(req, res) {
+      return _authenticateOrRefresh(req,res,SESSION_ACTION_TYPE_REFRESH);
+    },
+
+
+    doLogin(req, res) {
+      return _authenticateOrRefresh(req,res,SESSION_ACTION_TYPE_AUTHENTICATE);
+    },
     
     doLogout(req: any, res: any) {
       //FIXME XSRF
@@ -215,7 +240,8 @@ module.exports = function(authManager: any) {
     
     middleware: BBPromise.coroutine(function*(req: any, res: any, next: any) {
       try {
-        if (req.url.endsWith(".websocket") && (res._header == null)) {
+        const isWebsocket = req.url.endsWith(".websocket");
+        if (isWebsocket && (res._header == null)) {
           //workaround for https://github.com/HenningM/express-ws/issues/64
           //copied from https://github.com/HenningM/express-ws/pull/92
           //TODO remove this once that bug is fixed
@@ -230,8 +256,10 @@ module.exports = function(authManager: any) {
         }
         const authPluginID = handler.pluginID;
         const authPluginSession = getAuthPluginSession(req, authPluginID, {});
-        const result = yield handler.authorized(req, authPluginSession);
-        //we only care if its authorized
+        const result = yield handler.authorized(req, authPluginSession, {
+          syncOnly: isWebsocket,
+          bypassAuthorizatonCheck: !authManager.isRbacEnabled()
+        });        //we only care if its authorized
         if (!result.authorized) {
           const errorResponse = {
             /* TODO doctype/version */

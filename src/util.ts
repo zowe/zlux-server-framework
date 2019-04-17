@@ -33,16 +33,16 @@ export function resolveRelativePathAgainstCWD(path: any, x: any) {
 }
 
 export const loggers = {
-  bootstrapLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.bootstrap"),
-  authLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.auth"),
-  contentLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.static"),
-  childLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.child"),
-  utilLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.utils"),
-  proxyLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.proxy"),
-  installLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.install"),
-  apiml: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.apiml"),
-  routing: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.routing"),
-  network: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_unp.network"),
+  bootstrapLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.bootstrap"),
+  authLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.auth"),
+  contentLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.static"),
+  childLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.child"),
+  utilLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.utils"),
+  proxyLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.proxy"),
+  installLogger: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.install"),
+  apiml: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.apiml"),
+  routing: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.routing"),
+  network: (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.network"),
 };
 
 // module.exports.loggers = loggers;
