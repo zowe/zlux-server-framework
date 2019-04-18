@@ -341,6 +341,9 @@ const commonMiddleware = {
       }
       appData.webApp.callRootService = function callRootService(name: any, url: any, 
           options: any) {
+        if (!this.rootServices[name]) {
+          throw new Error(`root service ${name} not found`);
+        }
         return this.rootServices[name].call(url, options, req);
       }
       if (!appData.plugin) {
@@ -519,6 +522,16 @@ function makeLoopbackConfig(nodeConfig: any) {
   }
 }
 
+function getAgentProxyOptions(serverConfig: any, agentConfig: any) {
+  if (!agentConfig) return null;
+  let options = {};
+  if (agentConfig.https || (agentConfig.http && agentConfig.http.attls === true)) {
+    (options as any).isHttps = true;
+    (options as any).allowInvalidTLSProxy = serverConfig.allowInvalidTLSProxy
+  }
+  return options;
+}
+
 export class WebApp{
   public expressApp: any;
   public wsEnvironment: any;
@@ -547,8 +560,8 @@ export class WebApp{
       store: require("./sessionStore").sessionStore,
       resave: true, saveUninitialized: false,
       cookie: {
-        maxAge: sessionTimeoutMs
-      }
+        maxAge: sessionTimeoutMs,
+        secure: 'auto'      }
     }));
     this.wsEnvironment = {
       loopbackConfig: makeLoopbackConfig(options.serverConfig.node)
@@ -584,17 +597,21 @@ export class WebApp{
     return `[WebApp product: ${this.options.productCode}]`
   }
   
-  makeProxy(urlPrefix: any, noAuth?: any) {
+  makeProxy(urlPrefix: any, noAuth: any, overrideOptions: any) {
     const r = express.Router();
-    r.use(proxy.makeSimpleProxy(this.options.proxiedHost, this.options.proxiedPort, 
-    {
+    let options = {
       urlPrefix, 
       isHttps: false, 
       addProxyAuthorizations: (noAuth? null : this.auth.addProxyAuthorizations) 
-    }));
+    };
+    if (overrideOptions) {
+      options = Object.assign(options, overrideOptions);
+    }
+    r.use(proxy.makeSimpleProxy(this.options.proxiedHost, this.options.proxiedPort,
+                                options));    
     r.ws('/', proxy.makeWsProxy(this.options.proxiedHost, this.options.proxiedPort, 
-        urlPrefix, false))
-    return r;
+      urlPrefix, options.isHttps))
+      return r;
   }
   
   makeExternalProxy(host: any, port: any, urlPrefix: any, isHttps: any, noAuth: any, pluginID: any, serviceName: any) {
@@ -631,7 +648,7 @@ export class WebApp{
   }
 
   _installRootService(url: any, method: any, handler: any, {needJson, needAuth, isPseudoSso}: any) {
-    const handlers = [commonMiddleware.logRootServiceCall(false, url)];
+    const handlers = [commonMiddleware.logRootServiceCall(false, url), commonMiddleware.httpNoCacheHeaders()];
     if (needJson) {
       handlers.push(jsonParser);
     }
@@ -659,13 +676,14 @@ export class WebApp{
       //note that it has to be explicitly false. other falsy values like undefined
       //are treated as default, which is true
       if (proxiedRootService.requiresAuth === false) {
-        const _router = this.makeProxy(proxiedRootService.url, true);
+        const _router = this.makeProxy(proxiedRootService.url, true,
+          getAgentProxyOptions(this.options, this.options.serverConfig.agent));
         this.expressApp.use(proxiedRootService.url,
             [commonMiddleware.logRootServiceCall(true, name), _router]);
       } else {
-        const _router = this.makeProxy(proxiedRootService.url);
-        this.expressApp.use(proxiedRootService.url,
-            this.auth.middleware,
+        const _router = this.makeProxy(proxiedRootService.url, false,
+          getAgentProxyOptions(this.options, this.options.serverConfig.agent));
+        this.expressApp.use(proxiedRootService.url, this.auth.middleware,
             [commonMiddleware.logRootServiceCall(true, name), _router]);
       }
       serviceHandleMap[name] = new (WebServiceHandle as any)(proxiedRootService.url, 
@@ -678,6 +696,8 @@ export class WebApp{
         {needJson: true, needAuth: false, isPseudoSso: true});
     this._installRootService('/auth', 'get', this.auth.getStatus, 
       {needJson: true, needAuth: false, isPseudoSso: true});
+    this._installRootService('/auth-refresh', 'get', this.auth.refreshStatus, 
+        {needJson: true, needAuth: false, isPseudoSso: true});    
     this._installRootService('/auth-logout', 'post', this.auth.doLogout, 
         {needJson: true, needAuth: false, isPseudoSso: true});
     this._installRootService('/auth-logout', 'get', this.auth.doLogout, 
@@ -811,8 +831,8 @@ export class WebApp{
     case "service":
       //installLog.info(`${plugin.identifier}: installing proxy at ${subUrl}`);
       router = this.makeProxy(zLuxUrl.makePluginURL(this.options.productCode, 
-          plugin.identifier) + zLuxUrl.makeServiceSubURL(service, false, true));
-      break;
+        plugin.identifier) + zLuxUrl.makeServiceSubURL(service, false, true), false,
+        getAgentProxyOptions(this.options, this.options.serverConfig.agent));      break;
     case "nodeService":
       //installLog.info(
       //    `${plugin.identifier}: installing legacy service router at ${subUrl}`);

@@ -20,6 +20,7 @@ const url = require('url');
 const WebSocket = require('ws');
 const expressWs = require('express-ws');
 const util = require('./util');
+const constants = require('./unp-constants');
 const reader = require('./reader');
 const crypto = require('crypto');
 
@@ -27,6 +28,52 @@ const bootstrapLogger = util.loggers.bootstrapLogger;
 const contentLogger = util.loggers.contentLogger;
 const childLogger = util.loggers.childLogger;
 const networkLogger = util.loggers.network;
+
+function readCiphersFromArray(stringArray: string[]) {
+  if (stringArray && Array.isArray(stringArray)) {
+    let uppercase = [];
+    for (let i = 0; i < stringArray.length; i++) {
+      if (typeof stringArray[i] != 'string') {
+        bootstrapLogger.warn(`Returning null for cipher array because input had non-string: `,stringArray[i]);
+        return null;
+      }
+      uppercase[i] = stringArray[i].toUpperCase();
+    }
+    return uppercase.join(':');
+  } else {
+    return null;
+  }
+};
+
+
+function readTlsOptionsFromConfig(config: any, httpsOptions: any) {
+  if (config.https.pfx) {
+    try {
+      httpsOptions.pfx = fs.readFileSync(config.https.pfx);
+      bootstrapLogger.info('Using PFX: '+ config.https.pfx);
+    } catch (e) {
+      bootstrapLogger.warn('Error when reading PFX. Server cannot continue. Error='
+          + e.message);
+      //process.exit(UNP_EXIT_PFX_READ_ERROR);
+      throw e;
+    }
+  } else {
+    if (config.https.certificates) {
+      httpsOptions.cert = util.readFilesToArray(
+          config.https.certificates);
+      bootstrapLogger.info('Using Certificate: ' + config.https.certificates);
+    }
+    if (config.https.keys) {
+      httpsOptions.key = util.readFilesToArray(config.https.keys);
+    }
+  }
+  if (config.https.certificateAuthorities) {
+    httpsOptions.ca = util.readFilesToArray(config.https.certificateAuthorities);
+  }
+  if (config.https.certificateRevocationLists) {
+    httpsOptions.crl = util.readFilesToArray(config.https.certificateRevocationLists);
+  }
+}
 
 export class WebServer{
   public config: any;
@@ -71,33 +118,8 @@ export class WebServer{
 
   }
   
-  _loadHttpsKeyData() {
-    if (this.config.https.pfx) {
-      try {
-        this.httpsOptions.pfx = fs.readFileSync(this.config.https.pfx);
-        bootstrapLogger.info('Using PFX: '+ this.config.https.pfx);
-      } catch (e) {
-        bootstrapLogger.warn('Error when reading PFX. Server cannot continue. Error='+e.message);
-        //        process.exit(UNP_EXIT_PFX_READ_ERROR);
-        throw e;
-      }
-    } else {
-      if (this.config.https.certificates) {
-        this.httpsOptions.cert = util.readFilesToArray(
-            this.config.https.certificates);
-        bootstrapLogger.info('Using Certificate: '
-            + this.config.https.certificates);
-      }
-      if (this.config.https.keys) {
-        this.httpsOptions.key = util.readFilesToArray(this.config.https.keys);
-      }
-    }
-    if (this.config.https.certificateAuthorities) {
-      this.httpsOptions.ca = util.readFilesToArray(this.config.https.certificateAuthorities);
-    }
-    if (this.config.https.certificateRevocationLists) {
-      this.httpsOptions.crl = util.readFilesToArray(this.config.https.certificateRevocationLists);
-    };
+  getTlsOptions() {
+    return this.httpsOptions;
   }
 
   validateAndPreprocessConfig =
@@ -135,7 +157,6 @@ export class WebServer{
     return canRun;
   });
 
-
   setConfig(config: any) {
     this.config = config;
     if (this.config.http && this.config.http.port) {
@@ -153,8 +174,17 @@ export class WebServer{
       } else {
         let consts = crypto.constants;
         //tls 1.3 was released in 2018, and tls 1.2 should be in this blacklist list when it has widespread support
-        this.httpsOptions.secureOptions = consts.SSL_OP_NO_SSLv2 | consts.SSL_OP_NO_SSLv3 | consts.SSL_OP_NO_TLSv1 | consts.SSL_OP_NO_TLSv1_1;
+        this.httpsOptions.secureOptions = consts.SSL_OP_NO_SSLv2 | 
+          consts.SSL_OP_NO_SSLv3 | consts.SSL_OP_NO_TLSv1 | consts.SSL_OP_NO_TLSv1_1;
       }
+      let ciphers = readCiphersFromArray(options.ciphers);
+      if (ciphers == null || ciphers.length==0) {
+        ciphers = readCiphersFromArray(constants.HTTPS_DEFAULT_CIPHERS);
+      }
+      if (ciphers != 'NODEJS') {//for using nodejs defaults - very unlikely to overlap as a reserved word
+        this.httpsOptions.ciphers = ciphers;
+      } 
+    readTlsOptionsFromConfig(this.config, this.httpsOptions);
     }
   }
 
@@ -165,10 +195,10 @@ export class WebServer{
       for (let ipAddress of this.config.https.ipAddresses) {
         let listening = false;
         let httpsServer;
-        this._loadHttpsKeyData();
+        const httpsOptions = this.getTlsOptions();
         while (!listening) {
           try {
-            httpsServer = https.createServer(this.httpsOptions, app);
+            httpsServer = https.createServer(httpsOptions, app);
             this._setErrorLogger(httpsServer, 'HTTPS', ipAddress, port);
             this.httpsServers.push(httpsServer);
             this.expressWsHttps.push(expressWs(app, httpsServer, {maxPayload: 50000}));
@@ -235,6 +265,7 @@ export class WebServer{
 
 export{};
 module.exports = WebServer;
+module.exports.readTlsOptionsFromConfig = readTlsOptionsFromConfig;
 
 
 /*

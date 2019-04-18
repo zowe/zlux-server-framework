@@ -33,6 +33,7 @@ export class AuthManager {
   public authTypes: any;
   public pendingPlugins: any;
   public configuration: any;
+  public rbacEnabled: any;
 
   constructor(options: any) {
     if (!AuthManager.prototype.isConfigValid(options.config)) {
@@ -43,8 +44,14 @@ export class AuthManager {
       handlers: {},
       defaultType: options.config.defaultAuthentication,
       authTypes: {},
-      pendingPlugins: []
+      pendingPlugins: [],
+      rbacEnabled: !!options.config.rbac
     });
+    if (!this.rbacEnabled) {
+      bootstrapLogger.warn('RBAC is disabled in the configuration. All authenticated'
+          + ' users will have access to all servces. Enable RBAC in the configuration'
+          + " to control users' access to individual services");
+    }
   }
 
   isConfigValid(serviceAuthJSON: any) {
@@ -185,32 +192,9 @@ export class AuthManager {
    };
  })
 
-  getResourceName(url: any, method: any) {
-    const [_l, productCode, _p, pluginID, _s, serviceName, ...subUrl] 
-      = url.split('/');
-    let resourceName = `${productCode}.${pluginID}_service.${serviceName}.`
-      + `${method}.${subUrl.join('.')}`;
-    if (resourceName.endsWith('.')) {
-      resourceName = resourceName.substring(0, resourceName.length-1);
-    }
-    //console.log("url, method, resource name:", url, method, resourceName);
-    return resourceName;
-  }
-
-  *possibleResourceNameMasks(resourceName: any) {
-    const resourceNameParts = resourceName.split('.');
-    let resourceNameCheck = resourceName;
-    yield resourceNameCheck;
-    for (let resourceNamePart of resourceNameParts) {
-      if (resourceNameCheck == resourceName) {
-        resourceNameCheck = resourceNamePart + '.*';
-      } else {
-        resourceNameCheck = resourceNameCheck.substring(0, 
-          resourceNameCheck.length - 1) + resourceNamePart + '.*';
-      }
-      yield resourceNameCheck;
-    }
-  }
+ isRbacEnabled() {
+  return this.rbacEnabled;
+ }
 }
 
 export{};

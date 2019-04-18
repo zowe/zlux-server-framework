@@ -64,16 +64,18 @@ function getRelevantHandlers(authManager: any, body: any) {
   return handlers;
 }
 
-function AuthResponse() {
+export class AuthResponse {
   /* TODO 
    * this.doctype = ...;
    * this.version = ...;
    */
-  this.categories = {};
-}
-AuthResponse.prototype = {
-  constructor: AuthResponse,
-  
+  public categories: any;
+  public keyField: any;
+  public success: any;
+
+  constructor(){
+    this.categories = {};
+  }
   /**
    * Takes a report from an auth plugin and adds it to the structure 
    */
@@ -94,8 +96,8 @@ AuthResponse.prototype = {
       handlerResult.expms = handler.sessionExpirationMS;
     }
     authCategoryResult.plugins[pluginID] = handlerResult;
-  },
-  
+  }
+
   /**
    * Checks if all auth types are successful (have at least one succesful plugin)
    * and updates the summary field on this object
@@ -114,29 +116,22 @@ AuthResponse.prototype = {
         result = true;
       }
     }
-    this[this.keyField] = result;
+    (this as any)[this.keyField] = result;
   }
 }
 
-function LoginResult() {
-  AuthResponse.call(this);
-}
-LoginResult.prototype = {
-  constructor: LoginResult,
-  __proto__: AuthResponse.prototype,
-  
+class LoginResult extends AuthResponse {
+  constructor() {
+    super()
+  }
   keyField: "success"
 }
 
-function StatusResponse() {
-  AuthResponse.call(this);
-}
-StatusResponse.prototype = {
-  constructor: StatusResponse,
-  __proto__: AuthResponse.prototype,
-  
+class StatusResponse extends AuthResponse {
+  constructor() {
+    super()
+  }
   keyField: "authenticated"
-  
 }
 
 const SESSION_ACTION_TYPE_AUTHENTICATE = 1;
@@ -145,7 +140,7 @@ const SESSION_ACTION_TYPE_REFRESH = 2;
  * Assumes req.session is there and behaves as it should
  */
 module.exports = function(authManager: any) {
-  const _authenticateOrRefresh = Promise.coroutine(function*(req, res, type) {
+  const _authenticateOrRefresh = BBPromise.coroutine(function*(req: any, res: any, type: any) {
     let functionName;
     if (type == SESSION_ACTION_TYPE_AUTHENTICATE) {
       functionName = 'authenticate';
@@ -175,10 +170,15 @@ module.exports = function(authManager: any) {
         }          
         //do not modify session if not authenticated or deauthenticated
         if (wasAuthenticated || handlerResult.success) {
+          bootstrapLogger.warn('help')
           setAuthPluginSession(req, pluginID, authPluginSession);
         }
+        bootstrapLogger.warn('help1')
+
         result.addHandlerResult(handlerResult, handler);
       }
+      bootstrapLogger.warn('help2')
+
       result.updateStatus();
       res.status(result.success? 200 : 401).json(result);
     } catch (e) {
@@ -201,7 +201,7 @@ module.exports = function(authManager: any) {
     
     getStatus(req: any, res: any) {
       const handlers = authManager.getAllHandlers();
-      const result = new (StatusResponse as any)();
+      const result = new StatusResponse();
       for (const handler of handlers) {
         const pluginID = handler.pluginID;
         const authPluginSession = util.getOrInit(req.session, pluginID, {});
@@ -218,12 +218,12 @@ module.exports = function(authManager: any) {
       res.status(200).json(result);
     },
     
-    refreshStatus(req, res) {
+    refreshStatus(req: any, res: any) {
       return _authenticateOrRefresh(req,res,SESSION_ACTION_TYPE_REFRESH);
     },
 
 
-    doLogin(req, res) {
+    doLogin(req: any, res: any) {
       return _authenticateOrRefresh(req,res,SESSION_ACTION_TYPE_AUTHENTICATE);
     },
     

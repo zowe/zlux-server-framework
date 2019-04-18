@@ -158,8 +158,8 @@ export class ApimlConnector {
     }
     log.debug("zluxProxyServerInstanceConfig: " 
         + JSON.stringify(zluxProxyServerInstanceConfig, null, 2))
-    const url: any = `https://${this.apimlHost}:${this.apimlPort}/eureka/apps`
-    (zluxProxyServerInstanceConfig.eureka) as any).serviceUrls = {
+    const url: any = `https://${this.apimlHost}:${this.apimlPort}/eureka/apps`;
+    (zluxProxyServerInstanceConfig.eureka as any).serviceUrls = {
       'default': [
         url
       ]};
