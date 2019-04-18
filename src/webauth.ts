@@ -8,13 +8,13 @@
   
   Copyright Contributors to the Zowe Project.
 */
-const Promise = require('bluebird');
+const BBPromise = require('bluebird');
 const util = require('./util');
 const UNP = require('./unp-constants');
 
 const authLogger = util.loggers.authLogger;
 
-function getAuthHandler(req, authManager) {
+function getAuthHandler(req: any, authManager: any) {
   const appData = req[`${UNP.APP_NAME}Data`];
   if (appData.service && appData.service.def) {
     const service = appData.service.def;
@@ -27,7 +27,7 @@ function getAuthHandler(req, authManager) {
   return authManager.getBestAuthenticationHandler(null);
 }
 
-function getAuthPluginSession(req, pluginID, dflt) {
+function getAuthPluginSession(req: any, pluginID: any, dflt: any) {
   if (req.session) {
     let value = req.session[pluginID];
     if (value) {
@@ -37,7 +37,7 @@ function getAuthPluginSession(req, pluginID, dflt) {
   return dflt;
 }
 
-function setAuthPluginSession(req, pluginID, authPluginSession) {
+function setAuthPluginSession(req: any, pluginID: any, authPluginSession: any) {
   if (req.session) {
     // FIXME Note that it does something only when req.session[pluginID] is 
     // undefined. Otherwise it does nothing (see getAuthPluginSession()) 
@@ -46,31 +46,35 @@ function setAuthPluginSession(req, pluginID, authPluginSession) {
   }
 }
 
-function getRelevantHandlers(authManager, body) {
+function getRelevantHandlers(authManager: any, body: any) {
   let handlers = authManager.getAllHandlers();
   if (body && body.categories) {
-    const authCategories = {};
-    body.categories.map(t => authCategories[t] = true);
-    handlers = handlers.filter(h => 
+    const authCategories: any = {};
+    body.categories.map((t: any) => authCategories[t] = true);
+    handlers = handlers.filter((h: any) => 
       authCategories.hasOwnProperty(h.pluginDef.authenticationCategory));
   }
   return handlers;
 }
 
-function AuthResponse() {
-  /* TODO 
-   * this.doctype = ...;
-   * this.version = ...;
-   */
-  this.categories = {};
-}
-AuthResponse.prototype = {
-  constructor: AuthResponse,
+
+export class AuthResponse {
+    /* TODO 
+     * this.doctype = ...;
+     * this.version = ...;
+     */
+    public categories: any;
+    public keyField: any;
+    public success: any;
   
+    constructor(){
+      this.categories = {};
+    }
+    
   /**
    * Takes a report from an auth plugin and adds it to the structure 
    */
-  addHandlerResult(handlerResult, handler) {
+  addHandlerResult(handlerResult: any, handler: any) {
     const pluginID = handler.pluginID;
     const authCategory = handler.pluginDef.authenticationCategory;
     const authCategoryResult = util.getOrInit(this.categories, authCategory, {
@@ -87,7 +91,7 @@ AuthResponse.prototype = {
       handlerResult.expms = handler.sessionExpirationMS;
     }
     authCategoryResult.plugins[pluginID] = handlerResult;
-  },
+  }
   
   /**
    * Checks if all auth types are successful (have at least one succesful plugin)
@@ -97,7 +101,7 @@ AuthResponse.prototype = {
     let result = false;
     for (const type of Object.keys(this.categories)) {
       const authCategoryResult = this.categories[type];
-      if (!(typeof authCategoryResult) === "object") {
+      if (!((typeof authCategoryResult) === "object")) {
         continue;
       }
       if (!authCategoryResult[this.keyField]) {
@@ -107,27 +111,21 @@ AuthResponse.prototype = {
         result = true;
       }
     }
-    this[this.keyField] = result;
+    (this as any)[this.keyField] = result;
   }
 }
 
-function LoginResult() {
-  AuthResponse.call(this);
-}
-LoginResult.prototype = {
-  constructor: LoginResult,
-  __proto__: AuthResponse.prototype,
-  
+class LoginResult extends AuthResponse {
+  constructor() {
+    super()
+  }
   keyField: "success"
 }
 
-function StatusResponse() {
-  AuthResponse.call(this);
-}
-StatusResponse.prototype = {
-  constructor: StatusResponse,
-  __proto__: AuthResponse.prototype,
-  
+class StatusResponse extends AuthResponse {
+  constructor() {
+    super()
+  }
   keyField: "authenticated"
 }
 
@@ -137,8 +135,8 @@ const SESSION_ACTION_TYPE_REFRESH = 2;
 /*
  * Assumes req.session is there and behaves as it should
  */
-module.exports = function(authManager) {
-  const _authenticateOrRefresh = Promise.coroutine(function*(req, res, type) {
+module.exports = function(authManager: any) {
+  const _authenticateOrRefresh = BBPromise.coroutine(function*(req: any, res: any, type: any) {
     let functionName;
     if (type == SESSION_ACTION_TYPE_AUTHENTICATE) {
       functionName = 'authenticate';
@@ -155,6 +153,7 @@ module.exports = function(authManager) {
       const authServiceHandleMaps = 
             req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps;
       for (const handler of handlers) {
+        authLogger.warn("YEEDLE1")
         const pluginID = handler.pluginID;
         const authPluginSession = getAuthPluginSession(req, pluginID, {});
         req[`${UNP.APP_NAME}Data`].plugin.services = 
@@ -184,7 +183,7 @@ module.exports = function(authManager) {
   
   return {
     
-    addProxyAuthorizations(req1, req2Options) {
+    addProxyAuthorizations(req1: any, req2Options: any) {
       const handler = getAuthHandler(req1, authManager);
       if (!handler) {
         return;
@@ -193,10 +192,11 @@ module.exports = function(authManager) {
       handler.addProxyAuthorizations(req1, req2Options, authPluginSession);     
     },
     
-    getStatus(req, res) {
+    getStatus(req: any, res: any) {
       const handlers = authManager.getAllHandlers();
       const result = new StatusResponse();
       for (const handler of handlers) {
+        authLogger.warn("YEEDLE2")
         const pluginID = handler.pluginID;
         const authPluginSession = util.getOrInit(req.session, pluginID, {});
         let status;
@@ -212,18 +212,19 @@ module.exports = function(authManager) {
       res.status(200).json(result);
     },
 
-    refreshStatus(req, res) {
+    refreshStatus(req: any, res: any) {
       return _authenticateOrRefresh(req,res,SESSION_ACTION_TYPE_REFRESH);
     },
     
-    doLogin(req, res) {
+    doLogin(req: any, res: any) {
       return _authenticateOrRefresh(req,res,SESSION_ACTION_TYPE_AUTHENTICATE);
     },
     
-    doLogout(req, res) {
+    doLogout(req: any, res: any) {
       //FIXME XSRF
       const handlers = getRelevantHandlers(authManager, req.body);
       for (const handler of handlers) {
+        authLogger.warn("YEEDLE3")
         const pluginID = handler.pluginID;
         authLogger.debug(`${req.session.id}: User logout for auth handler ${pluginID}`);
         delete req.session[pluginID];
@@ -231,7 +232,7 @@ module.exports = function(authManager) {
       res.status(200).send('');
     },
     
-    middleware: Promise.coroutine(function*(req, res, next) {
+    middleware: BBPromise.coroutine(function*(req: any, res: any, next: any) {
       try {
         const isWebsocket = req.url.endsWith(".websocket");
         if (isWebsocket && (res._header == null)) {
