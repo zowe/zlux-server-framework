@@ -15,6 +15,7 @@
   ],
   "main": "lib/index.js",
   "scripts": {
+    "install:tomcat": "gradlew getDeps", 
     "build": "tsc",
     "test": "mocha --recursive --exit test"
   },
