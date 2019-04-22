@@ -316,7 +316,7 @@ export class JavaManager {
       return; //TODO what more validation should we do here
     } else {
       //find from path
-      let JAVA_HOME = process.env.JAVA_HOME;
+      let JAVA_HOME = process.env.ZOWE_JAVA_HOME ? process.env.ZOWE_JAVA_HOME : process.env.JAVA_HOME;
       if (!JAVA_HOME) {
         throw new Error(`Java runtimes not specified, and no JAVA_HOME set`);
       }

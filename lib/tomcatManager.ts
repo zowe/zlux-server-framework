@@ -73,21 +73,26 @@ export class TomcatManager implements JavaServerManager {
     });
   }
 
-  public startForUnix(DOptionsArray: Array<string>) {
+  public startViaCatalinaShell(DOptionsArray: Array<string>) {
     const opts = '-D'+DOptionsArray.join(' -D');
-    return spawn(path.join(this.config.path, 'bin', 'catalina.sh'),
-                 [ 'start',  '-config', this.config.config],
-                 {env: {
-                   "JAVA_OPTS": opts,
-                   "CATALINA_BASE": this.config.path,
-                   "CATALINA_HOME": this.config.path,
-                   "JRE_HOME": this.config.runtime.home,
-                   "CATALINA_PID": path.join(this.appdir,'tomcat.pid'),
-                   "ZOWE_ZLUX_URL": this.config.zluxUrl
-                 }});
+    const env = { "JAVA_OPTS": opts,
+                  "CATALINA_BASE": this.config.path,
+                  "CATALINA_HOME": this.config.path,
+                  "JRE_HOME": this.config.runtime.home,
+                  "CATALINA_PID": path.join(this.appdir,'tomcat.pid'),
+                  "ZOWE_ZLUX_URL": this.config.zluxUrl };
+    const catalina = path.join(this.config.path, 'bin', 'catalina.sh');
+    const args = [ 'run',  '-config', this.config.config];
+    log.info(`Starting tomcat with params:\n`
+             + `Catalina: ${catalina}\n`
+             + `Args: ${JSON.stringify(args)}\n`
+             + `Env: ${JSON.stringify(env)}`); 
+    return spawn(catalina,
+                 args,
+                 {env: env});
   }
 
-  public startForWindows(DOptionsArray: Array<string>) {
+  public startViaJava(DOptionsArray: Array<string>) {
     let seperator = (TomcatManager.isWindows ? ';' : ':');
     let classPath = '"' + `${path.join(this.config.path, 'bin')}`
       + seperator
@@ -103,17 +108,23 @@ export class TomcatManager implements JavaServerManager {
         classPath,
         'org.apache.catalina.startup.Bootstrap',
         '-config', this.config.config, 'start']);
-    return spawn(path.join(this.config.runtime.home, 'bin', 'java'),
+    const env = { "CLASSPATH": classPath,
+                  "CATALINA_BASE": this.config.path,
+                  "CATALINA_HOME": this.config.path,
+                  "JRE_HOME": this.config.runtime.home,
+                  "JAVA_HOME": this.config.runtime.home,
+                  "ZOWE_ZLUX_URL": this.config.zluxUrl };
+    const javaPath = path.join(this.config.runtime.home, 'bin', 'java');
+    const cwd = path.join(this.config.path, 'bin');
+    log.info(`Starting tomcat with params:\n`
+             + `Java=${javaPath}\n`
+             + `Options=${JSON.stringify(DOptionsArray)}\n`
+             + `Env=${JSON.stringify(env)}\n`
+             + `cwd=${cwd}`);
+    return spawn(javaPath,
                  DOptionsArray,
-                 {env: {
-                   "CLASSPATH": classPath,
-                   "CATALINA_BASE": this.config.path,
-                   "CATALINA_HOME": this.config.path,
-                   "JRE_HOME": this.config.runtime.home,
-                   "JAVA_HOME": this.config.runtime.home,
-                   "ZOWE_ZLUX_URL": this.config.zluxUrl
-                 },
-                  cwd: path.join(this.config.path, 'bin')
+                 {env: env,
+                  cwd: cwd
                  });
   }
 
@@ -178,7 +189,7 @@ export class TomcatManager implements JavaServerManager {
       ];
       let tomcatProcess;
       try {
-        tomcatProcess = TomcatManager.isWindows ? this.startForWindows(DOptionsArray) : this.startForUnix(DOptionsArray);
+        tomcatProcess = this.startViaJava(DOptionsArray);
       } catch (e) {
         log.warn(`Could not start tomcat, error=`,e);
         return;
@@ -194,14 +205,22 @@ export class TomcatManager implements JavaServerManager {
       });
 
       let onClose = (code)=> {
-        log.info(`${this.getIdString()} closed, code=${code}`);
+	if (tomcatProcess.pid) {
+          log.info(`${this.getIdString()} closed, code=${code}`);
+        } else {
+          log.warn(`Tomcat could not start. Closing. code=${code}`);
+        }
       };
 
       tomcatProcess.on('close', onClose);
 
       tomcatProcess.on('exit', (code)=> {
-        log.info(`${this.getIdString()} exited, code=${code}`);
-        tomcatProcess.off('close', onClose);
+	if (tomcatProcess.pid) {
+          log.info(`${this.getIdString()} exited, code=${code}`);
+        } else {
+          log.warn(`Tomcat could not start. Exiting. code=${code}`);
+        }
+        tomcatProcess.removeListener('close', onClose);
         this.tomcatProcess = null;
       });
 
@@ -257,7 +276,7 @@ export class TomcatManager implements JavaServerManager {
     stopProcess.on('exit', (code)=> {
       log.info(`${this.getIdString()} exited, code=${code}`);              
       this.status = "stopped";
-      stopProcess.off('close', onClose);
+      stopProcess.removeListener('close', onClose);
       stopProcess = null;
     });
 
@@ -333,7 +352,9 @@ export class TomcatManager implements JavaServerManager {
 
       yauzl.open(warpath, {autoClose: true, lazyEntries: true}, function(err, zipfile) {
         if (err) {
-          zipfile.close();
+          if (zipfile) {
+            zipfile.close();
+          }
           reject(err);
         } else {
           let error = undefined;
