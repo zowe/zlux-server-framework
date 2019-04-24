@@ -584,7 +584,6 @@ class PluginLoader extends EventEmitter{
         defs.push(plugin);
       } catch (e) {
         console.log(e);
-        bootstrapLogger.warn(e)
         bootstrapLogger.log(bootstrapLogger.INFO,
           `Failed to load ${pluginDescriptorFilename}\n`);
       }
@@ -631,7 +630,6 @@ class PluginLoader extends EventEmitter{
         successCount++;
       } catch (e) {
         console.log(e);
-        //bootstrapLogger.warn(e)
         bootstrapLogger.log(bootstrapLogger.INFO,
           `Failed to load ${pluginDef.identifier}: ${e}`);
       }
