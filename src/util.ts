@@ -130,8 +130,8 @@ const errorProto = {
     "messageDetails": "An error occurred when processing the request"
   };
 
-export function makeError(details: any) {
-  if ((details._objectType !== undefined) 
+  function makeError(details: any) {
+    if ((details._objectType !== undefined) 
       || (details._metaDataVersion !== undefined)) {
     throw new Error("can't specify error metadata");
   }
@@ -140,6 +140,8 @@ export function makeError(details: any) {
   Object.assign(err, details);
   return err;
 }
+
+export {makeError as makeErrorObject};
 
 export function* concatIterables() {
   for (let i=0; i < arguments.length; i++) {

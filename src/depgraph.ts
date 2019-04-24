@@ -14,25 +14,23 @@ const semver = require('semver');
 //const assert = require('assert');
 const zluxUtil = require('./util');
 
-// TODO translation
-module.exports.statuses = {
-  "REQUIRED_PLUGIN_FAILED_TO_LOAD": "Required plugin failed to load",
-  "REQUIRED_PLUGIN_NOT_FOUND": "Required plugin not found",
-  "INVALID_REQUIRED_VERSION_RANGE": "Invalid required version range",
-  "IMPORTED_SERVICE_IS_AN_IMPORT": "Imported service is itself an import",
-  "REQUIRED_SERVICE_VERSION_NOT_FOUND": "Required service version not found",
-  "REQUIRED_SERVICE_NOT_FOUND": "Required service version not found"
-}
-
 const logger = zluxUtil.loggers.bootstrapLogger
 
 /**
  * Checks if all plugin dependencies are met, including versions.
  * Sorts the plugins so that they can be installed in that order.
  */
-export class DependencyGraph{
+export = class DependencyGraph{
   public pluginsById: any;
-
+  // TODO translation
+  public static readonly statuses: any = {
+    "REQUIRED_PLUGIN_FAILED_TO_LOAD": "Required plugin failed to load",
+    "REQUIRED_PLUGIN_NOT_FOUND": "Required plugin not found",
+    "INVALID_REQUIRED_VERSION_RANGE": "Invalid required version range",
+    "IMPORTED_SERVICE_IS_AN_IMPORT": "Imported service is itself an import",
+    "REQUIRED_SERVICE_VERSION_NOT_FOUND": "Required service version not found",
+    "REQUIRED_SERVICE_NOT_FOUND": "Required service version not found"
+  };
   constructor(initialPlugins: any) {
     this.pluginsById = {};
     for (const p of initialPlugins) {
@@ -304,8 +302,6 @@ function validateDep(dep: any, providerPlugin: any) {
   logger.debug('dep.valid: ', dep.valid)
 }
 
-export{};
-module.exports = DependencyGraph;
 
 /*
   This program and the accompanying materials are

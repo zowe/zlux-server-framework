@@ -65,7 +65,6 @@ export class AuthResponse {
      */
     public categories: any;
     public keyField: any;
-    public success: any;
   
     constructor(){
       this.categories = {};
@@ -116,17 +115,19 @@ export class AuthResponse {
 }
 
 class LoginResult extends AuthResponse {
+  public keyField: string = "success";
+  public success: boolean = false;
   constructor() {
     super()
   }
-  keyField: "success"
 }
 
 class StatusResponse extends AuthResponse {
+  public keyField: string = "authenticated";
+  public authenticated: boolean = false;
   constructor() {
     super()
   }
-  keyField: "authenticated"
 }
 
 const SESSION_ACTION_TYPE_AUTHENTICATE = 1;
@@ -153,7 +154,6 @@ module.exports = function(authManager: any) {
       const authServiceHandleMaps = 
             req[`${UNP.APP_NAME}Data`].webApp.authServiceHandleMaps;
       for (const handler of handlers) {
-        authLogger.warn("YEEDLE1")
         const pluginID = handler.pluginID;
         const authPluginSession = getAuthPluginSession(req, pluginID, {});
         req[`${UNP.APP_NAME}Data`].plugin.services = 
@@ -196,7 +196,6 @@ module.exports = function(authManager: any) {
       const handlers = authManager.getAllHandlers();
       const result = new StatusResponse();
       for (const handler of handlers) {
-        authLogger.warn("YEEDLE2")
         const pluginID = handler.pluginID;
         const authPluginSession = util.getOrInit(req.session, pluginID, {});
         let status;
@@ -224,7 +223,6 @@ module.exports = function(authManager: any) {
       //FIXME XSRF
       const handlers = getRelevantHandlers(authManager, req.body);
       for (const handler of handlers) {
-        authLogger.warn("YEEDLE3")
         const pluginID = handler.pluginID;
         authLogger.debug(`${req.session.id}: User logout for auth handler ${pluginID}`);
         delete req.session[pluginID];
