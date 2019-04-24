@@ -94,11 +94,11 @@ export class TomcatManager implements JavaServerManager {
 
   public startViaJava(DOptionsArray: Array<string>) {
     let seperator = (TomcatManager.isWindows ? ';' : ':');
-    let classPath = '"' + `${path.join(this.config.path, 'bin')}`
+    let classPath = `${path.join(this.config.path, 'bin')}`
       + seperator
       + `${path.join(this.config.path, 'bin', 'bootstrap.jar')}`
       + seperator
-      + `${path.join(this.config.path, 'bin', 'tomcat-juli.jar')}` + '"';
+      + `${path.join(this.config.path, 'bin', 'tomcat-juli.jar')}`;
     DOptionsArray = DOptionsArray.map(str => '-D'+str).concat(
       [ '-Djava.util.logging.manager=org.apache.juli.ClassLoaderLogManager',
         '-Djdk.tls.ephemeralDHKeySize=2048',
