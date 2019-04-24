@@ -518,6 +518,7 @@ function makePlugin(def: any, pluginConfiguration: any, pluginContext: any, dyna
     self.verifyStaticWebContent();
   }
   self.init(pluginContext);
+  self.loadTranslations();
   return self;
 };
 
