@@ -201,7 +201,7 @@ export class TomcatManager implements JavaServerManager {
       });
 
       tomcatProcess.stderr.on('data', (data)=> {
-        log.info(`${this.getIdString()} stderr=${data}`);
+        log.warn(`${this.getIdString()} stderr=${data}`);
       });
 
       let onClose = (code)=> {
@@ -265,7 +265,7 @@ export class TomcatManager implements JavaServerManager {
     });
 
     stopProcess.stderr.on('data', (data)=> {
-      log.info(`${this.getIdString()} stderr=${data}`);
+      log.warn(`${this.getIdString()} stderr=${data}`);
     });
     
     let onClose = (code)=> {
