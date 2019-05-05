@@ -2408,6 +2408,10 @@ function ConfigService(context) {
     }
     else {
       let currentResource = uriParts[partsIndex];
+      if (!currentResource) {
+        respondWithJsonError(response,`Resource missing from request or malformed`,HTTP_STATUS_BAD_REQUEST);
+        return 1;
+      }
       request.resourceURL+='/'+currentResource;
 
       request.currentResourceObject = getResourceDefinitionJsonOrFail(response,request.currentResourceList,currentResource);
