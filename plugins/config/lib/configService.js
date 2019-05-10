@@ -102,6 +102,10 @@ function htPut(table,key,value) {
 }
 
 function percentEncode(value){
+  if (typeof value != 'string') {
+    logger.warn(`Cannot percent encode non-string value`);
+    return null;
+  }
   if (ConfigService.directoryTrace && ConfigService.traceLevel > 1) {
     logger.debug("Percent encode for value="+value);
   }
@@ -2206,6 +2210,11 @@ function ConfigService(context) {
     var username = null;
     if (authData && authData.username) {
       username = percentEncode(authData.username);
+      if (username === null) {
+        logger.warn("Username encoding error. Username=${username}");
+        respondWithJsonError(response,"Username invalid format",HTTP_STATUS_INTERNAL_SERVER_ERROR);
+        return;
+      }
     }
 
     if(this.pluginDefs == null || this.context.plugin.server == null){
@@ -2408,6 +2417,10 @@ function ConfigService(context) {
     }
     else {
       let currentResource = uriParts[partsIndex];
+      if (!currentResource) {
+        respondWithJsonError(response,`Resource missing from request or malformed`,HTTP_STATUS_BAD_REQUEST);
+        return 1;
+      }
       request.resourceURL+='/'+currentResource;
 
       request.currentResourceObject = getResourceDefinitionJsonOrFail(response,request.currentResourceList,currentResource);
@@ -2428,7 +2441,10 @@ function ConfigService(context) {
     //if not a leaf, return a json with list of subresources
     //if not a leaf but has ?name, return that next level
     let itemName = request.query.name ? percentEncode(request.query.name) : '';
-
+    if (itemName === null) {
+      respondWithJsonError(response,`Invalid value for query parameter name`,HTTP_STATUS_BAD_REQUEST);
+      return 1;
+    }
     let b64 = request.query.b64;
     let isB64 = b64 ? (b64.toLowerCase() == 'true') : false;
     logger.debug("Reached the GET case. lastPath="+lastPath+". itemName="+itemName);
@@ -2468,6 +2484,10 @@ function ConfigService(context) {
     //if not a leaf, return warning unless ?recursive=true
     //if not a leaf but has ?name, delete that next level
     let itemName = request.query.name ? percentEncode(request.query.name) : '';
+    if (itemName === null) {
+      respondWithJsonError(response,`Invalid value for query parameter name`,HTTP_STATUS_BAD_REQUEST);
+      return 1;
+    }
     let timestamp = request.query.lastmod;
     let recursive = request.query.recursive;
     let isRecursive = recursive ? (recursive.toLowerCase() == 'true') : false;
@@ -2518,6 +2538,10 @@ function ConfigService(context) {
   var handlePut = function(request,response,lastPath) {
     //replace or create an element, or replace entire collection with another collection
     let itemName = request.query.name ? percentEncode(request.query.name) : '';
+    if (itemName === null) {
+      respondWithJsonError(response,`Invalid value for query parameter name`,HTTP_STATUS_BAD_REQUEST);
+      return 1;
+    }
     logger.debug("Reached the PUT case. lastPath="+lastPath+". itemName="+itemName);
     if (request.currentResourceList && itemName.length<=0) {
       //Not a leaf, reject
