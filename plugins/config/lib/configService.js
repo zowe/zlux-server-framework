@@ -19,7 +19,7 @@ const proxyUtils = require('../../../lib/util.js');
 const express = require('express');
 const Promise = require('bluebird');
 const bodyParser = require('body-parser');
-const { HtmlObfuscator } = require('../../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
+const obfuscator = require ('../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
 
 //Buffer comes from node global.
 
@@ -599,7 +599,7 @@ function getResourceDefinitionJsonOrFailInner(parentJson, resourceName,errorCall
 }
 
 function getResourceDefinitionJsonOrFail(response, parentJson, resourceName) {
-  var htmlObfuscator = new HtmlObfuscator();
+  var htmlObfuscator = new obfuscator.HtmlObfuscator();
   var safeResourceName = htmlObfuscator.findAndReplaceHTMLEntities(resourceName);
   var errorCallback = function(returnCode) {
     if (returnCode == 1) {
