@@ -21,6 +21,8 @@ const Promise = require('bluebird');
 const bodyParser = require('body-parser');
 const obfuscator = require ('../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
 
+const htmlObfuscator = new obfuscator.HtmlObfuscator();
+
 //Buffer comes from node global.
 
 ConfigService.pluginId = '';
@@ -599,8 +601,7 @@ function getResourceDefinitionJsonOrFailInner(parentJson, resourceName,errorCall
 }
 
 function getResourceDefinitionJsonOrFail(response, parentJson, resourceName) {
-  var htmlObfuscator = new obfuscator.HtmlObfuscator();
-  var safeResourceName = htmlObfuscator.findAndReplaceHTMLEntities(resourceName);
+  let safeResourceName = htmlObfuscator.findAndReplaceHTMLEntities(resourceName);
   var errorCallback = function(returnCode) {
     if (returnCode == 1) {
       respondWithJsonError(response,`Error in plugin configuration definition or resource (${safeResourceName}) not found`,HTTP_STATUS_BAD_REQUEST);
