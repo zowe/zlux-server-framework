@@ -48,7 +48,7 @@ const CONFIG_SCOPE_PRODUCT = 5;
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.8.5";
+const CURRENT_JSON_VERSION = "0.8.6";
 
 //a file
 const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
