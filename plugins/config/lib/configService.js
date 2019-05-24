@@ -19,7 +19,7 @@ const proxyUtils = require('../../../lib/util.js');
 const express = require('express');
 const Promise = require('bluebird');
 const bodyParser = require('body-parser');
-const obfuscator = require ('../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
+const obfuscator = require ('../../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
 
 const htmlObfuscator = new obfuscator.HtmlObfuscator();
 
