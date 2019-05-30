@@ -254,7 +254,14 @@ TerminalWebsocketProxy.prototype.handleWebsocketClosed = function(code, reason) 
 };
 
 TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message, websocket) {
-  var jsonObject = JSON.parse(message);
+  let jsonObject;
+  try {
+    jsonObject = JSON.parse(message);
+  } catch (e) {
+    //not json
+    this.logger.warn(this.identifierString()+' sent messsage which was not JSON');
+    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'Message not JSON');
+  }
   this.logger.debug(this.identifierString()+' Websocket client message received. Length='+message.length);
   this.logger.log(this.logger.FINER,this.identifierString()+' Websocket client message content='+message);
   if (jsonObject) {
