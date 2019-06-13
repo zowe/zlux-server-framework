@@ -19,6 +19,9 @@ const proxyUtils = require('../../../lib/util.js');
 const express = require('express');
 const Promise = require('bluebird');
 const bodyParser = require('body-parser');
+const obfuscator = require ('../../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
+
+const htmlObfuscator = new obfuscator.HtmlObfuscator();
 
 //Buffer comes from node global.
 
@@ -45,7 +48,7 @@ const CONFIG_SCOPE_PRODUCT = 5;
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.8.5";
+const CURRENT_JSON_VERSION = "0.8.6";
 
 //a file
 const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
@@ -102,6 +105,10 @@ function htPut(table,key,value) {
 }
 
 function percentEncode(value){
+  if (typeof value != 'string') {
+    logger.warn(`Cannot percent encode non-string value`);
+    return null;
+  }
   if (ConfigService.directoryTrace && ConfigService.traceLevel > 1) {
     logger.debug("Percent encode for value="+value);
   }
@@ -594,21 +601,22 @@ function getResourceDefinitionJsonOrFailInner(parentJson, resourceName,errorCall
 }
 
 function getResourceDefinitionJsonOrFail(response, parentJson, resourceName) {
+  let safeResourceName = htmlObfuscator.findAndReplaceHTMLEntities(resourceName);
   var errorCallback = function(returnCode) {
     if (returnCode == 1) {
-      respondWithJsonError(response,`Error in plugin configuration definition or resource (${resourceName}) not found`,HTTP_STATUS_BAD_REQUEST);
+      respondWithJsonError(response,`Error in plugin configuration definition or resource (${safeResourceName}) not found`,HTTP_STATUS_BAD_REQUEST);
     }
     else if (returnCode == 2) {
-      respondWithJsonError(response,`Resource (${resourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
+      respondWithJsonError(response,`Resource (${safeResourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
     }
     else if (returnCode == 3) {
-      respondWithJsonError(response,`Error in plugin configuration definition for resource (${resourceName})`,HTTP_STATUS_INTERNAL_SERVER_ERROR);
+      respondWithJsonError(response,`Error in plugin configuration definition for resource (${safeResourceName})`,HTTP_STATUS_INTERNAL_SERVER_ERROR);
     }
     else if (returnCode == 4) {
-      respondWithJsonError(response,`Resource (${resourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
+      respondWithJsonError(response,`Resource (${safeResourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
     }
     else if (returnCode == 5) {
-      respondWithJsonError(response,`Resource (${resourceName}) name invalid`,HTTP_STATUS_BAD_REQUEST);
+      respondWithJsonError(response,`Resource (${safeResourceName}) name invalid`,HTTP_STATUS_BAD_REQUEST);
     }    
   };
   var resourceDefinition = getResourceDefinitionJsonOrFailInner(parentJson,resourceName,errorCallback);
@@ -2206,6 +2214,11 @@ function ConfigService(context) {
     var username = null;
     if (authData && authData.username) {
       username = percentEncode(authData.username);
+      if (username === null) {
+        logger.warn("Username encoding error. Username=${username}");
+        respondWithJsonError(response,"Username invalid format",HTTP_STATUS_INTERNAL_SERVER_ERROR);
+        return;
+      }
     }
 
     if(this.pluginDefs == null || this.context.plugin.server == null){
@@ -2408,6 +2421,10 @@ function ConfigService(context) {
     }
     else {
       let currentResource = uriParts[partsIndex];
+      if (!currentResource) {
+        respondWithJsonError(response,`Resource missing from request or malformed`,HTTP_STATUS_BAD_REQUEST);
+        return 1;
+      }
       request.resourceURL+='/'+currentResource;
 
       request.currentResourceObject = getResourceDefinitionJsonOrFail(response,request.currentResourceList,currentResource);
@@ -2428,7 +2445,10 @@ function ConfigService(context) {
     //if not a leaf, return a json with list of subresources
     //if not a leaf but has ?name, return that next level
     let itemName = request.query.name ? percentEncode(request.query.name) : '';
-
+    if (itemName === null) {
+      respondWithJsonError(response,`Invalid value for query parameter name`,HTTP_STATUS_BAD_REQUEST);
+      return 1;
+    }
     let b64 = request.query.b64;
     let isB64 = b64 ? (b64.toLowerCase() == 'true') : false;
     logger.debug("Reached the GET case. lastPath="+lastPath+". itemName="+itemName);
@@ -2468,6 +2488,10 @@ function ConfigService(context) {
     //if not a leaf, return warning unless ?recursive=true
     //if not a leaf but has ?name, delete that next level
     let itemName = request.query.name ? percentEncode(request.query.name) : '';
+    if (itemName === null) {
+      respondWithJsonError(response,`Invalid value for query parameter name`,HTTP_STATUS_BAD_REQUEST);
+      return 1;
+    }
     let timestamp = request.query.lastmod;
     let recursive = request.query.recursive;
     let isRecursive = recursive ? (recursive.toLowerCase() == 'true') : false;
@@ -2518,6 +2542,10 @@ function ConfigService(context) {
   var handlePut = function(request,response,lastPath) {
     //replace or create an element, or replace entire collection with another collection
     let itemName = request.query.name ? percentEncode(request.query.name) : '';
+    if (itemName === null) {
+      respondWithJsonError(response,`Invalid value for query parameter name`,HTTP_STATUS_BAD_REQUEST);
+      return 1;
+    }
     logger.debug("Reached the PUT case. lastPath="+lastPath+". itemName="+itemName);
     if (request.currentResourceList && itemName.length<=0) {
       //Not a leaf, reject

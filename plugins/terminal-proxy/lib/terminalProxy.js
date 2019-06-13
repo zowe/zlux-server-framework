@@ -154,6 +154,12 @@ const binToB64 =[0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4
                  0x77,0x78,0x79,0x7A,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x2B,0x2F];
 
 function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, handlers) {
+  websocket.on('error', (error) => {
+    this.logger.warn("websocket error", error);
+    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'websocket error occurred');
+  });
+  websocket.on('close',(code,reason)=>{this.handleWebsocketClosed(code,reason);});
+
   this.handlers = handlers;
   this.host;
   this.hostPort;
@@ -165,31 +171,22 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
   this.logger = context.logger;
   this.bufferedHostMessages = []; //while awaiting certificate verification
   this.ws = websocket;
-  if (messageConfig) {
+  if (messageConfig
+      && messageConfig.hostTypeKey
+      && messageConfig.hostDataKey
+      && messageConfig.clientTypeKey
+      && messageConfig.clientDataKey) {
     this.hostTypeKey = messageConfig.hostTypeKey;
     this.hostDataKey = messageConfig.hostDataKey;
     this.clientTypeKey = messageConfig.clientTypeKey;
     this.clientDataKey = messageConfig.clientDataKey;
-    var t = this;
-    if (t.hostTypeKey && t.hostDataKey && t.clientTypeKey && t.clientDataKey) {
 
-      websocket.on('message',(msg)=>{t.handleWebsocketMessage(msg);});
-      websocket.on('close',(code,reason)=>{t.handleWebsocketClosed(code,reason);});
-      websocket.on('error', (error) => {
-        /* TODO handle the error, close the host connection, etc */
-        t.logger.warn("websocket error", error) 
-      });
-      
-      t.configured = true;
-    }
-    else {
-      /* TODO any cleanup needed? close the client websocket? */
-      this.logger.warn('Terminal websocket proxy was not supplied with valid message config description');
-    }
+    websocket.on('message',(msg)=>{this.handleWebsocketMessage(msg);});
+    this.configured = true;
   }
   else {
-    /* TODO any cleanup needed? close the client websocket? */
     this.logger.warn('Terminal websocket proxy was not supplied with valid message config description');
+    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'termproxy config invalid');
   }
 }
 
@@ -230,10 +227,12 @@ TerminalWebsocketProxy.prototype.closeConnection = function(ws, code, message) {
     this.decrementCounter();
     this.hostConnected = false;
   }
-  try {
-    this.hostSocket.destroy();
-  } catch (e) {
-    this.logger.warn(this.identifierString()+' Error when destroying host socket. e='+e.message);
+  if (this.hostSocket) {
+    try {
+      this.hostSocket.destroy();
+    } catch (e) {
+      this.logger.warn(this.identifierString()+' Error when destroying host socket. e='+e.message);
+    }
   }
   if (ws.readyState < 2) {//if still open
     ws.close(code,message.substring(0,WS_CLOSE_MESSAGE_LENGTH_LIMIT));//web limited to length=123
@@ -255,7 +254,14 @@ TerminalWebsocketProxy.prototype.handleWebsocketClosed = function(code, reason) 
 };
 
 TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message, websocket) {
-  var jsonObject = JSON.parse(message);
+  let jsonObject;
+  try {
+    jsonObject = JSON.parse(message);
+  } catch (e) {
+    //not json
+    this.logger.warn(this.identifierString()+' sent messsage which was not JSON');
+    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'Message not JSON');
+  }
   this.logger.debug(this.identifierString()+' Websocket client message received. Length='+message.length);
   this.logger.log(this.logger.FINER,this.identifierString()+' Websocket client message content='+message);
   if (jsonObject) {
