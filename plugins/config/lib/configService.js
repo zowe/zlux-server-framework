@@ -19,6 +19,9 @@ const proxyUtils = require('../../../lib/util.js');
 const express = require('express');
 const Promise = require('bluebird');
 const bodyParser = require('body-parser');
+const obfuscator = require ('../../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
+
+const htmlObfuscator = new obfuscator.HtmlObfuscator();
 
 //Buffer comes from node global.
 
@@ -45,7 +48,7 @@ const CONFIG_SCOPE_PRODUCT = 5;
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.8.5";
+const CURRENT_JSON_VERSION = "0.8.6";
 
 //a file
 const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
@@ -598,21 +601,22 @@ function getResourceDefinitionJsonOrFailInner(parentJson, resourceName,errorCall
 }
 
 function getResourceDefinitionJsonOrFail(response, parentJson, resourceName) {
+  let safeResourceName = htmlObfuscator.findAndReplaceHTMLEntities(resourceName);
   var errorCallback = function(returnCode) {
     if (returnCode == 1) {
-      respondWithJsonError(response,`Error in plugin configuration definition or resource (${resourceName}) not found`,HTTP_STATUS_BAD_REQUEST);
+      respondWithJsonError(response,`Error in plugin configuration definition or resource (${safeResourceName}) not found`,HTTP_STATUS_BAD_REQUEST);
     }
     else if (returnCode == 2) {
-      respondWithJsonError(response,`Resource (${resourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
+      respondWithJsonError(response,`Resource (${safeResourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
     }
     else if (returnCode == 3) {
-      respondWithJsonError(response,`Error in plugin configuration definition for resource (${resourceName})`,HTTP_STATUS_INTERNAL_SERVER_ERROR);
+      respondWithJsonError(response,`Error in plugin configuration definition for resource (${safeResourceName})`,HTTP_STATUS_INTERNAL_SERVER_ERROR);
     }
     else if (returnCode == 4) {
-      respondWithJsonError(response,`Resource (${resourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
+      respondWithJsonError(response,`Resource (${safeResourceName}) not found in plugin`,HTTP_STATUS_NOT_FOUND);
     }
     else if (returnCode == 5) {
-      respondWithJsonError(response,`Resource (${resourceName}) name invalid`,HTTP_STATUS_BAD_REQUEST);
+      respondWithJsonError(response,`Resource (${safeResourceName}) name invalid`,HTTP_STATUS_BAD_REQUEST);
     }    
   };
   var resourceDefinition = getResourceDefinitionJsonOrFailInner(parentJson,resourceName,errorCallback);
