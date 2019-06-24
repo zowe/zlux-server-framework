@@ -79,7 +79,7 @@ function validatePluginInDirectory(inputDir) {
 exports.validatePluginInDirectory = validatePluginInDirectory;
 
 function endWithMessage(message) {
-  logger.severe(message);
+  console.error(message);
   process.exit(1);
 }
 exports.endWithMessage = endWithMessage;

@@ -38,8 +38,7 @@ const commandArgs = process.argv.slice(2);
 const argumentParser = argParser.createParser(OPTION_ARGS);
 const userInput = argumentParser.parse(commandArgs);
 
-if (!userInput.inputApp || !userInput.outputDir ||
-    !(!userInput.pluginsDir ^ !userInput.zluxConfig)) {
+if (!userInput.inputApp || !(!userInput.pluginsDir ^ !userInput.zluxConfig)) {
   logger.severe(usage);
   process.exit(1);
 }
@@ -49,7 +48,6 @@ if (userInput.verbose) {
 }
 
 userInput.inputApp = serverUtils.normalizePath(userInput.inputApp);
-userInput.outputDir = serverUtils.normalizePath(userInput.outputDir);
 
 let pluginsDir;
 if (userInput.pluginsDir) {
