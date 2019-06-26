@@ -53,7 +53,7 @@ function internalAuthenticator(pluginDef, pluginConf, serverConf) {
   };
 }
 
-internalAuthenticator.prototype.authorized = () => {return this.capabilities};
+internalAuthenticator.prototype.getCapabilities = () => {return this.capabilities};
 
 /*access requested is one of GET,PUT,POST,DELETE*/
 internalAuthenticator.prototype.authorized = function(override,userName,resourceName,success,failure) {
