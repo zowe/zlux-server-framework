@@ -10,6 +10,8 @@
 
 # dependencies
 /node_modules
+*/node_modules
+node_modules
 
 # Ignore Gradle project-specific cache directory
 .gradle
