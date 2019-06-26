@@ -12,7 +12,7 @@ function TrivialAuthenticator(pluginDef, pluginConf, serverConf) {
   this.authPluginID = pluginDef.identifier;
   this.capabilities = {
     "canGetStatus": true,
-    "canRefresh": false,
+    "canRefresh": true,
     "canAuthenticate": true,
     "canAuthorize": true,
     "proxyAuthorizations": false
