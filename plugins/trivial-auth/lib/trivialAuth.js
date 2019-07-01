@@ -10,9 +10,20 @@
 
 function TrivialAuthenticator(pluginDef, pluginConf, serverConf) {
   this.authPluginID = pluginDef.identifier;
+  this.capabilities = {
+    "canGetStatus": true,
+    "canRefresh": true,
+    "canAuthenticate": true,
+    "canAuthorize": true,
+    "proxyAuthorizations": false
+  };
 }
 
 TrivialAuthenticator.prototype = {
+
+  getCapabilities(){
+    return this.capabilities;
+  },
 
   getStatus(sessionState) {
     return {
