@@ -39,7 +39,13 @@ const pluginContext = {
     server: {
       config: {
         app: {},
-        user: {},
+        user: {
+          node: {
+            http: {
+              port: 8543
+            }
+          }
+        },
         startUp: {}
       },
       state: {
