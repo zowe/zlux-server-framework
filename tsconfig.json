@@ -1,0 +1,18 @@
+{
+  "compileOnSave": true,
+  "include": [
+    "lib/*.ts"
+  ],
+  "exclude": ["lib/*.js"],
+  "compilerOptions": {
+    "outDir": "./lib",
+    "sourceMap": true,
+    "moduleResolution": "node",
+    "target": "es5",
+    "types": [
+      "node",
+      "express"
+    ],
+    "lib": ["es5", "es6"]
+  }
+}
