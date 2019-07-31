@@ -5,10 +5,11 @@
   ],
   "exclude": ["lib/*.js"],
   "compilerOptions": {
-    "outDir": "./lib",
+    "outDir": "lib",
     "sourceMap": true,
     "moduleResolution": "node",
     "target": "es5",
+    "downlevelIteration": true,
     "types": [
       "node",
       "express"
