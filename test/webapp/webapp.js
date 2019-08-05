@@ -22,7 +22,8 @@ const config = require('./config');
 
 let webAppOptions = config.webAppOptions;
 
-const pl = new PluginLoader({ 
+const pl = new PluginLoader();
+pl.init({ 
   pluginsDir: path.join(process.cwd(), 'test/webapp'),
   relativePathResolver(p) {
     return path.join(process.cwd(), 'test/webapp', p);

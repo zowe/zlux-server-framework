@@ -290,7 +290,7 @@ module.exports = function(authManager: any) {
           req.session.zlux = undefined;
         }
         req.sessionStore.destroy(req.session.id);
-        req.session.id = null;
+        // (req.session.id as any) = null;
       }
       res.status(200).send('');
     },

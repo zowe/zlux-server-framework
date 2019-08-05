@@ -9,7 +9,7 @@
   Copyright Contributors to the Zowe Project.
 */
 
-'use strict';
+// 'use strict';
 
 if (!(global as any).COM_RS_COMMON_LOGGER) {
   const loggerFile = require('../../zlux-shared/src/logging/logger.js');
@@ -133,9 +133,10 @@ export function makeErrorObject(details: any) {
   return err;
 }
 
-export function* concatIterables() {
-  for (let i=0; i < arguments.length; i++) {
-    yield *arguments[i];
+//problem
+export function* concatIterables(...args: any[]) {
+  for (let i=0; i < args.length; i++) {
+    yield *args[i];
   }
 }
 
@@ -150,7 +151,7 @@ export function asyncEventListener(listenerFun: any, logger: any) {
   //another event can be handled
   let promise = BBPromise.resolve();
   
-  return function(event) {
+  return function(event: any) {
     promise = promise.then(() => {
       return listenerFun(event);
     }, err => {
@@ -161,7 +162,7 @@ export function asyncEventListener(listenerFun: any, logger: any) {
   }
 }
 
-module.exports.uniqueIps = BBPromise.coroutine(function *uniqueIps(hostnames: string[]) {
+export let uniqueIps = BBPromise.coroutine(function *uniqueIps(hostnames: string[]) {
   if (hostnames == null) {
     loggers.network.debug("uniqueIps: no addresses specified, returning 0.0.0.0");
     return [ '0.0.0.0' ];
@@ -183,6 +184,8 @@ module.exports.uniqueIps = BBPromise.coroutine(function *uniqueIps(hostnames: st
   loggers.network.debug("uniqueIps: " + arr);
   return arr;
 })
+
+// export uniqueIps
 
 export function getLoopbackAddress(listenerAddresses: any[]) {
   if (listenerAddresses == null || listenerAddresses.length === 0) {

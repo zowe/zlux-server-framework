@@ -102,7 +102,8 @@ export class Server{
       sessionTimeoutMs: sessionTimeoutMs
     });
 
-    this.pluginLoader = new PluginLoader({
+    this.pluginLoader = new PluginLoader();
+    this.pluginLoader.init({
       productCode: appConfig.productCode,
       authManager: this.authManager,
       pluginsDir: userConfig.pluginsDir,
@@ -110,6 +111,7 @@ export class Server{
       relativePathResolver: this.options.relativePathResolver,
       langManagers: this.langManagers
     });
+
     this.pluginMapRO = util.readOnlyProxy(this.pluginLoader.pluginMap);
     this.webServer = new WebServer();
     this.webApp = null;
@@ -213,7 +215,7 @@ export class Server{
       }, err => {
         installLogger.warn(`Exception occurred, plugin (${event.data.identifier}) installation skipped. `
                            +`Message: ${err.message}`);
-        installLogger.debug(err.stack);
+        installLogger.warn(err.stack);
       });
     }, installLogger));
     this.pluginLoader.loadPlugins();
