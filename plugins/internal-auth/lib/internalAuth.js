@@ -44,7 +44,16 @@ function internalAuthenticator(pluginDef, pluginConf, serverConf) {
       resources: pluginConf.getContents(['resources.json'])
     };
   }
+  this.capabilities = {
+    "canGetStatus": false,
+    "canRefresh": false,
+    "canAuthenticate": true,
+    "canAuthorize": true,
+    "proxyAuthorizations": false
+  };
 }
+
+internalAuthenticator.prototype.getCapabilities = () => {return this.capabilities};
 
 /*access requested is one of GET,PUT,POST,DELETE*/
 internalAuthenticator.prototype.authorized = function(override,userName,resourceName,success,failure) {
