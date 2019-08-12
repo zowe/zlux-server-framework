@@ -659,7 +659,7 @@ class PluginLoader extends EventEmitter{
       bootstrapLogger.warn(`Could not initialize plugin` 
           + ` ${rejectedPlugin.pluginId}: `  
           + zluxUtil.formatErrorStatus(rejectedPlugin.validationError, 
-              DependencyGraph.statuses));
+              depgraph.statuses));
     }
     for (const pluginDef of sortedAndRejectedPlugins.plugins) { 
       try {
