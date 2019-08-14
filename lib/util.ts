@@ -14,7 +14,7 @@
 if (!(global as any).COM_RS_COMMON_LOGGER) {
   const loggerFile = require('../../zlux-shared/src/logging/logger.js');
   (global as any).COM_RS_COMMON_LOGGER = new loggerFile.Logger();
-  (global as any).COM_RS_COMMON_LOGGER.addDestination((global as any).COM_RS_COMMON_LOGGER.makeDefaultDestination(true,true,true));
+  (global as any).COM_RS_COMMON_LOGGER.addDestination((global as any).COM_RS_COMMON_LOGGER.makeDefaultDestination(true,true,true,true,true));
 }
 
 const path = require('path');

@@ -67,7 +67,7 @@ export class DataserviceContext{
     this.serviceConfiguration = serviceConfiguration;
     this.plugin = pluginContext;
     this.logger = (global as any).COM_RS_COMMON_LOGGER.makeComponentLogger(
-      pluginContext.pluginDef.identifier + "." + serviceDefinition.name);
+      pluginContext.pluginDef.identifier + ":" + serviceDefinition.name);
     
     // makeErrorObject: zluxUtil.makeErrorObject
   }

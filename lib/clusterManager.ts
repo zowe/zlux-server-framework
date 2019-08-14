@@ -150,7 +150,7 @@ export class ClusterManagerMaster extends ClusterManager {
       var lines = String(chunk).split('\n');
       lines.forEach(function(line) {
         if (line) {
-          console.log('[' + thatClusterManager.workers[wi].process.pid + '] ' + line);
+          console.log(line);
         }
       });
     });
@@ -158,7 +158,7 @@ export class ClusterManagerMaster extends ClusterManager {
       var lines = String(chunk).split('\n');
       lines.forEach(function(line) {
         if (line) {
-          console.error('[' + thatClusterManager.workers[wi].process.pid + '] ' + line);
+          console.error(line);
         }
       });
     });
