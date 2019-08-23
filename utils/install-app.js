@@ -24,8 +24,8 @@ const usage = 'Usage: --inputApp | -i INPUTAPP --pluginsDir | -p PLUGINSDIR '
       + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v]';
 
 //TODO if plugins get extracted read-only, then how would we go about doing upgrades? read-write for now!
-const FILE_WRITE_MODE = 0o600;
-const DIR_WRITE_MODE = 0o700;
+const FILE_WRITE_MODE = 0o660;
+const DIR_WRITE_MODE = 0o770;
 
 const OPTION_ARGS = [
   new argParser.CLIArgument('inputApp', 'i', argParser.constants.ARG_TYPE_VALUE),
