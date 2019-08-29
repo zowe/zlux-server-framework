@@ -1897,8 +1897,8 @@ function handleDeleteFileRequest(response, filename, resource, directories, scop
   });
 };
 
-function makeConfigurationDirectoriesStruct(directoryConfig, productCode, user) {
-  return makeConfigurationDirectoriesStructInner(directoryConfig,productCode,user);
+function makeConfigurationDirectoriesStruct(directoryConfig, productCode, user, pluginLocation) {
+  return makeConfigurationDirectoriesStructInner(directoryConfig,productCode,user, pluginLocation);
 }
 
 function makeUserConfigurationDirectories(serverSettings, productCode, user) {
@@ -1918,10 +1918,11 @@ function makeUserConfigurationDirectories(serverSettings, productCode, user) {
 }
 
 
-function makeConfigurationDirectoriesStructInner(serverSettings, productCode, user) {
+function makeConfigurationDirectoriesStructInner(serverSettings, productCode, user, pluginLocation) {
   var pluginDir = productCode+'/'+"pluginStorage";
 
   var directories = {};
+  
   var productDir = jsonObjectGetString(serverSettings, "productDir");
   var fullProductDir = productDir+'/'+pluginDir;
   directories.productDir = fullProductDir;
@@ -1936,6 +1937,9 @@ function makeConfigurationDirectoriesStructInner(serverSettings, productCode, us
 
   if (user) {
     directories.usersDir = makeUserConfigurationDirectories(serverSettings,productCode,user);
+  }
+  if (pluginLocation) {
+    directories.pluginDir = pathModule.join(pluginLocation, PLUGIN_DEFAULT_DIR);
   }
   logger.debug('Directories = '+JSON.stringify(directories));
   return directories;
@@ -2143,13 +2147,16 @@ function getJSONFromLocation(relativeLocation,directories,startScope,endScope) {
   var scope = startScope;
   var configuration = {};
   while (scope) {
-    var rootPath = pathModule.join(getScopeRootPath(scope,directories),relativeLocation);
-    var updatedConfiguration = addJSONFilesToJSON(rootPath,configuration);
-    if (updatedConfiguration) {
-      logger.debug("Configuration is now = "+JSON.stringify(updatedConfiguration));
-      var filesFound = Object.keys(updatedConfiguration);
-      for (var i = 0; i < filesFound; i++) {
-        configuration[filesFound[i]] = updatedConfiguration[filesFound[i]];
+    const path = getScopeRootPath(scope,directories);
+    if (path) {
+      var rootPath = pathModule.join(path,relativeLocation);
+      var updatedConfiguration = addJSONFilesToJSON(rootPath,configuration);
+      if (updatedConfiguration) {
+        logger.debug("Configuration is now = "+JSON.stringify(updatedConfiguration));
+        var filesFound = Object.keys(updatedConfiguration);
+        for (var i = 0; i < filesFound; i++) {
+          configuration[filesFound[i]] = updatedConfiguration[filesFound[i]];
+        }
       }
     }
     if (scope === endScope) {
@@ -2160,9 +2167,9 @@ function getJSONFromLocation(relativeLocation,directories,startScope,endScope) {
   return configuration;
 }
 
-function getServiceConfiguration(pluginIdentifier,serviceName,serverSettings,productCode) {
+function getServiceConfiguration(pluginIdentifier, pluginLocation, serviceName,serverSettings,productCode) {
   var policy = AGGREGATION_POLICY_NONE;
-  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode);
+  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = pluginIdentifier+'/_internal/services/'+serviceName;
   var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
   return new InternalConfiguration(configuration);
@@ -2171,9 +2178,9 @@ exports.getServiceConfiguration = getServiceConfiguration;
 
 //reserved folder _internal
 //may contain services and plugin
-function getPluginConfiguration(identifier,serverSettings,productCode) {
+function getPluginConfiguration(identifier, pluginLocation, serverSettings,productCode) {
   var policy = AGGREGATION_POLICY_NONE;
-  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode);
+  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = identifier+'/_internal/plugin';
   var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
   return new InternalConfiguration(configuration);
