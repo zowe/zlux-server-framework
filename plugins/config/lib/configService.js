@@ -44,12 +44,15 @@ const CONFIG_SCOPE_GROUP = 2;
 const CONFIG_SCOPE_INSTANCE = 3;
 const CONFIG_SCOPE_SITE = 4;
 const CONFIG_SCOPE_PRODUCT = 5;
+const CONFIG_SCOPE_PLUGIN = 6;
 
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.8.6";
+const CURRENT_JSON_VERSION = "0.9.0";
 
+
+const PLUGIN_DEFAULT_DIR = pathModule.join('config','storageDefaults');
 //a file
 const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
 //contents of a folder
@@ -679,6 +682,15 @@ function getPathForScope(lastPath, filename, scope, directories){
       path = directories.productDir+'/'+lastPath;
     }
     break;
+  case CONFIG_SCOPE_PLUGIN:
+    const len = directories._pluginID.length;
+    if (hasFilename) {
+      path = directories.pluginDir+'/'+lastPath.substring(len)+'/'+filename;
+    }
+    else {
+      path = directories.pluginDir+'/'+lastPath.substring(len);
+    }
+    break;    
   default:
     logger.warn(`getpathforscope: Warning, invalid scope of ${scope}`);
   }
@@ -686,7 +698,7 @@ function getPathForScope(lastPath, filename, scope, directories){
 }
 
 /*
-Methods to transition down the chain of P.S.I.G.U
+Methods to transition down the chain of P.P.S.I.G.U
 */
 //TODO group unhandled for now.
 function getNextBroadestScope(scope) {
@@ -699,6 +711,8 @@ function getNextBroadestScope(scope) {
   case CONFIG_SCOPE_SITE:
     return CONFIG_SCOPE_PRODUCT;
   case CONFIG_SCOPE_PRODUCT:
+    return CONFIG_SCOPE_PLUGIN;
+  case CONFIG_SCOPE_PLUGIN:
     return 0;
   default:
     logger.warn(`Scope=${scope} not found`);
@@ -717,6 +731,8 @@ function getNextNarrowestScope(scope) {
     return CONFIG_SCOPE_INSTANCE;
   case CONFIG_SCOPE_PRODUCT:
     return CONFIG_SCOPE_SITE;
+  case CONFIG_SCOPE_PLUGIN:
+    return CONFIG_SCOPE_PRODUCT;
   default:
     logger.warn(`Scope=${scope} not found`);
   }
@@ -977,7 +993,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
 }
 
 function getOverrideJson(relativePath, filename, directories, scope) {
-  var currentScope = CONFIG_SCOPE_PRODUCT;
+  var currentScope = CONFIG_SCOPE_PLUGIN;
 
   var path = getPathForScope(relativePath,filename,currentScope,directories);
   var result = getJSONFromFile(path);
@@ -1013,7 +1029,7 @@ function getOverrideJson(relativePath, filename, directories, scope) {
 }
 
 function getOverrideJsonAsync(relativePath, filename, directories, scope, callback) {
-  var currentScope = CONFIG_SCOPE_PRODUCT;
+  var currentScope = CONFIG_SCOPE_PLUGIN;
 
   var path = getPathForScope(relativePath,filename,currentScope,directories);
   var getJsonAtNextScope = function() {
@@ -1341,7 +1357,7 @@ function getFilesInDirectory(resource, subresourceList, directories, scope, rela
   we still want to start from the top, just allowing for replacement of files with lower levels.
   */
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListing(fileTable,startScope,scope,relativePath,null,directories,true);
     logger.debug("File table before mapping="+JSON.stringify(fileTable));
     tableMap(fileTable,configFileInternalVisitor,jsonTable);
@@ -1349,7 +1365,7 @@ function getFilesInDirectory(resource, subresourceList, directories, scope, rela
   }
   case AGGREGATION_POLICY_OVERRIDE:
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListing(fileTable,startScope,scope,relativePath,null,directories,false);
     logger.debug("File table before mapping="+JSON.stringify(fileTable));
     tableMap(fileTable,configFileOverrideInternalVisitor,jsonTable);
@@ -1371,7 +1387,7 @@ function respondWithFilenamesInDirectory(response, filename, resource, subresour
 
   case AGGREGATION_POLICY_NONE:
   case AGGREGATION_POLICY_OVERRIDE:
-    var startScope = CONFIG_SCOPE_PRODUCT;
+    var startScope = CONFIG_SCOPE_PLUGIN;
     var streamer = startResponseForConfigDirectory(response,200,"OK",location,true);
     jStreamer.jsonStartArray(streamer,"contents");
     getFileListing(fileTable,startScope,scope,relativePath,filename,directories,true);
@@ -1408,7 +1424,7 @@ function respondWithFilesInDirectory(response, filename, resource, subresourceLi
   we still want to start from the top, just allowing for replacement of files with lower levels.
   */
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListingAsync(fileTable,startScope,scope,relativePath,filename,directories,true).then(()=> {
       if (Object.keys(fileTable).length != 0) {
         var streamer = startResponseForConfigDirectory(response,200,"OK",location,false);
@@ -1430,7 +1446,7 @@ function respondWithFilesInDirectory(response, filename, resource, subresourceLi
   }
   case AGGREGATION_POLICY_OVERRIDE:
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListingAsync(fileTable,startScope,scope,relativePath,filename,directories,false).then(()=> {
       if (Object.keys(fileTable).length != 0) {
         var streamer = startResponseForConfigDirectory(response,200,"OK",location,false);
@@ -1881,8 +1897,8 @@ function handleDeleteFileRequest(response, filename, resource, directories, scop
   });
 };
 
-function makeConfigurationDirectoriesStruct(directoryConfig, productCode, user) {
-  return makeConfigurationDirectoriesStructInner(directoryConfig,productCode,user);
+function makeConfigurationDirectoriesStruct(directoryConfig, productCode, user, pluginLocation) {
+  return makeConfigurationDirectoriesStructInner(directoryConfig,productCode,user, pluginLocation);
 }
 
 function makeUserConfigurationDirectories(serverSettings, productCode, user) {
@@ -1902,10 +1918,11 @@ function makeUserConfigurationDirectories(serverSettings, productCode, user) {
 }
 
 
-function makeConfigurationDirectoriesStructInner(serverSettings, productCode, user) {
+function makeConfigurationDirectoriesStructInner(serverSettings, productCode, user, pluginLocation) {
   var pluginDir = productCode+'/'+"pluginStorage";
 
   var directories = {};
+  
   var productDir = jsonObjectGetString(serverSettings, "productDir");
   var fullProductDir = productDir+'/'+pluginDir;
   directories.productDir = fullProductDir;
@@ -1920,6 +1937,9 @@ function makeConfigurationDirectoriesStructInner(serverSettings, productCode, us
 
   if (user) {
     directories.usersDir = makeUserConfigurationDirectories(serverSettings,productCode,user);
+  }
+  if (pluginLocation) {
+    directories.pluginDir = pathModule.join(pluginLocation, PLUGIN_DEFAULT_DIR);
   }
   logger.debug('Directories = '+JSON.stringify(directories));
   return directories;
@@ -2073,6 +2093,9 @@ function addJSONFilesToJSON(startingPath,json) {
 function getScopeRootPath(scope,directories) {
   var path;
   switch (scope) {
+  case CONFIG_SCOPE_PLUGIN:
+    path = directories.pluginDir;
+    break;
   case CONFIG_SCOPE_PRODUCT:
     path = directories.productDir;
     break;
@@ -2124,13 +2147,16 @@ function getJSONFromLocation(relativeLocation,directories,startScope,endScope) {
   var scope = startScope;
   var configuration = {};
   while (scope) {
-    var rootPath = pathModule.join(getScopeRootPath(scope,directories),relativeLocation);
-    var updatedConfiguration = addJSONFilesToJSON(rootPath,configuration);
-    if (updatedConfiguration) {
-      logger.debug("Configuration is now = "+JSON.stringify(updatedConfiguration));
-      var filesFound = Object.keys(updatedConfiguration);
-      for (var i = 0; i < filesFound; i++) {
-        configuration[filesFound[i]] = updatedConfiguration[filesFound[i]];
+    const path = getScopeRootPath(scope,directories);
+    if (path) {
+      var rootPath = pathModule.join(path,relativeLocation);
+      var updatedConfiguration = addJSONFilesToJSON(rootPath,configuration);
+      if (updatedConfiguration) {
+        logger.debug("Configuration is now = "+JSON.stringify(updatedConfiguration));
+        var filesFound = Object.keys(updatedConfiguration);
+        for (var i = 0; i < filesFound; i++) {
+          configuration[filesFound[i]] = updatedConfiguration[filesFound[i]];
+        }
       }
     }
     if (scope === endScope) {
@@ -2141,22 +2167,22 @@ function getJSONFromLocation(relativeLocation,directories,startScope,endScope) {
   return configuration;
 }
 
-function getServiceConfiguration(pluginIdentifier,serviceName,serverSettings,productCode) {
+function getServiceConfiguration(pluginIdentifier, pluginLocation, serviceName,serverSettings,productCode) {
   var policy = AGGREGATION_POLICY_NONE;
-  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode);
+  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = pluginIdentifier+'/_internal/services/'+serviceName;
-  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PRODUCT,CONFIG_SCOPE_INSTANCE);
+  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
   return new InternalConfiguration(configuration);
 }
 exports.getServiceConfiguration = getServiceConfiguration;
 
 //reserved folder _internal
 //may contain services and plugin
-function getPluginConfiguration(identifier,serverSettings,productCode) {
+function getPluginConfiguration(identifier, pluginLocation, serverSettings,productCode) {
   var policy = AGGREGATION_POLICY_NONE;
-  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode);
+  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = identifier+'/_internal/plugin';
-  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PRODUCT,CONFIG_SCOPE_INSTANCE);
+  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
   return new InternalConfiguration(configuration);
 };
 exports.getPluginConfiguration = getPluginConfiguration;
@@ -2262,6 +2288,9 @@ function ConfigService(context) {
         return;
       }
     }
+    //TODO plugin.location seems like it will be changed in the future.
+    request.directories.pluginDir = pathModule.join(request.plugin.location, PLUGIN_DEFAULT_DIR);
+    request.directories._pluginID = encodeDirectoryName(id);
     next();
   });
 
@@ -2280,6 +2309,15 @@ function ConfigService(context) {
     }
     determineResource(null,parts,0,request,response);
   });
+  router.get('/:pluginID/plugin/:resource*',(request, response)=> {
+    request.scope = CONFIG_SCOPE_PLUGIN;
+    request.resourceURL+='/plugin';
+    let parts = getResourcePartsOrFail(request,response);
+    if (!parts) {
+      return;
+    }
+    determineResource(null,parts,0,request,response);
+  });  
   router.all('/:pluginID/site/:resource*',(request, response)=> {
     request.scope = CONFIG_SCOPE_SITE;
     request.resourceURL+='/site';
@@ -2455,7 +2493,9 @@ function ConfigService(context) {
     if (!request.currentResourceList && itemName.length>0) {
       //respond with one file
       accessLogger.debug(`Configuration service handling request for element. Resource${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
-      respondWithConfigFile(response,itemName,request.currentResourceObject,request.directories,request.scope,lastPath,request.resourceURL);
+      respondWithConfigFile(response,itemName,request.currentResourceObject,
+                            request.directories,request.scope,lastPath,
+                            request.resourceURL);
     }
     else if (request.currentResourceList && itemName.length===0) {
       //give us a listing of sub resources
