@@ -49,10 +49,11 @@ const CONFIG_SCOPE_PLUGIN = 6;
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.9.0";
-
+const CURRENT_JSON_VERSION = "0.10.0";
 
 const PLUGIN_DEFAULT_DIR = pathModule.join('config','storageDefaults');
+const BINARY_BODY_SIZE_LIMIT = '3mb';
+
 //a file
 const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
 //contents of a folder
@@ -997,6 +998,10 @@ function getJsonLocal(lastPath, filename, directories, scope, resource) {
 
 function respondWithConfigFile(response, filename, resource, directories, scope, lastPath, location) {
   var policy = getAggregationPolicy(resource);
+  if (resource.binary) {
+    //until we can think of reasons to have others
+    policy = AGGREGATION_POLICY_NONE;
+  }
   switch (policy) {
 
   case AGGREGATION_POLICY_NONE:
@@ -1029,33 +1034,22 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
     }
     break;
   case AGGREGATION_POLICY_OVERRIDE:
-    {
-      if (resource.binary) {
-        getOverridePathAsync(lastPath, filename, directories, scope,(result)=> {
-          if (result) {
-            console.log('lets send=',result);
-            response.sendFile(result);
-          } else {
-            respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
-          }
-        });
-      } else {
-        getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
-          if (result) {
-            var streamer = startResponseForConfigFile(response,200,"OK",location);
-            jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
-            jStreamer.jsonStartObject(streamer,"contents");
-            jStreamer.jsonPrintObject(streamer,result.data);
-            jStreamer.jsonEndObject(streamer);
-            jStreamer.jsonEnd(streamer);
-            finishResponse(response);
-            logger.debug(`Configuration service request complete. Resource=${location}`);
-          }
-          else {
-            respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
-          }
-        });
-      }
+    {      
+      getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
+        if (result) {
+          var streamer = startResponseForConfigFile(response,200,"OK",location);
+          jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
+          jStreamer.jsonStartObject(streamer,"contents");
+          jStreamer.jsonPrintObject(streamer,result.data);
+          jStreamer.jsonEndObject(streamer);
+          jStreamer.jsonEnd(streamer);
+          finishResponse(response);
+          logger.debug(`Configuration service request complete. Resource=${location}`);
+        }
+        else {
+          respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
+        }
+      }); 
     }
     break;
   default:
@@ -1158,30 +1152,6 @@ function getOverrideJsonAsync(relativePath, filename, directories, scope, callba
 
   getJsonAtNextScope();
 }
-
-function getOverridePathAsync(relativePath, filename, directories, scope, callback) {
-  var currentScope = CONFIG_SCOPE_PRODUCT;
-
-  var path = getPathForScope(relativePath,filename,currentScope,directories);
-  var foundPath;
-  var getPathAtNextScope = function() {
-    isFileReadableAsync(path,(result)=> {
-      if (result) {
-        foundPath = path;
-      }
-      if (currentScope == scope) {
-        callback(foundPath);
-      } else {
-        currentScope = getNextNarrowestScope(currentScope);    
-        path = getPathForScope(relativePath,filename,currentScope,directories);
-        getPathAtNextScope();
-      }
-    });
-  };
-  getPathAtNextScope();
-}
-
-
 
 function configFileInternalVisitor(hashtable, keyVoid, valueVoid) {
   var jsonTable = hashtable;
@@ -2171,7 +2141,7 @@ function addJSONFilesToJSON(startingPath,json) {
         try {
           contents = jsonUtils.parseJSONWithComments(filepath);
         } catch (e) {
-          //probably not intented to be json, which isnt supported
+          //binary or corrupt. this function only for json
           logger.warn(`Failed to load ${filepath} as a JSON`);
         }
         if (contents) {
@@ -2402,8 +2372,8 @@ function ConfigService(context) {
   });
 
   
-
-  router.use(bodyParser.raw({type: binaryTypeCheck, limit:'3mb'}));
+  //default limit was '100kb' at time of writing this comment
+  router.use(bodyParser.raw({type: binaryTypeCheck, limit:BINARY_BODY_SIZE_LIMIT}));
   router.use(bodyParser.text({type:'application/json'}));
   router.use(bodyParser.text({type:'text/html'}));
   
