@@ -49,10 +49,11 @@ const CONFIG_SCOPE_PLUGIN = 6;
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.9.0";
-
+const CURRENT_JSON_VERSION = "0.10.0";
 
 const PLUGIN_DEFAULT_DIR = pathModule.join('config','storageDefaults');
+const BINARY_BODY_SIZE_LIMIT = '3mb';
+
 //a file
 const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
 //contents of a folder
@@ -66,8 +67,11 @@ const MSG_TYPE_ERROR = "org.zowe.configjs.error";
 const MSG_TYPE_UPDATE = "org.zowe.configjs.resource.update";
 const MSG_TYPE_DELETE = "org.zowe.configjs.delete";
 
-
-
+//used to tell if the type is one other than one we process as json
+function binaryTypeCheck(req) {
+  let result = !req.is('json') && !req.is('text/html');
+  return result;
+}
 
 
 const jsonFileReadOptions = {
@@ -850,6 +854,31 @@ function getJSONFromFileAsync(path, callback) {
   });
 }
 
+function isFileReadableAsync(path, callback) {
+  logger.debug('Opening binary file. Path='+path);  
+  fs.open(path,'r',(err,fd)=> {
+    if (err) fdCloseOnError(err,fd,path,callback);
+    else {
+      fs.fstat(fd, (err, stats)=> {
+        if (err) fdCloseOnError(err,fd,path,callback);
+        else {
+          if (stats.isDirectory()) {
+            callback(false);
+          }
+          else {
+            setTimeout(()=> {
+              fs.close(fd, (err) => {
+                //TODO error could exist here but there's not much we can do?
+                callback(true);
+              });
+            },0);//allow for GC
+          }
+        }
+      });
+    }
+  });
+}
+
 
 function startConfigDirectoryJson(resourceLocation, streamer,listing) {
   jStreamer.jsonStart(streamer);
@@ -915,8 +944,35 @@ function getJsonForAggregationNoneAsync(lastPath, filename, directories, scope, 
   getJsonAtNextScope(path);
 }
 
+//for binary, rather than json
+function getPathForAggregationNoneAsync(lastPath, filename, directories, scope, callback) {
+  var path = getPathForScope(lastPath,filename,scope,directories);
+  var getPathAtNextScope = function() {
+    isFileReadableAsync(path,(result)=> {
+      if (!result) {
+        scope = getNextBroadestScope(scope);
+        if (scope) {
+          path = getPathForScope(lastPath,filename,scope,directories);
+          getPathAtNextScope();
+        }
+        else {
+          callback(null);
+        }
+      }
+      else {
+        callback(path);
+      }
+    });
+  };
+  getPathAtNextScope(path);
+}
+
+
 
 function getJsonLocal(lastPath, filename, directories, scope, resource) {
+  if (resource.binary) {
+    return null;
+  }
   var policy = getAggregationPolicy(resource);
   switch (policy) {
   case AGGREGATION_POLICY_NONE:
@@ -942,30 +998,43 @@ function getJsonLocal(lastPath, filename, directories, scope, resource) {
 
 function respondWithConfigFile(response, filename, resource, directories, scope, lastPath, location) {
   var policy = getAggregationPolicy(resource);
+  if (resource.binary) {
+    //until we can think of reasons to have others
+    policy = AGGREGATION_POLICY_NONE;
+  }
   switch (policy) {
 
   case AGGREGATION_POLICY_NONE:
     {
-      getJsonForAggregationNoneAsync(lastPath, filename, directories, scope,(result)=> {
-        if (result) {
-          var fileJsonObject = result.data;
-          var streamer = startResponseForConfigFile(response,200,"OK",location);
-          jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
-          jStreamer.jsonStartObject(streamer,"contents");
-          jStreamer.jsonPrintObject(streamer,fileJsonObject);
-          jStreamer.jsonEndObject(streamer);
-          jStreamer.jsonEnd(streamer);
-          finishResponse(response);
-          logger.debug(`Configuration service request complete. Resource=${location}`);
-        }
-        else {
-          respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
-        }
-      });
+      if (resource.binary) {
+        getPathForAggregationNoneAsync(lastPath, filename, directories, scope,(result)=> {
+          if (result) {
+            response.sendFile(result);
+          } else {
+            respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
+          }
+        });
+      } else {
+        getJsonForAggregationNoneAsync(lastPath, filename, directories, scope,(result)=> {
+          if (result) {
+            var fileJsonObject = result.data;
+            var streamer = startResponseForConfigFile(response,200,"OK",location);
+            jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
+            jStreamer.jsonStartObject(streamer,"contents");
+            jStreamer.jsonPrintObject(streamer,fileJsonObject);
+            jStreamer.jsonEndObject(streamer);
+            jStreamer.jsonEnd(streamer);
+            finishResponse(response);
+            logger.debug(`Configuration service request complete. Resource=${location}`);
+          } else {
+            respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
+          }
+        });
+      }
     }
     break;
   case AGGREGATION_POLICY_OVERRIDE:
-    {
+    {      
       getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
         if (result) {
           var streamer = startResponseForConfigFile(response,200,"OK",location);
@@ -980,7 +1049,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
         else {
           respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
         }
-      });
+      }); 
     }
     break;
   default:
@@ -1083,8 +1152,6 @@ function getOverrideJsonAsync(relativePath, filename, directories, scope, callba
 
   getJsonAtNextScope();
 }
-
-
 
 function configFileInternalVisitor(hashtable, keyVoid, valueVoid) {
   var jsonTable = hashtable;
@@ -1498,19 +1565,23 @@ function replaceOrCreateDirectoryFiles(response, resource, directories, scope, r
 }
 
 function replaceOrCreateFile(response, filename, directories, scope, relativePath,
-                             location, content, contentLength) {
+                             location, content, contentLength, binary) {
 
   var path = getPathForScope(relativePath,filename,scope,directories);
   var mode = 0700; //TODO is 700 good for us?
   //mode is for if the file is created.
   //w means create if doesnt exist, and open for writing
-
   
   fs.open(path,'w',mode,function(error, fd) {
     if (!error) {
       var offset = 0;
       var contentLength = content.length;
-      var buff = Buffer.from(content,'utf8');
+      var buff;
+      if (binary) {
+        buff = new Uint8Array(Buffer.from(content));
+      } else {
+        buff = Buffer.from(content,'utf8');
+      }
       var writeCallback = function(err,writtenLength,buffer) {
         contentLength -= writtenLength;
         offset += writtenLength;
@@ -2066,7 +2137,13 @@ function addJSONFilesToJSON(startingPath,json) {
     fileNames.forEach(function (filename) {
       var filepath = pathModule.join(startingPath,filename);
       if (fs.statSync(filepath).isFile()) {
-        let contents = jsonUtils.parseJSONWithComments(filepath);
+        let contents;
+        try {
+          contents = jsonUtils.parseJSONWithComments(filepath);
+        } catch (e) {
+          //binary or corrupt. this function only for json
+          logger.warn(`Failed to load ${filepath} as a JSON`);
+        }
         if (contents) {
           json[filename] = {"_objectType": 'org.zowe.configjs.internal.file', "contents":contents};
         }
@@ -2294,8 +2371,10 @@ function ConfigService(context) {
     next();
   });
 
+  
+  //default limit was '100kb' at time of writing this comment
+  router.use(bodyParser.raw({type: binaryTypeCheck, limit:BINARY_BODY_SIZE_LIMIT}));
   router.use(bodyParser.text({type:'application/json'}));
-  router.use(bodyParser.text({type:'text/plain'}));
   router.use(bodyParser.text({type:'text/html'}));
   
   context.addBodyParseMiddleware(router);
@@ -2506,9 +2585,14 @@ function ConfigService(context) {
       let listing = request.query.listing ? (request.query.listing.toLowerCase() == 'true') : false;
       accessLogger.debug(`Configuration service responding with elements in resource. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}. ListingOnly=${listing}.`);
       if (!listing) {
-        //give us a collection of all files in this folder            
-        respondWithFilesInDirectory(response,itemName,request.currentResourceObject,request.currentResourceList,request.directories,
-                                    request.scope,lastPath,request.resourceURL);
+        if (request.currentResourceObject.binary) {
+          respondWithJsonError(response,`Cannot return multiple binaries in a single request`,HTTP_STATUS_BAD_REQUEST);
+        } else {
+          //give us a collection of all files in this folder            
+          respondWithFilesInDirectory(response, itemName, request.currentResourceObject,
+                                      request.currentResourceList, request.directories,
+                                      request.scope, lastPath, request.resourceURL);
+        }
       } else {
         respondWithFilenamesInDirectory(response,itemName,request.currentResourceObject,request.currentResourceList,request.directories,
                                         request.scope,lastPath,request.resourceURL);
@@ -2593,18 +2677,20 @@ function ConfigService(context) {
       return 1;
     }
 
-    if (typeof request.body !== 'string') {
-      respondWithJsonError(response,"Could not access PUT body.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
-      return 1;
-    }
-    try {
-      //We only support JSON storage for now.
-      //If we attempt to write out a string that isnt JSON, retrieval will be broken.
-      //This also handles the case in which body was just empty...
-      const bodyTest = JSON.parse(request.body);
-    } catch (e) {
-      respondWithJsonError(response,"PUT body is not JSON.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
-      return 1;
+    if (!request.currentResourceObject.binary) {
+      if (typeof request.body !== 'string') {
+        respondWithJsonError(response,"Could not access PUT body.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+        return 1;
+      }
+      try {
+        //We only support JSON storage for now.
+        //If we attempt to write out a string that isnt JSON, retrieval will be broken.
+        //This also handles the case in which body was just empty...
+        const bodyTest = JSON.parse(request.body);
+      } catch (e) {
+        respondWithJsonError(response,"PUT body is not JSON.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+        return 1;
+      }
     }
     
     let b64 = request.query.b64;
@@ -2616,8 +2702,9 @@ function ConfigService(context) {
       accessLogger.debug(`Configuration service handling element write request. `
                          +`Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
       restCheckModifiedTimestamp(itemName,request.directories,request.scope,lastPath,timestamp).then(()=> {
-        replaceOrCreateFile(response, itemName, request.directories,
-                            request.scope,lastPath, request.resourceURL, request.body, request.body.length);
+          replaceOrCreateFile(response, itemName, request.directories,
+                              request.scope, lastPath, request.resourceURL,
+                              request.body, request.body.length, request.currentResourceObject.binary);
       }, (err)=> {
         if (err && err.message === 'Timestamp mismatch'){
           logger.warn(`Could not delete resource due to timestamp mismatch. `
