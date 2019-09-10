@@ -43,7 +43,7 @@ if(calledViaCLI){
 
   if (!userInput.inputApp || !(!userInput.pluginsDir ^ !userInput.zluxConfig)) {
     logger.severe(usage);
-    //process.exit(1);
+    process.exit(1);
   }
 
   if (userInput.verbose) {
@@ -80,6 +80,7 @@ function isFile(path) {
       packagingUtils.endWithMessage(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
     } else {
       logger.warn(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
+      return true;
     }
   }
   return false;
