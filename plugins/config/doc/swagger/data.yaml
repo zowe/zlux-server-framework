@@ -9,7 +9,7 @@
 swagger: '2.0'
 info:
   description: This service is core to the App server and handles user, group, and administrative preferences for individual plugins
-  version: 1.0.0
+  version: 1.5.0
   title: Configuration Dataservice
 host: localhost
 basePath: /data
@@ -17,14 +17,20 @@ schemes:
   - http
   - https
 tags:
-  - name: Config
-  - name: Configuration
-  - name: Settings
-  - name: Preferences
-  - name: Storage
+  - name: Read
+  - name: Write
+  - name: Delete
+  - name: Plugin
+  - name: Product
+  - name: Site
+  - name: Instance
+  - name: User
 paths:
   /{plugin}/plugin/{resource}:
     get:
+      tags: 
+        - Read
+        - Plugin
       summary: Get a JSON resource, listing, or binary file from the plugin scope
       description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
       parameters:
@@ -40,7 +46,7 @@ paths:
           type: string
         - name: name
           in: query
-          description: Used to retrieve a subresource when resource in URL is not a leaf
+          description: Retrieves a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: listing
@@ -70,6 +76,9 @@ paths:
             $ref: '#/definitions/Error'  
   /{plugin}/product/{resource}:
     get:
+      tags: 
+        - Read
+        - Product
       summary: Get a JSON resource, listing, or binary file from the plugin scope or higher
       description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
       parameters:
@@ -85,7 +94,7 @@ paths:
           type: string
         - name: name
           in: query
-          description: Used to retrieve a subresource when resource in URL is not a leaf
+          description: Retrieves a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: listing
@@ -115,6 +124,9 @@ paths:
             $ref: '#/definitions/Error'  
   /{plugin}/site/{resource}:
     get:
+      tags: 
+        - Read
+        - Site
       summary: Get a JSON resource, listing, or binary file from the site scope or higher
       description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
       parameters:
@@ -130,7 +142,7 @@ paths:
           type: string
         - name: name
           in: query
-          description: Used to retrieve a subresource when resource in URL is not a leaf
+          description: Retrieves a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: listing
@@ -159,6 +171,9 @@ paths:
           schema:
             $ref: '#/definitions/Error' 
     put:
+      tags: 
+        - Write
+        - Site
       summary: Writes a JSON or binary resource to the multi-server instance storage area
       description: Writes either a binary or JSON resource according to the plugin definition. 
       parameters:
@@ -174,7 +189,7 @@ paths:
           type: string        
         - name: name
           in: query
-          description: Used to write to a leaf resource
+          description: Writes a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: body
@@ -205,6 +220,9 @@ paths:
           schema:
             $ref: '#/definitions/Error'
     delete:
+      tags: 
+        - Delete
+        - Site
       summary: Deletes a resource from the multi-server instance storage area
       description: Deletes a resource, and optionally its subresources.
       parameters:
@@ -219,11 +237,13 @@ paths:
           required: true          
           type: string        
         - name: name
+          description: Deletes a named subresource when resource given is not a leaf
           in: query
           required: false
           type: string
         - name: recursive
           in: query
+          description: Whether or not to delete subresources recursively
           required: false
           type: boolean
       produces:
@@ -247,6 +267,9 @@ paths:
             $ref: '#/definitions/Error'                   
   /{plugin}/instance/{resource}:
     get:
+      tags: 
+        - Read
+        - Instance
       summary: Get a JSON resource, listing, or binary file from the instance scope or higher
       description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
       parameters:
@@ -262,7 +285,7 @@ paths:
           type: string
         - name: name
           in: query
-          description: Used to retrieve a subresource when resource in URL is not a leaf
+          description: Retrieves a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: listing
@@ -291,6 +314,9 @@ paths:
           schema:
             $ref: '#/definitions/Error'  
     put:
+      tags: 
+        - Write
+        - Instance
       summary: Writes a JSON or binary resource to the server instance storage area
       description: Writes either a binary or JSON resource according to the plugin definition.
       parameters:
@@ -306,7 +332,7 @@ paths:
           type: string        
         - name: name
           in: query
-          description: Used to write to a leaf resource
+          description: Writes a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: body
@@ -337,6 +363,9 @@ paths:
           schema:
             $ref: '#/definitions/Error'
     delete:
+      tags: 
+        - Delete
+        - Instance
       summary: Deletes a resource from the multi-server instance storage area
       description: Deletes a resource, and optionally its subresources.    
       parameters:
@@ -352,10 +381,12 @@ paths:
           type: string        
         - name: name
           in: query
+          description: Deletes a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: recursive
           in: query
+          description: Whether or not to delete subresources recursively
           required: false
           type: boolean
       produces:
@@ -379,6 +410,9 @@ paths:
             $ref: '#/definitions/Error'                   
   /{plugin}/user/{resource}:
     get:
+      tags: 
+        - Read
+        - User
       summary: Get a JSON resource, listing, or binary file from the user scope or higher
       description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter. The user scope determines which user's data to lookup via the session info.
       parameters:
@@ -394,7 +428,7 @@ paths:
           type: string
         - name: name
           in: query
-          description: Used to retrieve a subresource when resource in URL is not a leaf
+          description: Retrieves a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: listing
@@ -423,6 +457,9 @@ paths:
           schema:
             $ref: '#/definitions/Error'
     put:
+      tags: 
+        - Write
+        - User
       summary: Writes a JSON or binary resource to the user's storage area
       description: Writes either a binary or JSON resource according to the plugin definition. The user scope determines which user's data to lookup via the session info.
       parameters:
@@ -438,7 +475,7 @@ paths:
           type: string        
         - name: name
           in: query
-          description: Used to write to a leaf resource
+          description: Writes a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: body
@@ -469,6 +506,9 @@ paths:
           schema:
             $ref: '#/definitions/Error'
     delete:
+      tags: 
+        - Delete
+        - User
       summary: Deletes a resource from the multi-server instance storage area
       description: Deletes a resource, and optionally its subresources.
       parameters:
@@ -484,10 +524,12 @@ paths:
           type: string        
         - name: name
           in: query
+          description: Deletes a named subresource when resource given is not a leaf
           required: false
           type: string
         - name: recursive
           in: query
+          description: Whether or not to delete subresources recursively
           required: false
           type: boolean
       produces:
