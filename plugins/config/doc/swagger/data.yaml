@@ -1,11 +1,3 @@
-#  This program and the accompanying materials are
-#  made available under the terms of the Eclipse Public License v2.0 which accompanies
-#  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
-#  
-#  SPDX-License-Identifier: EPL-2.0
-#  
-#  Copyright Contributors to the Zowe Project.
-
 swagger: '2.0'
 info:
   description: This service is core to the App server and handles user, group, and administrative preferences for individual plugins
@@ -23,24 +15,19 @@ tags:
   - name: Preferences
   - name: Storage
 paths:
-  /{plugin}/{scope}/{resource}:
+  /{plugin}/plugin/{resource}:
     get:
-      summary: Returns a JSON resource, or listing
-      description: Returns a resource or collection of subresources as a JSON, aggregated according to scope & plugin definition. Or, can be made to return a listing of resources instead
+      summary: Get a JSON resource, listing, or binary file from the plugin scope
+      description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
       parameters:
         - name: plugin
           in: path
           description: Plugin ID for plugin installed on App server
           required: true          
           type: string
-        - name: scope
-          in: path
-          description: One of [product, site, instance, user] which determines what scopes of storage will be searched and possibly aggregated to return the resource
-          required: true          
-          type: string
         - name: resource
           in: path
-          description: A unit of storage that can be represented as a JSON, possibly containing subresources, all defined to exist by the plugin's own definition
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
           required: true          
           type: string
         - name: name
@@ -55,6 +42,7 @@ paths:
           type: boolean
       produces:
         - application/json
+        - application/octet-stream
       responses:
         '200':
           description: Retrieval success
@@ -71,22 +59,109 @@ paths:
         '404':
           description: Resource not defined for plugin
           schema:
-            $ref: '#/definitions/Error'
-    put:
+            $ref: '#/definitions/Error'  
+  /{plugin}/product/{resource}:
+    get:
+      summary: Get a JSON resource, listing, or binary file from the plugin scope or higher
+      description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
       parameters:
         - name: plugin
           in: path
           description: Plugin ID for plugin installed on App server
           required: true          
           type: string
-        - name: scope
+        - name: resource
           in: path
-          description: One of product, site, instance, user which determines what scopes of storage will be searched and possibly aggregated to return the resource
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string
+        - name: name
+          in: query
+          description: Used to retrieve a subresource when resource in URL is not a leaf
+          required: false
+          type: string
+        - name: listing
+          in: query
+          description: Returns a list of subresources, rather than their contents
+          required: false
+          type: boolean
+      produces:
+        - application/json
+        - application/octet-stream
+      responses:
+        '200':
+          description: Retrieval success
+          schema:
+            $ref: '#/definitions/ResourceGet'
+        '204':
+          description: Resource can exist but has not yet been made
+          schema:
+            $ref: '#/definitions/Error' 
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error'  
+  /{plugin}/site/{resource}:
+    get:
+      summary: Get a JSON resource, listing, or binary file from the site scope or higher
+      description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
           required: true          
           type: string
         - name: resource
           in: path
-          description: A unit of storage that can be represented as a JSON, possibly containing subresources, all defined to exist by the plugin's own definition
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string
+        - name: name
+          in: query
+          description: Used to retrieve a subresource when resource in URL is not a leaf
+          required: false
+          type: string
+        - name: listing
+          in: query
+          description: Returns a list of subresources, rather than their contents
+          required: false
+          type: boolean
+      produces:
+        - application/json
+        - application/octet-stream
+      responses:
+        '200':
+          description: Retrieval success
+          schema:
+            $ref: '#/definitions/ResourceGet'
+        '204':
+          description: Resource can exist but has not yet been made
+          schema:
+            $ref: '#/definitions/Error' 
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error' 
+    put:
+      summary: Writes a JSON or binary resource to the multi-server instance storage area
+      description: Writes either a binary or JSON resource according to the plugin definition. 
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
+          required: true          
+          type: string
+        - name: resource
+          in: path
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
           required: true          
           type: string        
         - name: name
@@ -97,11 +172,13 @@ paths:
         - name: body
           in: body
           required: true
-          type: object
+          schema: 
+            type: object
       produces:
         - application/json
       consumes:
         - application/json
+        - application/octet-stream
       responses:
         '201':
           description: Write success
@@ -120,20 +197,281 @@ paths:
           schema:
             $ref: '#/definitions/Error'
     delete:
+      summary: Deletes a resource from the multi-server instance storage area
+      description: Deletes a resource, and optionally its subresources.
       parameters:
         - name: plugin
           in: path
           description: Plugin ID for plugin installed on App server
           required: true          
           type: string
-        - name: scope
+        - name: resource
           in: path
-          description: One of product, site, instance, user which determines what scopes of storage will be searched and possibly aggregated to return the resource
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string        
+        - name: name
+          in: query
+          required: false
+          type: string
+        - name: recursive
+          in: query
+          required: false
+          type: boolean
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Delete success
+          schema:
+            $ref: '#/definitions/ResourceDelete'
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error'            
+        '500':
+          description: Write error
+          schema:
+            $ref: '#/definitions/Error'                   
+  /{plugin}/instance/{resource}:
+    get:
+      summary: Get a JSON resource, listing, or binary file from the instance scope or higher
+      description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter.
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
           required: true          
           type: string
         - name: resource
           in: path
-          description: A unit of storage that can be represented as a JSON, possibly containing subresources, all defined to exist by the plugin's own definition
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string
+        - name: name
+          in: query
+          description: Used to retrieve a subresource when resource in URL is not a leaf
+          required: false
+          type: string
+        - name: listing
+          in: query
+          description: Returns a list of subresources, rather than their contents
+          required: false
+          type: boolean
+      produces:
+        - application/json
+        - application/octet-stream
+      responses:
+        '200':
+          description: Retrieval success
+          schema:
+            $ref: '#/definitions/ResourceGet'
+        '204':
+          description: Resource can exist but has not yet been made
+          schema:
+            $ref: '#/definitions/Error' 
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error'  
+    put:
+      summary: Writes a JSON or binary resource to the server instance storage area
+      description: Writes either a binary or JSON resource according to the plugin definition.
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
+          required: true          
+          type: string
+        - name: resource
+          in: path
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string        
+        - name: name
+          in: query
+          description: Used to write to a leaf resource
+          required: false
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema: 
+            type: object
+      produces:
+        - application/json
+      consumes:
+        - application/json
+        - application/octet-stream
+      responses:
+        '201':
+          description: Write success
+          schema:
+            $ref: '#/definitions/ResourcePut'
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error'            
+        '500':
+          description: Write error
+          schema:
+            $ref: '#/definitions/Error'
+    delete:
+      summary: Deletes a resource from the multi-server instance storage area
+      description: Deletes a resource, and optionally its subresources.    
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
+          required: true          
+          type: string
+        - name: resource
+          in: path
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string        
+        - name: name
+          in: query
+          required: false
+          type: string
+        - name: recursive
+          in: query
+          required: false
+          type: boolean
+      produces:
+        - application/json
+      responses:
+        '200':
+          description: Delete success
+          schema:
+            $ref: '#/definitions/ResourceDelete'
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error'            
+        '500':
+          description: Write error
+          schema:
+            $ref: '#/definitions/Error'                   
+  /{plugin}/user/{resource}:
+    get:
+      summary: Get a JSON resource, listing, or binary file from the user scope or higher
+      description: Returns a binary or JSON resource or a collection of JSON subresources. JSON resources are aggregated with broader scopes according to plugin definition. Whether the resource is JSON or binary also is according to the plugin definition. Can return a listing rather than content by use of query parameter. The user scope determines which user's data to lookup via the session info.
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
+          required: true          
+          type: string
+        - name: resource
+          in: path
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string
+        - name: name
+          in: query
+          description: Used to retrieve a subresource when resource in URL is not a leaf
+          required: false
+          type: string
+        - name: listing
+          in: query
+          description: Returns a list of subresources, rather than their contents
+          required: false
+          type: boolean
+      produces:
+        - application/json
+        - application/octet-stream
+      responses:
+        '200':
+          description: Retrieval success
+          schema:
+            $ref: '#/definitions/ResourceGet'
+        '204':
+          description: Resource can exist but has not yet been made
+          schema:
+            $ref: '#/definitions/Error' 
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error'
+    put:
+      summary: Writes a JSON or binary resource to the user's storage area
+      description: Writes either a binary or JSON resource according to the plugin definition. The user scope determines which user's data to lookup via the session info.
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
+          required: true          
+          type: string
+        - name: resource
+          in: path
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
+          required: true          
+          type: string        
+        - name: name
+          in: query
+          description: Used to write to a leaf resource
+          required: false
+          type: string
+        - name: body
+          in: body
+          required: true
+          schema: 
+            type: object
+      produces:
+        - application/json
+      consumes:
+        - application/json
+        - application/octet-stream
+      responses:
+        '201':
+          description: Write success
+          schema:
+            $ref: '#/definitions/ResourcePut'
+        '400':
+          description: Resource, plugin, or scope, or plugin definition not valid
+          schema:
+            $ref: '#/definitions/Error'
+        '404':
+          description: Resource not defined for plugin
+          schema:
+            $ref: '#/definitions/Error'            
+        '500':
+          description: Write error
+          schema:
+            $ref: '#/definitions/Error'
+    delete:
+      summary: Deletes a resource from the multi-server instance storage area
+      description: Deletes a resource, and optionally its subresources.
+      parameters:
+        - name: plugin
+          in: path
+          description: Plugin ID for plugin installed on App server
+          required: true          
+          type: string
+        - name: resource
+          in: path
+          description: The name of a JSON or binary storage item, possibly containing subresources. Each resource's details are defined in the plugin definition.
           required: true          
           type: string        
         - name: name
@@ -163,143 +501,6 @@ paths:
           description: Write error
           schema:
             $ref: '#/definitions/Error'        
-  /{plugin}/{scopecategory}/{scope}/{resource}:
-    get:
-      summary: Returns a JSON resource, or listing
-      description: Returns a resource or collection of subresources as a JSON, aggregated according to scope & plugin definition. Or, can be made to return a listing of resources instead
-      parameters:
-        - name: plugin
-          in: path
-          description: Plugin ID for plugin installed on App server
-          required: true          
-          type: string
-        - name: scope
-          in: path
-          description: One of product, site, instance, user which determines what scopes of storage will be searched and possibly aggregated to return the resource
-          required: true          
-          type: string
-        - name: resource
-          in: path
-          description: A unit of storage that can be represented as a JSON, possibly containing subresources, all defined to exist by the plugin's own definition
-          required: true          
-          type: string        
-        - name: name
-          in: query
-          description: Used to retrieve a subresource when resource in URL is not a leaf
-          required: false
-          type: string
-        - name: listing
-          in: query
-          description: Returns a list of subresources, rather than their contents
-          required: false
-          type: boolean
-      produces:
-        - application/json          
-      responses:
-        '200':
-          description: Retrieval success
-          schema:
-            $ref: '#/definitions/ResourceGet'
-        '204':
-          description: Resource can exist but has not yet been made
-          schema:
-            $ref: '#/definitions/Error' 
-        '400':
-          description: Resource, plugin, or scope, or plugin definition not valid
-          schema:
-            $ref: '#/definitions/Error'
-        '404':
-          description: Resource not defined for plugin
-          schema:
-            $ref: '#/definitions/Error'
-    put:
-      parameters:
-        - name: plugin
-          in: path
-          description: Plugin ID for plugin installed on App server
-          type: string
-        - name: scope
-          in: path
-          description: One of product, site, instance, user which determines what scopes of storage will be searched and possibly aggregated to return the resource
-          type: string
-        - name: resource
-          in: path
-          description: A unit of storage that can be represented as a JSON, possibly containing subresources, all defined to exist by the plugin's own definition
-          type: string        
-        - name: name
-          in: query
-          description: Used to write to a leaf resource
-          required: false
-          type: string
-        - name: body
-          in: body
-          required: true
-          type: object
-      produces:
-        - application/json
-      consumes:
-        - application/json
-      responses:
-        '201':
-          description: Write success
-          schema:
-            $ref: '#/definitions/ResourcePut'
-        '400':
-          description: Resource, plugin, or scope, or plugin definition not valid
-          schema:
-            $ref: '#/definitions/Error'
-        '404':
-          description: Resource not defined for plugin
-          schema:
-            $ref: '#/definitions/Error'            
-        '500':
-          description: Write error
-          schema:
-            $ref: '#/definitions/Error'        
-    delete:
-      parameters:
-        - name: plugin
-          in: path
-          description: Plugin ID for plugin installed on App server
-          required: true
-          type: string
-        - name: scope
-          in: path
-          description: One of product, site, instance, user which determines what scopes of storage will be searched and possibly aggregated to return the resource
-          required: true
-          type: string
-        - name: resource
-          in: path
-          description: A unit of storage that can be represented as a JSON, possibly containing subresources, all defined to exist by the plugin's own definition
-          required: true
-          type: string        
-        - name: name
-          in: query
-          required: false
-          type: string
-        - name: recursive
-          in: query
-          required: false
-          type: boolean
-      produces:
-        - application/json
-      responses:
-        '200':
-          description: Delete success
-          schema:
-            $ref: '#/definitions/ResourceDelete'
-        '400':
-          description: Resource, plugin, or scope, or plugin definition not valid
-          schema:
-            $ref: '#/definitions/Error'
-        '404':
-          description: Resource not defined for plugin
-          schema:
-            $ref: '#/definitions/Error'            
-        '500':
-          description: Write error
-          schema:
-            $ref: '#/definitions/Error'             
 definitions:
   ResourceGet:
     type: object
