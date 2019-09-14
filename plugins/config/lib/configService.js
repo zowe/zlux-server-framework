@@ -49,7 +49,7 @@ const CONFIG_SCOPE_PLUGIN = 6;
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.10.0";
+const CURRENT_JSON_VERSION = "0.10.1";
 
 const PLUGIN_DEFAULT_DIR = pathModule.join('config','storageDefaults');
 const BINARY_BODY_SIZE_LIMIT = '3mb';
@@ -2379,55 +2379,71 @@ function ConfigService(context) {
   
   context.addBodyParseMiddleware(router);
   
-  router.get('/:pluginID/product/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_PRODUCT;
-    request.resourceURL+='/product';
-    let parts = getResourcePartsOrFail(request,response);
-    if (!parts) {
+  router.get('/:pluginID/:scope/:resource*',function(request, response) {
+    let scope = request.params.scope;
+    switch (scope) {
+    case 'plugin':
+      request.scope = CONFIG_SCOPE_PLUGIN;
+      break;
+    case 'product':
+      request.scope = CONFIG_SCOPE_PRODUCT;
+      break;
+    case 'site':
+      request.scope = CONFIG_SCOPE_SITE;
+      break;
+    case 'instance':
+      request.scope = CONFIG_SCOPE_INSTANCE;
+      break;
+    case 'user':
+      request.scope = CONFIG_SCOPE_USER;
+      break;
+    default:
+      respondWithJsonError(response,"Unsupported scope or method", HTTP_STATUS_BAD_REQUEST);
       return;
     }
-    determineResource(null,parts,0,request,response);
-  });
-  router.get('/:pluginID/plugin/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_PLUGIN;
-    request.resourceURL+='/plugin';
-    let parts = getResourcePartsOrFail(request,response);
-    if (!parts) {
-      return;
-    }
-    determineResource(null,parts,0,request,response);
-  });  
-  router.all('/:pluginID/site/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_SITE;
-    request.resourceURL+='/site';
-    let parts = getResourcePartsOrFail(request,response);
-    if (!parts) {
-      return;
-    }
-    determineResource(null,parts,0,request,response);
-  });
-  router.all('/:pluginID/instance/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_INSTANCE;
-    request.resourceURL+='/instance';
-    let parts = getResourcePartsOrFail(request,response);
-    if (!parts) {
-      return;
-    }
-    determineResource(null,parts,0,request,response);
-  });
-  router.all('/:pluginID/user/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_USER;
-    request.resourceURL+='/user';    
-    if (!request.username) {
+    
+    request.resourceURL+='/'+scope;
+    if (request.scope == CONFIG_SCOPE_USER && !request.username) {
       respondWithJsonError(response,"Requested user scope without providing username",HTTP_STATUS_BAD_REQUEST);
       return;
     }
+
     let parts = getResourcePartsOrFail(request,response);
     if (!parts) {
       return;
     }
     determineResource(null,parts,0,request,response);
   });
+  router.all('/:pluginID/:scope/:resource*',function(request, response) {
+    let scope = request.params.scope;
+    switch (scope) {
+    case 'site':
+      request.scope = CONFIG_SCOPE_SITE;
+      break;
+    case 'instance':
+      request.scope = CONFIG_SCOPE_INSTANCE;
+      break;
+    case 'user':
+      request.scope = CONFIG_SCOPE_USER;
+      break;
+    default:
+      respondWithJsonError(response,"Unsupported scope or method", HTTP_STATUS_BAD_REQUEST);
+      return;
+    }
+    
+    request.resourceURL+='/'+scope;
+    if (request.scope == CONFIG_SCOPE_USER && !request.username) {
+      respondWithJsonError(response,"Requested user scope without providing username",HTTP_STATUS_BAD_REQUEST);
+      return;
+    }
+
+    let parts = getResourcePartsOrFail(request,response);
+    if (!parts) {
+      return;
+    }
+    determineResource(null,parts,0,request,response);
+  });
+  
 
   /*extra level*/
   /*
@@ -2473,6 +2489,7 @@ function ConfigService(context) {
     */    
     switch (request.method) {
     case 'GET':
+    case 'HEAD':
       return handleGet(request,response,lastPath);
     case 'POST':
       return handlePost(request,response,lastPath);
