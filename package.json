@@ -11,6 +11,14 @@
     {
       "name": "Sean Grady",
       "email": "sgrady@rocketsoftware.com"
+    },
+    {
+      "name": "Leanid Astrakou",
+      "email": "lastrakou@rocketsoftware.com"
+    },
+    {
+      "name": "Tim Gerstel",
+      "email": "tgerstel@rocketsoftware.com"
     }
   ],
   "main": "lib/index.js",
