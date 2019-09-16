@@ -35,11 +35,13 @@ const OPTION_ARGS = [
 ];
 
 const calledViaCLI = (require.main === module);
+let userInput;
+let pluginsDir;
 
 if(calledViaCLI){
   const commandArgs = process.argv.slice(2);
   const argumentParser = argParser.createParser(OPTION_ARGS);
-  const userInput = argumentParser.parse(commandArgs);
+  userInput = argumentParser.parse(commandArgs);
 
   if (!userInput.inputApp || !(!userInput.pluginsDir ^ !userInput.zluxConfig)) {
     logger.severe(usage);
@@ -52,7 +54,6 @@ if(calledViaCLI){
 
   userInput.inputApp = serverUtils.normalizePath(userInput.inputApp);
 
-  let pluginsDir;
   if (userInput.pluginsDir) {
     pluginsDir = serverUtils.normalizePath(userInput.pluginsDir); 
   } else {
