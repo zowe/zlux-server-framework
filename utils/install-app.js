@@ -24,8 +24,8 @@ const usage = 'Usage: --inputApp | -i INPUTAPP --pluginsDir | -p PLUGINSDIR '
       + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v]';
 
 //TODO if plugins get extracted read-only, then how would we go about doing upgrades? read-write for now!
-const FILE_WRITE_MODE = 0o600;
-const DIR_WRITE_MODE = 0o700;
+const FILE_WRITE_MODE = 0o660;
+const DIR_WRITE_MODE = 0o770;
 
 const OPTION_ARGS = [
   new argParser.CLIArgument('inputApp', 'i', argParser.constants.ARG_TYPE_VALUE),
@@ -34,33 +34,41 @@ const OPTION_ARGS = [
   new argParser.CLIArgument('verbose', 'v', argParser.constants.ARG_TYPE_FLAG)
 ];
 
-const commandArgs = process.argv.slice(2);
-const argumentParser = argParser.createParser(OPTION_ARGS);
-const userInput = argumentParser.parse(commandArgs);
-
-if (!userInput.inputApp || !(!userInput.pluginsDir ^ !userInput.zluxConfig)) {
-  logger.severe(usage);
-  process.exit(1);
-}
-
-if (userInput.verbose) {
-  packagingUtils.coreLogger.setLogLevelForComponentName('install-app', logger.FINE);
-}
-
-userInput.inputApp = serverUtils.normalizePath(userInput.inputApp);
-
+const calledViaCLI = (require.main === module);
+let userInput;
 let pluginsDir;
-if (userInput.pluginsDir) {
-  pluginsDir = serverUtils.normalizePath(userInput.pluginsDir); 
-} else {
-  userInput.zluxConfig = serverUtils.normalizePath(userInput.zluxConfig);
-  const zluxConfig = jsonUtils.parseJSONWithComments(userInput.zluxConfig);
-  pluginsDir = serverUtils.normalizePath(
-    zluxConfig.pluginsDir,
-    process.cwd());
-  if (!path.isAbsolute(pluginsDir)){
-    //zluxconfig paths relative to whereever that file is
-    path.normalize(userInput.zluxConfig,pluginsDir);
+
+if(calledViaCLI){
+  const commandArgs = process.argv.slice(2);
+  const argumentParser = argParser.createParser(OPTION_ARGS);
+  userInput = argumentParser.parse(commandArgs);
+
+  if (!userInput.inputApp || !(!userInput.pluginsDir ^ !userInput.zluxConfig)) {
+    logger.severe(usage);
+    process.exit(1);
+  }
+
+  if (userInput.verbose) {
+    packagingUtils.coreLogger.setLogLevelForComponentName('install-app', logger.FINE);
+  }
+
+  userInput.inputApp = serverUtils.normalizePath(userInput.inputApp);
+
+  if (userInput.pluginsDir) {
+    pluginsDir = serverUtils.normalizePath(userInput.pluginsDir); 
+  } else {
+    userInput.zluxConfig = serverUtils.normalizePath(userInput.zluxConfig);
+    const zluxConfig = jsonUtils.parseJSONWithComments(userInput.zluxConfig);
+    pluginsDir = serverUtils.normalizePath(
+      zluxConfig.pluginsDir,
+      process.cwd());
+    if (!path.isAbsolute(pluginsDir)){
+      //zluxconfig paths relative to whereever that file is
+      path.normalize(userInput.zluxConfig,pluginsDir);
+    }
+  }
+  if (isFile(pluginsDir)) {
+    packagingUtils.endWithMessage(`App Server plugins directory location given (${pluginsDir}) is not a directory.`);
   }
 }
 
@@ -69,7 +77,12 @@ function isFile(path) {
     let stat = fs.statSync(path);
     return !stat.isDirectory();
   } catch (e) {
-    packagingUtils.endWithMessage(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
+    if(calledViaCLI){
+      packagingUtils.endWithMessage(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
+    } else {
+      logger.warn(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
+      return true;
+    }
   }
   return false;
 }
@@ -78,38 +91,56 @@ function cleanup() {
   logger.warn(`Cleanup not yet implemented`);
 }
 
-function addToServer(appDir) {
+function addToServer(appDir, installDir) {
   try {
     let pluginDefinition = JSON.parse(fs.readFileSync(path.join(appDir,'pluginDefinition.json')));
     logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
     let locatorJSONString =
         `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir.replace(/\\/g,'\\\\')}"\n}`;
-    let destination = path.join(pluginsDir, pluginDefinition.identifier+'.json');
+    let destination;
+    if(calledViaCLI){
+      destination = path.join(pluginsDir, pluginDefinition.identifier+'.json');
+    } else {
+      destination = path.join(installDir, pluginDefinition.identifier+'.json');
+    }
     logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
     fs.writeFile(destination, locatorJSONString, {mode: FILE_WRITE_MODE}, (err)=> {
-      if (err) {
-        packagingUtils.endWithMessage(
-          `App extracted but not registered to App Server due to write fail. Error=${err.message}`);
+      if(err){
+        let errMsg = `App extracted but not registered to App Server due to write fail. Error=${err.message}`;
+        if(calledViaCLI){
+          packagingUtils.endWithMessage(errMsg);
+        } else {
+          logger.warn(errMsg);
+        return {success: false, message: errMsg};
+        }
       }
       logger.info(`App ${pluginDefinition.identifier} installed to ${appDir} and registered with App Server`);
-      process.exit(0);
+      if(calledViaCLI){
+        process.exit(0);
+      }
     });
+    return {success: true, message: pluginDefinition.identifier};
   } catch (e) {
-    packagingUtils.endWithMessage(
+    if(calledViaCLI){
+      packagingUtils.endWithMessage(
       `Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`);
+    }
+    logger.warn(`Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`)
+    return {success: false, message: `Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`};
   }
 }
 
-if (isFile(pluginsDir)) {
-  packagingUtils.endWithMessage(`App Server plugins directory location given (${pluginsDir}) is not a directory.`);
+if(calledViaCLI){
+  if (!isFile(userInput.inputApp)) {
+    const pluginDefinition = packagingUtils.validatePluginInDirectory(userInput.inputApp);
+    addToServer(userInput.inputApp);  
+  } else {
+    packagingUtils.endWithMessage(`App given was not a directory. Not yet implemented: Package extraction`);
+  }
 }
 
-if (!isFile(userInput.inputApp)) {
-  const pluginDefinition = packagingUtils.validatePluginInDirectory(userInput.inputApp);
-  addToServer(userInput.inputApp);  
-} else {
-  packagingUtils.endWithMessage(`App given was not a directory. Not yet implemented: Package extraction`);
-}
+module.exports.addToServer = addToServer;
+module.exports.isFile = isFile;
 
 /*
  This program and the accompanying materials are

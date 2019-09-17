@@ -44,11 +44,15 @@ const CONFIG_SCOPE_GROUP = 2;
 const CONFIG_SCOPE_INSTANCE = 3;
 const CONFIG_SCOPE_SITE = 4;
 const CONFIG_SCOPE_PRODUCT = 5;
+const CONFIG_SCOPE_PLUGIN = 6;
 
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
 
-const CURRENT_JSON_VERSION = "0.8.6";
+const CURRENT_JSON_VERSION = "0.10.1";
+
+const PLUGIN_DEFAULT_DIR = pathModule.join('config','storageDefaults');
+const BINARY_BODY_SIZE_LIMIT = '3mb';
 
 //a file
 const MSG_TYPE_RESOURCE = "org.zowe.configjs.resource";
@@ -63,8 +67,11 @@ const MSG_TYPE_ERROR = "org.zowe.configjs.error";
 const MSG_TYPE_UPDATE = "org.zowe.configjs.resource.update";
 const MSG_TYPE_DELETE = "org.zowe.configjs.delete";
 
-
-
+//used to tell if the type is one other than one we process as json
+function binaryTypeCheck(req) {
+  let result = !req.is('json') && !req.is('text/html');
+  return result;
+}
 
 
 const jsonFileReadOptions = {
@@ -679,6 +686,15 @@ function getPathForScope(lastPath, filename, scope, directories){
       path = directories.productDir+'/'+lastPath;
     }
     break;
+  case CONFIG_SCOPE_PLUGIN:
+    const len = directories._pluginID.length;
+    if (hasFilename) {
+      path = directories.pluginDir+'/'+lastPath.substring(len)+'/'+filename;
+    }
+    else {
+      path = directories.pluginDir+'/'+lastPath.substring(len);
+    }
+    break;    
   default:
     logger.warn(`getpathforscope: Warning, invalid scope of ${scope}`);
   }
@@ -686,7 +702,7 @@ function getPathForScope(lastPath, filename, scope, directories){
 }
 
 /*
-Methods to transition down the chain of P.S.I.G.U
+Methods to transition down the chain of P.P.S.I.G.U
 */
 //TODO group unhandled for now.
 function getNextBroadestScope(scope) {
@@ -699,6 +715,8 @@ function getNextBroadestScope(scope) {
   case CONFIG_SCOPE_SITE:
     return CONFIG_SCOPE_PRODUCT;
   case CONFIG_SCOPE_PRODUCT:
+    return CONFIG_SCOPE_PLUGIN;
+  case CONFIG_SCOPE_PLUGIN:
     return 0;
   default:
     logger.warn(`Scope=${scope} not found`);
@@ -717,6 +735,8 @@ function getNextNarrowestScope(scope) {
     return CONFIG_SCOPE_INSTANCE;
   case CONFIG_SCOPE_PRODUCT:
     return CONFIG_SCOPE_SITE;
+  case CONFIG_SCOPE_PLUGIN:
+    return CONFIG_SCOPE_PRODUCT;
   default:
     logger.warn(`Scope=${scope} not found`);
   }
@@ -834,6 +854,31 @@ function getJSONFromFileAsync(path, callback) {
   });
 }
 
+function isFileReadableAsync(path, callback) {
+  logger.debug('Opening binary file. Path='+path);  
+  fs.open(path,'r',(err,fd)=> {
+    if (err) fdCloseOnError(err,fd,path,callback);
+    else {
+      fs.fstat(fd, (err, stats)=> {
+        if (err) fdCloseOnError(err,fd,path,callback);
+        else {
+          if (stats.isDirectory()) {
+            callback(false);
+          }
+          else {
+            setTimeout(()=> {
+              fs.close(fd, (err) => {
+                //TODO error could exist here but there's not much we can do?
+                callback(true);
+              });
+            },0);//allow for GC
+          }
+        }
+      });
+    }
+  });
+}
+
 
 function startConfigDirectoryJson(resourceLocation, streamer,listing) {
   jStreamer.jsonStart(streamer);
@@ -899,8 +944,35 @@ function getJsonForAggregationNoneAsync(lastPath, filename, directories, scope, 
   getJsonAtNextScope(path);
 }
 
+//for binary, rather than json
+function getPathForAggregationNoneAsync(lastPath, filename, directories, scope, callback) {
+  var path = getPathForScope(lastPath,filename,scope,directories);
+  var getPathAtNextScope = function() {
+    isFileReadableAsync(path,(result)=> {
+      if (!result) {
+        scope = getNextBroadestScope(scope);
+        if (scope) {
+          path = getPathForScope(lastPath,filename,scope,directories);
+          getPathAtNextScope();
+        }
+        else {
+          callback(null);
+        }
+      }
+      else {
+        callback(path);
+      }
+    });
+  };
+  getPathAtNextScope(path);
+}
+
+
 
 function getJsonLocal(lastPath, filename, directories, scope, resource) {
+  if (resource.binary) {
+    return null;
+  }
   var policy = getAggregationPolicy(resource);
   switch (policy) {
   case AGGREGATION_POLICY_NONE:
@@ -926,30 +998,43 @@ function getJsonLocal(lastPath, filename, directories, scope, resource) {
 
 function respondWithConfigFile(response, filename, resource, directories, scope, lastPath, location) {
   var policy = getAggregationPolicy(resource);
+  if (resource.binary) {
+    //until we can think of reasons to have others
+    policy = AGGREGATION_POLICY_NONE;
+  }
   switch (policy) {
 
   case AGGREGATION_POLICY_NONE:
     {
-      getJsonForAggregationNoneAsync(lastPath, filename, directories, scope,(result)=> {
-        if (result) {
-          var fileJsonObject = result.data;
-          var streamer = startResponseForConfigFile(response,200,"OK",location);
-          jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
-          jStreamer.jsonStartObject(streamer,"contents");
-          jStreamer.jsonPrintObject(streamer,fileJsonObject);
-          jStreamer.jsonEndObject(streamer);
-          jStreamer.jsonEnd(streamer);
-          finishResponse(response);
-          logger.debug(`Configuration service request complete. Resource=${location}`);
-        }
-        else {
-          respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
-        }
-      });
+      if (resource.binary) {
+        getPathForAggregationNoneAsync(lastPath, filename, directories, scope,(result)=> {
+          if (result) {
+            response.sendFile(result);
+          } else {
+            respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
+          }
+        });
+      } else {
+        getJsonForAggregationNoneAsync(lastPath, filename, directories, scope,(result)=> {
+          if (result) {
+            var fileJsonObject = result.data;
+            var streamer = startResponseForConfigFile(response,200,"OK",location);
+            jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
+            jStreamer.jsonStartObject(streamer,"contents");
+            jStreamer.jsonPrintObject(streamer,fileJsonObject);
+            jStreamer.jsonEndObject(streamer);
+            jStreamer.jsonEnd(streamer);
+            finishResponse(response);
+            logger.debug(`Configuration service request complete. Resource=${location}`);
+          } else {
+            respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
+          }
+        });
+      }
     }
     break;
   case AGGREGATION_POLICY_OVERRIDE:
-    {
+    {      
       getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
         if (result) {
           var streamer = startResponseForConfigFile(response,200,"OK",location);
@@ -964,7 +1049,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
         else {
           respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
         }
-      });
+      }); 
     }
     break;
   default:
@@ -977,7 +1062,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
 }
 
 function getOverrideJson(relativePath, filename, directories, scope) {
-  var currentScope = CONFIG_SCOPE_PRODUCT;
+  var currentScope = CONFIG_SCOPE_PLUGIN;
 
   var path = getPathForScope(relativePath,filename,currentScope,directories);
   var result = getJSONFromFile(path);
@@ -1013,7 +1098,7 @@ function getOverrideJson(relativePath, filename, directories, scope) {
 }
 
 function getOverrideJsonAsync(relativePath, filename, directories, scope, callback) {
-  var currentScope = CONFIG_SCOPE_PRODUCT;
+  var currentScope = CONFIG_SCOPE_PLUGIN;
 
   var path = getPathForScope(relativePath,filename,currentScope,directories);
   var getJsonAtNextScope = function() {
@@ -1067,8 +1152,6 @@ function getOverrideJsonAsync(relativePath, filename, directories, scope, callba
 
   getJsonAtNextScope();
 }
-
-
 
 function configFileInternalVisitor(hashtable, keyVoid, valueVoid) {
   var jsonTable = hashtable;
@@ -1341,7 +1424,7 @@ function getFilesInDirectory(resource, subresourceList, directories, scope, rela
   we still want to start from the top, just allowing for replacement of files with lower levels.
   */
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListing(fileTable,startScope,scope,relativePath,null,directories,true);
     logger.debug("File table before mapping="+JSON.stringify(fileTable));
     tableMap(fileTable,configFileInternalVisitor,jsonTable);
@@ -1349,7 +1432,7 @@ function getFilesInDirectory(resource, subresourceList, directories, scope, rela
   }
   case AGGREGATION_POLICY_OVERRIDE:
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListing(fileTable,startScope,scope,relativePath,null,directories,false);
     logger.debug("File table before mapping="+JSON.stringify(fileTable));
     tableMap(fileTable,configFileOverrideInternalVisitor,jsonTable);
@@ -1371,7 +1454,7 @@ function respondWithFilenamesInDirectory(response, filename, resource, subresour
 
   case AGGREGATION_POLICY_NONE:
   case AGGREGATION_POLICY_OVERRIDE:
-    var startScope = CONFIG_SCOPE_PRODUCT;
+    var startScope = CONFIG_SCOPE_PLUGIN;
     var streamer = startResponseForConfigDirectory(response,200,"OK",location,true);
     jStreamer.jsonStartArray(streamer,"contents");
     getFileListing(fileTable,startScope,scope,relativePath,filename,directories,true);
@@ -1408,7 +1491,7 @@ function respondWithFilesInDirectory(response, filename, resource, subresourceLi
   we still want to start from the top, just allowing for replacement of files with lower levels.
   */
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListingAsync(fileTable,startScope,scope,relativePath,filename,directories,true).then(()=> {
       if (Object.keys(fileTable).length != 0) {
         var streamer = startResponseForConfigDirectory(response,200,"OK",location,false);
@@ -1430,7 +1513,7 @@ function respondWithFilesInDirectory(response, filename, resource, subresourceLi
   }
   case AGGREGATION_POLICY_OVERRIDE:
   {
-    let startScope = CONFIG_SCOPE_PRODUCT;
+    let startScope = CONFIG_SCOPE_PLUGIN;
     getFileListingAsync(fileTable,startScope,scope,relativePath,filename,directories,false).then(()=> {
       if (Object.keys(fileTable).length != 0) {
         var streamer = startResponseForConfigDirectory(response,200,"OK",location,false);
@@ -1482,19 +1565,23 @@ function replaceOrCreateDirectoryFiles(response, resource, directories, scope, r
 }
 
 function replaceOrCreateFile(response, filename, directories, scope, relativePath,
-                             location, content, contentLength) {
+                             location, content, contentLength, binary) {
 
   var path = getPathForScope(relativePath,filename,scope,directories);
   var mode = 0700; //TODO is 700 good for us?
   //mode is for if the file is created.
   //w means create if doesnt exist, and open for writing
-
   
   fs.open(path,'w',mode,function(error, fd) {
     if (!error) {
       var offset = 0;
       var contentLength = content.length;
-      var buff = Buffer.from(content,'utf8');
+      var buff;
+      if (binary) {
+        buff = new Uint8Array(Buffer.from(content));
+      } else {
+        buff = Buffer.from(content,'utf8');
+      }
       var writeCallback = function(err,writtenLength,buffer) {
         contentLength -= writtenLength;
         offset += writtenLength;
@@ -1881,8 +1968,8 @@ function handleDeleteFileRequest(response, filename, resource, directories, scop
   });
 };
 
-function makeConfigurationDirectoriesStruct(directoryConfig, productCode, user) {
-  return makeConfigurationDirectoriesStructInner(directoryConfig,productCode,user);
+function makeConfigurationDirectoriesStruct(directoryConfig, productCode, user, pluginLocation) {
+  return makeConfigurationDirectoriesStructInner(directoryConfig,productCode,user, pluginLocation);
 }
 
 function makeUserConfigurationDirectories(serverSettings, productCode, user) {
@@ -1902,10 +1989,11 @@ function makeUserConfigurationDirectories(serverSettings, productCode, user) {
 }
 
 
-function makeConfigurationDirectoriesStructInner(serverSettings, productCode, user) {
+function makeConfigurationDirectoriesStructInner(serverSettings, productCode, user, pluginLocation) {
   var pluginDir = productCode+'/'+"pluginStorage";
 
   var directories = {};
+  
   var productDir = jsonObjectGetString(serverSettings, "productDir");
   var fullProductDir = productDir+'/'+pluginDir;
   directories.productDir = fullProductDir;
@@ -1920,6 +2008,9 @@ function makeConfigurationDirectoriesStructInner(serverSettings, productCode, us
 
   if (user) {
     directories.usersDir = makeUserConfigurationDirectories(serverSettings,productCode,user);
+  }
+  if (pluginLocation) {
+    directories.pluginDir = pathModule.join(pluginLocation, PLUGIN_DEFAULT_DIR);
   }
   logger.debug('Directories = '+JSON.stringify(directories));
   return directories;
@@ -2046,7 +2137,13 @@ function addJSONFilesToJSON(startingPath,json) {
     fileNames.forEach(function (filename) {
       var filepath = pathModule.join(startingPath,filename);
       if (fs.statSync(filepath).isFile()) {
-        let contents = jsonUtils.parseJSONWithComments(filepath);
+        let contents;
+        try {
+          contents = jsonUtils.parseJSONWithComments(filepath);
+        } catch (e) {
+          //binary or corrupt. this function only for json
+          logger.warn(`Failed to load ${filepath} as a JSON`);
+        }
         if (contents) {
           json[filename] = {"_objectType": 'org.zowe.configjs.internal.file', "contents":contents};
         }
@@ -2073,6 +2170,9 @@ function addJSONFilesToJSON(startingPath,json) {
 function getScopeRootPath(scope,directories) {
   var path;
   switch (scope) {
+  case CONFIG_SCOPE_PLUGIN:
+    path = directories.pluginDir;
+    break;
   case CONFIG_SCOPE_PRODUCT:
     path = directories.productDir;
     break;
@@ -2124,13 +2224,16 @@ function getJSONFromLocation(relativeLocation,directories,startScope,endScope) {
   var scope = startScope;
   var configuration = {};
   while (scope) {
-    var rootPath = pathModule.join(getScopeRootPath(scope,directories),relativeLocation);
-    var updatedConfiguration = addJSONFilesToJSON(rootPath,configuration);
-    if (updatedConfiguration) {
-      logger.debug("Configuration is now = "+JSON.stringify(updatedConfiguration));
-      var filesFound = Object.keys(updatedConfiguration);
-      for (var i = 0; i < filesFound; i++) {
-        configuration[filesFound[i]] = updatedConfiguration[filesFound[i]];
+    const path = getScopeRootPath(scope,directories);
+    if (path) {
+      var rootPath = pathModule.join(path,relativeLocation);
+      var updatedConfiguration = addJSONFilesToJSON(rootPath,configuration);
+      if (updatedConfiguration) {
+        logger.debug("Configuration is now = "+JSON.stringify(updatedConfiguration));
+        var filesFound = Object.keys(updatedConfiguration);
+        for (var i = 0; i < filesFound; i++) {
+          configuration[filesFound[i]] = updatedConfiguration[filesFound[i]];
+        }
       }
     }
     if (scope === endScope) {
@@ -2141,22 +2244,22 @@ function getJSONFromLocation(relativeLocation,directories,startScope,endScope) {
   return configuration;
 }
 
-function getServiceConfiguration(pluginIdentifier,serviceName,serverSettings,productCode) {
+function getServiceConfiguration(pluginIdentifier, pluginLocation, serviceName,serverSettings,productCode) {
   var policy = AGGREGATION_POLICY_NONE;
-  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode);
+  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = pluginIdentifier+'/_internal/services/'+serviceName;
-  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PRODUCT,CONFIG_SCOPE_INSTANCE);
+  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
   return new InternalConfiguration(configuration);
 }
 exports.getServiceConfiguration = getServiceConfiguration;
 
 //reserved folder _internal
 //may contain services and plugin
-function getPluginConfiguration(identifier,serverSettings,productCode) {
+function getPluginConfiguration(identifier, pluginLocation, serverSettings,productCode) {
   var policy = AGGREGATION_POLICY_NONE;
-  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode);
+  var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = identifier+'/_internal/plugin';
-  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PRODUCT,CONFIG_SCOPE_INSTANCE);
+  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
   return new InternalConfiguration(configuration);
 };
 exports.getPluginConfiguration = getPluginConfiguration;
@@ -2262,55 +2365,85 @@ function ConfigService(context) {
         return;
       }
     }
+    //TODO plugin.location seems like it will be changed in the future.
+    request.directories.pluginDir = pathModule.join(request.plugin.location, PLUGIN_DEFAULT_DIR);
+    request.directories._pluginID = encodeDirectoryName(id);
     next();
   });
 
+  
+  //default limit was '100kb' at time of writing this comment
+  router.use(bodyParser.raw({type: binaryTypeCheck, limit:BINARY_BODY_SIZE_LIMIT}));
   router.use(bodyParser.text({type:'application/json'}));
-  router.use(bodyParser.text({type:'text/plain'}));
   router.use(bodyParser.text({type:'text/html'}));
   
   context.addBodyParseMiddleware(router);
   
-  router.get('/:pluginID/product/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_PRODUCT;
-    request.resourceURL+='/product';
-    let parts = getResourcePartsOrFail(request,response);
-    if (!parts) {
+  router.get('/:pluginID/:scope/:resource*',function(request, response) {
+    let scope = request.params.scope;
+    switch (scope) {
+    case 'plugin':
+      request.scope = CONFIG_SCOPE_PLUGIN;
+      break;
+    case 'product':
+      request.scope = CONFIG_SCOPE_PRODUCT;
+      break;
+    case 'site':
+      request.scope = CONFIG_SCOPE_SITE;
+      break;
+    case 'instance':
+      request.scope = CONFIG_SCOPE_INSTANCE;
+      break;
+    case 'user':
+      request.scope = CONFIG_SCOPE_USER;
+      break;
+    default:
+      respondWithJsonError(response,"Unsupported scope or method", HTTP_STATUS_BAD_REQUEST);
       return;
     }
-    determineResource(null,parts,0,request,response);
-  });
-  router.all('/:pluginID/site/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_SITE;
-    request.resourceURL+='/site';
-    let parts = getResourcePartsOrFail(request,response);
-    if (!parts) {
-      return;
-    }
-    determineResource(null,parts,0,request,response);
-  });
-  router.all('/:pluginID/instance/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_INSTANCE;
-    request.resourceURL+='/instance';
-    let parts = getResourcePartsOrFail(request,response);
-    if (!parts) {
-      return;
-    }
-    determineResource(null,parts,0,request,response);
-  });
-  router.all('/:pluginID/user/:resource*',(request, response)=> {
-    request.scope = CONFIG_SCOPE_USER;
-    request.resourceURL+='/user';    
-    if (!request.username) {
+    
+    request.resourceURL+='/'+scope;
+    if (request.scope == CONFIG_SCOPE_USER && !request.username) {
       respondWithJsonError(response,"Requested user scope without providing username",HTTP_STATUS_BAD_REQUEST);
       return;
     }
+
     let parts = getResourcePartsOrFail(request,response);
     if (!parts) {
       return;
     }
     determineResource(null,parts,0,request,response);
   });
+  router.all('/:pluginID/:scope/:resource*',function(request, response) {
+    let scope = request.params.scope;
+    switch (scope) {
+    case 'site':
+      request.scope = CONFIG_SCOPE_SITE;
+      break;
+    case 'instance':
+      request.scope = CONFIG_SCOPE_INSTANCE;
+      break;
+    case 'user':
+      request.scope = CONFIG_SCOPE_USER;
+      break;
+    default:
+      respondWithJsonError(response,"Unsupported scope or method", HTTP_STATUS_BAD_REQUEST);
+      return;
+    }
+    
+    request.resourceURL+='/'+scope;
+    if (request.scope == CONFIG_SCOPE_USER && !request.username) {
+      respondWithJsonError(response,"Requested user scope without providing username",HTTP_STATUS_BAD_REQUEST);
+      return;
+    }
+
+    let parts = getResourcePartsOrFail(request,response);
+    if (!parts) {
+      return;
+    }
+    determineResource(null,parts,0,request,response);
+  });
+  
 
   /*extra level*/
   /*
@@ -2356,6 +2489,7 @@ function ConfigService(context) {
     */    
     switch (request.method) {
     case 'GET':
+    case 'HEAD':
       return handleGet(request,response,lastPath);
     case 'POST':
       return handlePost(request,response,lastPath);
@@ -2455,7 +2589,9 @@ function ConfigService(context) {
     if (!request.currentResourceList && itemName.length>0) {
       //respond with one file
       accessLogger.debug(`Configuration service handling request for element. Resource${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
-      respondWithConfigFile(response,itemName,request.currentResourceObject,request.directories,request.scope,lastPath,request.resourceURL);
+      respondWithConfigFile(response,itemName,request.currentResourceObject,
+                            request.directories,request.scope,lastPath,
+                            request.resourceURL);
     }
     else if (request.currentResourceList && itemName.length===0) {
       //give us a listing of sub resources
@@ -2466,9 +2602,14 @@ function ConfigService(context) {
       let listing = request.query.listing ? (request.query.listing.toLowerCase() == 'true') : false;
       accessLogger.debug(`Configuration service responding with elements in resource. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}. ListingOnly=${listing}.`);
       if (!listing) {
-        //give us a collection of all files in this folder            
-        respondWithFilesInDirectory(response,itemName,request.currentResourceObject,request.currentResourceList,request.directories,
-                                    request.scope,lastPath,request.resourceURL);
+        if (request.currentResourceObject.binary) {
+          respondWithJsonError(response,`Cannot return multiple binaries in a single request`,HTTP_STATUS_BAD_REQUEST);
+        } else {
+          //give us a collection of all files in this folder            
+          respondWithFilesInDirectory(response, itemName, request.currentResourceObject,
+                                      request.currentResourceList, request.directories,
+                                      request.scope, lastPath, request.resourceURL);
+        }
       } else {
         respondWithFilenamesInDirectory(response,itemName,request.currentResourceObject,request.currentResourceList,request.directories,
                                         request.scope,lastPath,request.resourceURL);
@@ -2553,18 +2694,20 @@ function ConfigService(context) {
       return 1;
     }
 
-    if (typeof request.body !== 'string') {
-      respondWithJsonError(response,"Could not access PUT body.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
-      return 1;
-    }
-    try {
-      //We only support JSON storage for now.
-      //If we attempt to write out a string that isnt JSON, retrieval will be broken.
-      //This also handles the case in which body was just empty...
-      const bodyTest = JSON.parse(request.body);
-    } catch (e) {
-      respondWithJsonError(response,"PUT body is not JSON.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
-      return 1;
+    if (!request.currentResourceObject.binary) {
+      if (typeof request.body !== 'string') {
+        respondWithJsonError(response,"Could not access PUT body.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+        return 1;
+      }
+      try {
+        //We only support JSON storage for now.
+        //If we attempt to write out a string that isnt JSON, retrieval will be broken.
+        //This also handles the case in which body was just empty...
+        const bodyTest = JSON.parse(request.body);
+      } catch (e) {
+        respondWithJsonError(response,"PUT body is not JSON.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+        return 1;
+      }
     }
     
     let b64 = request.query.b64;
@@ -2576,8 +2719,9 @@ function ConfigService(context) {
       accessLogger.debug(`Configuration service handling element write request. `
                          +`Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
       restCheckModifiedTimestamp(itemName,request.directories,request.scope,lastPath,timestamp).then(()=> {
-        replaceOrCreateFile(response, itemName, request.directories,
-                            request.scope,lastPath, request.resourceURL, request.body, request.body.length);
+          replaceOrCreateFile(response, itemName, request.directories,
+                              request.scope, lastPath, request.resourceURL,
+                              request.body, request.body.length, request.currentResourceObject.binary);
       }, (err)=> {
         if (err && err.message === 'Timestamp mismatch'){
           logger.warn(`Could not delete resource due to timestamp mismatch. `
