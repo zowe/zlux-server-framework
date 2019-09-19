@@ -2695,9 +2695,23 @@ function ConfigService(context) {
     }
 
     if (!request.currentResourceObject.binary) {
-      if (typeof request.body !== 'string') {
+      if (!request.body) {
         respondWithJsonError(response,"Could not access PUT body.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
         return 1;
+      }
+      else if (typeof request.body !== 'string') {
+        if (typeof request.body !== 'object') {
+          respondWithJsonError(response,"Could not access PUT body.",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+          return 1;
+        } else {
+          try {
+            let output = request.body.toString('utf8');
+            request.body = output;
+          } catch (e) {
+            respondWithJsonError(response,"PUT body contents invalid",HTTP_STATUS_BAD_REQUEST,request.resourceURL);
+            return 1;
+          }
+        }
       }
       try {
         //We only support JSON storage for now.
