@@ -1571,21 +1571,20 @@ function replaceOrCreateFile(response, filename, directories, scope, relativePat
   var mode = 0700; //TODO is 700 good for us?
   //mode is for if the file is created.
   //w means create if doesnt exist, and open for writing
-  
   fs.open(path,'w',mode,function(error, fd) {
     if (!error) {
       var offset = 0;
       var contentLength = content.length;
       var buff;
       if (binary) {
-        buff = new Uint8Array(Buffer.from(content));
+        buff = Buffer.from(content);
       } else {
         buff = Buffer.from(content,'utf8');
       }
       var writeCallback = function(err,writtenLength,buffer) {
         contentLength -= writtenLength;
         offset += writtenLength;
-        if (contentLength == 0) {
+        if (contentLength <= 0) {
           var handleException = function(e) {
             respondWithJsonError(response,"Failed to close written item.",HTTP_STATUS_INTERNAL_SERVER_ERROR,location);
             logger.warn('Error occurred while closing file. File='+path+'. Error='+e.message);
@@ -1639,7 +1638,7 @@ function replaceOrCreateFile(response, filename, directories, scope, relativePat
           fs.write(fd,buff,offset,contentLength,writeCallback);
         }
       };
-      fs.write(fd,buff,offset,contentLength,writeCallback);
+      fs.write(fd,buff,writeCallback);
     }
     else {
       logger.warn('Exception when opening file for writing. File='+path+'. Error='+error.message);
