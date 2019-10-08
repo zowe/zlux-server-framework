@@ -32,6 +32,7 @@ var accessLogger;
 
 const AGGREGATION_POLICY_NONE = 0;
 const AGGREGATION_POLICY_OVERRIDE = 1;
+const AGGREGATION_POLICY_MERGE = 2;
 const HTTP_STATUS_BAD_REQUEST = 400;
 const HTTP_STATUS_NO_CONTENT = 204;
 const HTTP_STATUS_NOT_FOUND = 404;
@@ -45,6 +46,13 @@ const CONFIG_SCOPE_INSTANCE = 3;
 const CONFIG_SCOPE_SITE = 4;
 const CONFIG_SCOPE_PRODUCT = 5;
 const CONFIG_SCOPE_PLUGIN = 6;
+
+exports.CONFIG_SCOPE_USER = CONFIG_SCOPE_USER;
+exports.CONFIG_SCOPE_GROUP = CONFIG_SCOPE_GROUP;
+exports.CONFIG_SCOPE_INSTANCE = CONFIG_SCOPE_INSTANCE;
+exports.CONFIG_SCOPE_SITE = CONFIG_SCOPE_SITE;
+exports.CONFIG_SCOPE_PRODUCT = CONFIG_SCOPE_PRODUCT;
+exports.CONFIG_SCOPE_PLUGIN = CONFIG_SCOPE_PLUGIN;
 
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
@@ -767,6 +775,36 @@ function overrideJsonProperties(originalObject, overrideObject) {
   return overrideObject;
 }
 
+function mergeJsonProperties(originalObject, overrideObject) {
+  var overrideTable = {};
+  var property = null;
+  var keyArray = Object.keys(overrideObject);
+  var key = null;
+  for (let i = 0; i < keyArray.length; i++) {
+    key = keyArray[i];
+    property = overrideObject[key];
+    htPut(overrideTable,key,property);
+  }
+
+  var overrideProperty = null;
+  keyArray = Object.keys(originalObject);
+  for (let i = 0; i < keyArray.length; i++) {
+    key = keyArray[i];
+    property = originalObject[key];
+    overrideProperty = htGet(overrideTable,key);
+    if (!overrideProperty) {
+      overrideObject[key] = property;
+    } else {
+      if (Array.isArray(overrideProperty)) {
+        if (Array.isArray(property)) {
+          Array.prototype.push.apply(overrideProperty, property);
+        }
+      }
+    }
+  }
+  return overrideObject;
+}
+
 /**
    Returns the contents of a JSON file and the timestamp of the file
    @returns object  An object containing data attributes (the json file contents), and timestamp attribute for the timestamp of the file.
@@ -1061,9 +1099,44 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
   }
 }
 
+
+function getMergeJson(relativePath, filename, directories, scope) {
+  var currentScope = CONFIG_SCOPE_PLUGIN;
+  var path = getPathForScope(relativePath,filename,currentScope,directories);
+  var result = getJSONFromFile(path);
+  while (!result && currentScope) {
+    currentScope = getNextNarrowestScope(currentScope);
+    path = getPathForScope(relativePath,filename,currentScope,directories);
+    result = getJSONFromFile(path);
+    if (currentScope == scope) {
+      break;
+    }
+  }
+  if (result) {
+    var returnJsonObject = result.data;
+    var overridingJsonObject = null;
+    if (currentScope != scope) {
+      currentScope = getNextNarrowestScope(currentScope);
+      while (currentScope) {
+        path = getPathForScope(relativePath,filename,currentScope,directories);
+        result = getJSONFromFile(path);
+        if (result) {
+          overridingJsonObject = result.data;
+          returnJsonObject = mergeJsonProperties(returnJsonObject, overridingJsonObject);
+        }
+        if (currentScope == scope) {
+          break;
+        }
+        currentScope = getNextNarrowestScope(currentScope);
+      }
+    }
+    return returnJsonObject;
+  }
+  return null;
+}
+
 function getOverrideJson(relativePath, filename, directories, scope) {
   var currentScope = CONFIG_SCOPE_PLUGIN;
-
   var path = getPathForScope(relativePath,filename,currentScope,directories);
   var result = getJSONFromFile(path);
   while (!result && currentScope) {
@@ -2263,6 +2336,21 @@ function getPluginConfiguration(identifier, pluginLocation, serverSettings,produ
   return new InternalConfiguration(configuration);
 };
 exports.getPluginConfiguration = getPluginConfiguration;
+
+function getAllowedPlugins(scope, options, username) {
+  let policy = AGGREGATION_POLICY_MERGE
+  let identifier = "org.zowe.zlux.bootstrap"
+  let filename = "allowedPlugins.json"
+  let relativePath = identifier + "/plugins"
+  let serverSettings = options.serverConfig
+  let productCode = "ZLUX"
+  let pluginLocation = "C:\\Users\\skeerthy\\post90\\zlux\\zlux-app-manager\\bootstrap"
+  let directories = makeConfigurationDirectoriesStructInner(serverSettings, productCode, username, pluginLocation);
+  directories._pluginID = encodeDirectoryName(identifier)
+  return getMergeJson(relativePath, filename, directories)
+}
+
+exports.getAllowedPlugins = getAllowedPlugins;
 
 function getConfigFileForPath(service, username, path, filename, scope, pluginDefinition) {
   var directories = getDirectoriesFromServiceSettings(service, username);
