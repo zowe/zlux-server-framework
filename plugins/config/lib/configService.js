@@ -1091,9 +1091,27 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
         else {
           respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
         }
-      }); 
+      }, overrideJsonProperties); 
     }
     break;
+  case AGGREGATION_POLICY_MERGE:
+    {
+      getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
+        if (result) {
+          var streamer = startResponseForConfigFile(response,200,"OK",location);
+          jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
+          jStreamer.jsonStartObject(streamer,"contents");
+          jStreamer.jsonPrintObject(streamer,result.data);
+          jStreamer.jsonEndObject(streamer);
+          jStreamer.jsonEnd(streamer);
+          finishResponse(response);
+          logger.debug(`Configuration service request complete. Resource=${location}`);
+        }
+        else {
+          respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
+        }
+      }, mergeJsonProperties); 
+    }
   default:
     {
       var msg = "Aggregation policy type="+policy+" unhandled";
@@ -1102,7 +1120,6 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
     }
   }
 }
-
 
 function getMergeJson(relativePath, filename, directories, scope) {
   var currentScope = CONFIG_SCOPE_PLUGIN;
@@ -1174,7 +1191,7 @@ function getOverrideJson(relativePath, filename, directories, scope) {
   return null;
 }
 
-function getOverrideJsonAsync(relativePath, filename, directories, scope, callback) {
+function getOverrideJsonAsync(relativePath, filename, directories, scope, callback, callbackJsonProperties) {
   var currentScope = CONFIG_SCOPE_PLUGIN;
 
   var path = getPathForScope(relativePath,filename,currentScope,directories);
@@ -1203,7 +1220,7 @@ function getOverrideJsonAsync(relativePath, filename, directories, scope, callba
             if (result) {
               if (result.maccess > latestTime) { latestTime = result.maccess; }
               overridingJsonObject = result.data;
-              returnJsonObject = overrideJsonProperties(returnJsonObject, overridingJsonObject);
+              returnJsonObject = callbackJsonProperties(returnJsonObject, overridingJsonObject);
             }
             if (currentScope == scope) {
               callback({data:returnJsonObject, maccess:latestTime});
