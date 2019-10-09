@@ -1077,7 +1077,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
     break;
   case AGGREGATION_POLICY_OVERRIDE:
     {      
-      getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
+      getAggregatedJsonAsync(lastPath,filename,directories,scope,(result)=> {
         if (result) {
           var streamer = startResponseForConfigFile(response,200,"OK",location);
           jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
@@ -1096,7 +1096,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
     break;
   case AGGREGATION_POLICY_MERGE:
     {
-      getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
+      getAggregatedJsonAsync(lastPath,filename,directories,scope,(result)=> {
         if (result) {
           var streamer = startResponseForConfigFile(response,200,"OK",location);
           jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
@@ -1191,7 +1191,7 @@ function getOverrideJson(relativePath, filename, directories, scope) {
   return null;
 }
 
-function getOverrideJsonAsync(relativePath, filename, directories, scope, callback, callbackJsonProperties) {
+function getAggregatedJsonAsync(relativePath, filename, directories, scope, callback, aggregatorFunction) {
   var currentScope = CONFIG_SCOPE_PLUGIN;
 
   var path = getPathForScope(relativePath,filename,currentScope,directories);
@@ -1220,7 +1220,7 @@ function getOverrideJsonAsync(relativePath, filename, directories, scope, callba
             if (result) {
               if (result.maccess > latestTime) { latestTime = result.maccess; }
               overridingJsonObject = result.data;
-              returnJsonObject = callbackJsonProperties(returnJsonObject, overridingJsonObject);
+              returnJsonObject = aggregatorFunction(returnJsonObject, overridingJsonObject);
             }
             if (currentScope == scope) {
               callback({data:returnJsonObject, maccess:latestTime});
