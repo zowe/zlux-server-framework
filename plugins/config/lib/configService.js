@@ -797,8 +797,12 @@ function mergeJsonProperties(originalObject, overrideObject) {
     } else {
       if (Array.isArray(overrideProperty)) {
         if (Array.isArray(property)) {
-          Array.prototype.push.apply(overrideProperty, property);
+          overrideProperty.push.apply(overrideProperty, property);
+        } else {
+          logger.debug(`Trying to merge ${property} but it is not an array`);
         }
+      } else {
+        logger.debug(`Trying to merge ${overrideProperty} but it is not an array`);
       }
     }
   }
@@ -2337,14 +2341,11 @@ function getPluginConfiguration(identifier, pluginLocation, serverSettings,produ
 };
 exports.getPluginConfiguration = getPluginConfiguration;
 
-function getAllowedPlugins(scope, options, username) {
-  let policy = AGGREGATION_POLICY_MERGE
-  let identifier = "org.zowe.zlux.bootstrap"
+function getAllowedPlugins(options, username, identifier, pluginLocation) {
   let filename = "allowedPlugins.json"
   let relativePath = identifier + "/plugins"
   let serverSettings = options.serverConfig
-  let productCode = "ZLUX"
-  let pluginLocation = "C:\\Users\\skeerthy\\post90\\zlux\\zlux-app-manager\\bootstrap"
+  let productCode = options.pluginLoader.options.productCode
   let directories = makeConfigurationDirectoriesStructInner(serverSettings, productCode, username, pluginLocation);
   directories._pluginID = encodeDirectoryName(identifier)
   return getMergeJson(relativePath, filename, directories)
