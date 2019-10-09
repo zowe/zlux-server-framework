@@ -2365,7 +2365,11 @@ function getAllowedPlugins(options, username, identifier, pluginLocation) {
   let productCode = options.pluginLoader.options.productCode
   let directories = makeConfigurationDirectoriesStructInner(serverSettings, productCode, username, pluginLocation);
   directories._pluginID = encodeDirectoryName(identifier)
-  return getMergeJson(relativePath, filename, directories)
+  if (username) {
+    return getMergeJson(relativePath, filename, directories, CONFIG_SCOPE_USER)
+  } else {
+    return getMergeJson(relativePath, filename, directories, CONFIG_SCOPE_INSTANCE)
+  }
 }
 
 exports.getAllowedPlugins = getAllowedPlugins;
