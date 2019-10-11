@@ -43,6 +43,7 @@ exports.webAppOptions = {
       getStatus() {},
       doLogout() {},
       refreshStatus() {},
+      semiAuthenticatedMiddleware(r, re, next) { next() },
       middleware(r, re, next) { next() }
     }
 };
