@@ -128,10 +128,12 @@ function resolveJson(argumentsObj, matchObj) {
       if (matchObj.value.length == 2) {
         currentLevel[matchParts.length-1] = [];
       } else {
-        currentLevel[matchParts.length-1] = matchObj.value.substr(1,matchObj.value.length-1).split[','];
+        const configArray = matchObj.value.substr(1,matchObj.value.length-1).split[',']
+              .map(entry => stringToValue(entry));
+        currentLevel[matchParts.length-1] = configArray;
       }
     }
-    currentLevel[matchParts.length-1] = matchObj.value;
+    currentLevel[matchParts.length-1] = stringToValue(matchObj.value);
   } catch (e) {
     console.log("SEVERE: Exception occurred trying to generate object from input:",e);
     process.exit(1);
