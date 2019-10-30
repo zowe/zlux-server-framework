@@ -181,6 +181,30 @@ exports.createParser = function(stringArray) {
 };
 
 
+/**
+Does not handle boolean strings like False or FALSE, only false.
+Does not handle number strings like One, one, or ONE, but does handle 1, -1, 1.1 and so on.
+**/
+function stringToValue(stringVal) {
+  if (stringVal == 'false') {
+    return false;
+  }  else if (stringVal == 'true') {
+    return true;
+  } else if (stringVal == 'null') {
+    return null;
+  } else if (stringVal == 'undefined') {
+    return undefined;
+  } else {
+    let num = Number(stringVal);
+    if (num != NaN) {
+      return num;
+    } else {
+      return stringVal;
+    }
+  }
+}
+exports.stringToValue = stringToValue;
+
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
