@@ -132,8 +132,9 @@ function resolveJson(argumentsObj, matchObj) {
               .map(entry => stringToValue(entry));
         currentLevel[matchParts.length-1] = configArray;
       }
+    } else {
+      currentLevel[matchParts[matchParts.length-1]] = stringToValue(matchObj.value);
     }
-    currentLevel[matchParts.length-1] = stringToValue(matchObj.value);
   } catch (e) {
     console.log("SEVERE: Exception occurred trying to generate object from input:",e);
     process.exit(1);
@@ -156,9 +157,12 @@ function ArgumentParser(validArgs, argArray) {
         validArg = validArguments[j];
         if (validArg) {
           var result = validArguments[j].getMatch(arg, (i < (args.length-1)) ? args[i+1] : null);
+          console.log(`getmatch result for ${arg},`, result);
           if (result && result.arg && result.value) {
             if (result.jsonName) {
-              resolveJson(argumentValues, result);
+              argumentValues[result.arg] = resolveJson(argumentValues, result);
+              found = true;
+              break;
             } else {
               argumentValues[result.arg] = result.value;
               if (result.value == args[i+1]) {
@@ -198,7 +202,7 @@ function stringToValue(stringVal) {
     return undefined;
   } else {
     let num = Number(stringVal);
-    if (num != NaN) {
+    if (!isNaN(num)) {
       return num;
     } else {
       return stringVal;
