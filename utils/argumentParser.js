@@ -157,7 +157,6 @@ function ArgumentParser(validArgs, argArray) {
         validArg = validArguments[j];
         if (validArg) {
           var result = validArguments[j].getMatch(arg, (i < (args.length-1)) ? args[i+1] : null);
-          console.log(`getmatch result for ${arg},`, result);
           if (result && result.arg && result.value) {
             if (result.jsonName) {
               argumentValues[result.arg] = resolveJson(argumentValues, result);
