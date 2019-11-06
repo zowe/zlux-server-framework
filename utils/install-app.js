@@ -19,7 +19,7 @@ const rmrf = require('rimraf');
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
 const logger = packagingUtils.coreLogger.makeComponentLogger("install-app"); //should only need one for this program
 
-const argParser = require('../lib/argumentParser');
+const argParser = require('./argumentParser');
 const usage = 'Usage: --inputApp | -i INPUTAPP --pluginsDir | -p PLUGINSDIR '
       + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v]';
 
