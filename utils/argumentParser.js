@@ -209,7 +209,7 @@ function EnvironmentVarsToObject(prefix, env) {
   let obj = {};
   let prefixLen = prefix ? prefix.length : 0;
   keys.forEach(function(key) {
-    let value = envVars[key];
+    let value = stringToValue(envVars[key]);
     let decodedKey = key.substr(prefixLen).replace(/___/g, '-')
         .replace(/[^_]_[A-Za-z0-9]/g, function(match){
           return match.replace(/_/g,'.');
