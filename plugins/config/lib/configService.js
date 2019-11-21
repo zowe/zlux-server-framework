@@ -32,6 +32,7 @@ var accessLogger;
 
 const AGGREGATION_POLICY_NONE = 0;
 const AGGREGATION_POLICY_OVERRIDE = 1;
+const AGGREGATION_POLICY_MERGE = 2;
 const HTTP_STATUS_BAD_REQUEST = 400;
 const HTTP_STATUS_NO_CONTENT = 204;
 const HTTP_STATUS_NOT_FOUND = 404;
@@ -45,6 +46,13 @@ const CONFIG_SCOPE_INSTANCE = 3;
 const CONFIG_SCOPE_SITE = 4;
 const CONFIG_SCOPE_PRODUCT = 5;
 const CONFIG_SCOPE_PLUGIN = 6;
+
+exports.CONFIG_SCOPE_USER = CONFIG_SCOPE_USER;
+exports.CONFIG_SCOPE_GROUP = CONFIG_SCOPE_GROUP;
+exports.CONFIG_SCOPE_INSTANCE = CONFIG_SCOPE_INSTANCE;
+exports.CONFIG_SCOPE_SITE = CONFIG_SCOPE_SITE;
+exports.CONFIG_SCOPE_PRODUCT = CONFIG_SCOPE_PRODUCT;
+exports.CONFIG_SCOPE_PLUGIN = CONFIG_SCOPE_PLUGIN;
 
 const PERMISSION_DEFAULT_FORBID = 0;
 const PERMISSION_DEFAULT_ALLOW = 1;
@@ -767,6 +775,40 @@ function overrideJsonProperties(originalObject, overrideObject) {
   return overrideObject;
 }
 
+function mergeJsonProperties(originalObject, overrideObject) {
+  var overrideTable = {};
+  var property = null;
+  var keyArray = Object.keys(overrideObject);
+  var key = null;
+  for (let i = 0; i < keyArray.length; i++) {
+    key = keyArray[i];
+    property = overrideObject[key];
+    htPut(overrideTable,key,property);
+  }
+
+  var overrideProperty = null;
+  keyArray = Object.keys(originalObject);
+  for (let i = 0; i < keyArray.length; i++) {
+    key = keyArray[i];
+    property = originalObject[key];
+    overrideProperty = htGet(overrideTable,key);
+    if (!overrideProperty) {
+      overrideObject[key] = property;
+    } else {
+      if (Array.isArray(overrideProperty)) {
+        if (Array.isArray(property)) {
+          overrideProperty.push.apply(overrideProperty, property);
+        } else {
+          logger.debug(`Trying to merge ${property} but it is not an array`);
+        }
+      } else {
+        logger.debug(`Trying to merge ${overrideProperty} but it is not an array`);
+      }
+    }
+  }
+  return overrideObject;
+}
+
 /**
    Returns the contents of a JSON file and the timestamp of the file
    @returns object  An object containing data attributes (the json file contents), and timestamp attribute for the timestamp of the file.
@@ -1035,7 +1077,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
     break;
   case AGGREGATION_POLICY_OVERRIDE:
     {      
-      getOverrideJsonAsync(lastPath,filename,directories,scope,(result)=> {
+      getAggregatedJsonAsync(lastPath,filename,directories,scope,(result)=> {
         if (result) {
           var streamer = startResponseForConfigFile(response,200,"OK",location);
           jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
@@ -1049,9 +1091,27 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
         else {
           respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
         }
-      }); 
+      }, overrideJsonProperties); 
     }
     break;
+  case AGGREGATION_POLICY_MERGE:
+    {
+      getAggregatedJsonAsync(lastPath,filename,directories,scope,(result)=> {
+        if (result) {
+          var streamer = startResponseForConfigFile(response,200,"OK",location);
+          jStreamer.jsonAddInt(streamer,result.maccess,"maccessms");
+          jStreamer.jsonStartObject(streamer,"contents");
+          jStreamer.jsonPrintObject(streamer,result.data);
+          jStreamer.jsonEndObject(streamer);
+          jStreamer.jsonEnd(streamer);
+          finishResponse(response);
+          logger.debug(`Configuration service request complete. Resource=${location}`);
+        }
+        else {
+          respondWithJsonError(response,"Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
+        }
+      }, mergeJsonProperties); 
+    }
   default:
     {
       var msg = "Aggregation policy type="+policy+" unhandled";
@@ -1061,9 +1121,43 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
   }
 }
 
+function getMergeJson(relativePath, filename, directories, scope) {
+  var currentScope = CONFIG_SCOPE_PLUGIN;
+  var path = getPathForScope(relativePath,filename,currentScope,directories);
+  var result = getJSONFromFile(path);
+  while (!result && currentScope) {
+    currentScope = getNextNarrowestScope(currentScope);
+    path = getPathForScope(relativePath,filename,currentScope,directories);
+    result = getJSONFromFile(path);
+    if (currentScope == scope) {
+      break;
+    }
+  }
+  if (result) {
+    var returnJsonObject = result.data;
+    var overridingJsonObject = null;
+    if (currentScope != scope) {
+      currentScope = getNextNarrowestScope(currentScope);
+      while (currentScope) {
+        path = getPathForScope(relativePath,filename,currentScope,directories);
+        result = getJSONFromFile(path);
+        if (result) {
+          overridingJsonObject = result.data;
+          returnJsonObject = mergeJsonProperties(returnJsonObject, overridingJsonObject);
+        }
+        if (currentScope == scope) {
+          break;
+        }
+        currentScope = getNextNarrowestScope(currentScope);
+      }
+    }
+    return returnJsonObject;
+  }
+  return null;
+}
+
 function getOverrideJson(relativePath, filename, directories, scope) {
   var currentScope = CONFIG_SCOPE_PLUGIN;
-
   var path = getPathForScope(relativePath,filename,currentScope,directories);
   var result = getJSONFromFile(path);
   while (!result && currentScope) {
@@ -1097,7 +1191,7 @@ function getOverrideJson(relativePath, filename, directories, scope) {
   return null;
 }
 
-function getOverrideJsonAsync(relativePath, filename, directories, scope, callback) {
+function getAggregatedJsonAsync(relativePath, filename, directories, scope, callback, aggregatorFunction) {
   var currentScope = CONFIG_SCOPE_PLUGIN;
 
   var path = getPathForScope(relativePath,filename,currentScope,directories);
@@ -1126,7 +1220,7 @@ function getOverrideJsonAsync(relativePath, filename, directories, scope, callba
             if (result) {
               if (result.maccess > latestTime) { latestTime = result.maccess; }
               overridingJsonObject = result.data;
-              returnJsonObject = overrideJsonProperties(returnJsonObject, overridingJsonObject);
+              returnJsonObject = aggregatorFunction(returnJsonObject, overridingJsonObject);
             }
             if (currentScope == scope) {
               callback({data:returnJsonObject, maccess:latestTime});
@@ -2262,6 +2356,22 @@ function getPluginConfiguration(identifier, pluginLocation, serverSettings,produ
   return new InternalConfiguration(configuration);
 };
 exports.getPluginConfiguration = getPluginConfiguration;
+
+function getAllowedPlugins(options, username, identifier, pluginLocation) {
+  let filename = "allowedPlugins.json"
+  let relativePath = identifier + "/plugins"
+  let serverSettings = options.serverConfig
+  let productCode = options.pluginLoader.options.productCode
+  let directories = makeConfigurationDirectoriesStructInner(serverSettings, productCode, username, pluginLocation);
+  directories._pluginID = encodeDirectoryName(identifier)
+  if (username) {
+    return getMergeJson(relativePath, filename, directories, CONFIG_SCOPE_USER)
+  } else {
+    return getMergeJson(relativePath, filename, directories, CONFIG_SCOPE_INSTANCE)
+  }
+}
+
+exports.getAllowedPlugins = getAllowedPlugins;
 
 function getConfigFileForPath(service, username, path, filename, scope, pluginDefinition) {
   var directories = getDirectoriesFromServiceSettings(service, username);
