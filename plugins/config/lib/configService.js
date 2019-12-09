@@ -1217,7 +1217,7 @@ function getAggregatedJsonAsync(relativePath, filename, directories, scope, call
         var getOverrideJsonAtNextScope = function() {
           path = getPathForScope(relativePath,filename,currentScope,directories);
           getJSONFromFileAsync(path,(result)=> {
-            if (result) {
+            if (result && result.data) {
               if (result.maccess > latestTime) { latestTime = result.maccess; }
               overridingJsonObject = result.data;
               returnJsonObject = aggregatorFunction(returnJsonObject, overridingJsonObject);
