@@ -124,13 +124,7 @@ function resolveJson(argumentsObj, matchObj) {
       currentLevel = currentLevel[part];
   //    }
     }
-    if (matchObj.value.indexOf(',') != -1 && matchObj.value.length >= 3 && matchObj.value !== ',,,') {
-      const configArray = matchObj.value.substr(1,matchObj.value.length-1).split[',']
-            .map(entry => stringToValue(entry));
-      currentLevel[matchParts.length-1] = configArray;
-    } else {
-      currentLevel[matchParts[matchParts.length-1]] = stringToValue(matchObj.value);
-    }
+    currentLevel[matchParts[matchParts.length-1]] = stringToValue(matchObj.value);
   } catch (e) {
     console.log("SEVERE: Exception occurred trying to generate object from input:",e);
     process.exit(1);
@@ -209,7 +203,7 @@ function EnvironmentVarsToObject(prefix, env) {
   let obj = {};
   let prefixLen = prefix ? prefix.length : 0;
   keys.forEach(function(key) {
-    let value = stringToValue(envVars[key]);
+    let value = stringToValue(envVars[key],true);
     let decodedKey = key.substr(prefixLen).replace(/___/g, '-')
         .replace(/[^_]_[A-Za-z0-9]/g, function(match){
           return match.replace(/_/g,'.');
@@ -224,7 +218,9 @@ function EnvironmentVarsToObject(prefix, env) {
       let currentObj = obj[keyParts[0]];
       for (let i = 1; i < keyParts.length-1; i++) {
         let part = keyParts[i];
-        currentObj[part] = {};
+        if (!currentObj[part]) {
+          currentObj[part] = {};
+        }
         currentObj = currentObj[part];
       }
       currentObj[keyParts[keyParts.length-1]] = value;
@@ -242,7 +238,7 @@ exports.environmentVarsToObject = EnvironmentVarsToObject;
 Does not handle boolean strings like False or FALSE, only false.
 Does not handle number strings like One, one, or ONE, but does handle 1, -1, 1.1 and so on.
 **/
-function stringToValue(stringVal) {
+function stringToValue(stringVal, csvAsArray) {
   if (stringVal == 'false') {
     return false;
   }  else if (stringVal == 'true') {
@@ -251,6 +247,18 @@ function stringToValue(stringVal) {
     return null;
   } else if (stringVal == 'undefined') {
     return undefined;
+  } else if (stringVal.indexOf(',') != -1
+             && stringVal.indexOf('[') == 0
+             && stringVal.indexOf(']') == stringVal.length-1) {
+    return stringVal.substring(1,stringVal.length-1)
+      .split(',')
+      .filter(function(value){return value.length > 0;})
+      .map(entry => stringToValue(entry));
+  } else if (stringVal.indexOf(',') != -1
+             && csvAsArray == true) {
+    return stringVal.split(',')
+      .filter(function(value){return value.length > 0;})
+      .map(entry => stringToValue(entry));
   } else {
     let num = Number(stringVal);
     if (!isNaN(num)) {
