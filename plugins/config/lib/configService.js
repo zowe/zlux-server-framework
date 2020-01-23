@@ -2698,9 +2698,13 @@ function ConfigService(context) {
     if (!request.currentResourceList && itemName.length>0) {
       //respond with one file
       accessLogger.debug(`Configuration service handling request for element. Resource${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
-      respondWithConfigFile(response,itemName,request.currentResourceObject,
-                            request.directories,request.scope,lastPath,
-                            request.resourceURL);
+      try {
+        respondWithConfigFile(response,itemName,request.currentResourceObject,
+                              request.directories,request.scope,lastPath,
+                              request.resourceURL);
+      } catch (err) {
+        logger.debug(err)
+      }
     }
     else if (request.currentResourceList && itemName.length===0) {
       //give us a listing of sub resources
