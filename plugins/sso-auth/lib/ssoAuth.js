@@ -20,7 +20,7 @@ function doesApimlExist(serverConf) {
   return (serverConf.node.mediationLayer !== undefined)
     && (serverConf.node.mediationLayer.server !== undefined)
     && (serverConf.node.mediationLayer.server.hostname !== undefined)
-    && (serverConf.node.mediationLayer.gatewayPort !== undefined)
+    && (serverConf.node.mediationLayer.server.gatewayPort !== undefined)
 }
 
 /*
@@ -48,7 +48,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   //TODO does this automatically mean JWT or does this mean JWT+other things, or is it unrelated?
   this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
   //Sso here meaning just authenticate to apiml, and handle jwt
-  this.usingSso = this.apimlSsoEnabled;
+  this.usingSso = this.apimlSsoEnabled && this.usingApiml;
 
   this.pluginConf = pluginConf;
   this.instanceID = serverConf.instanceID;
@@ -123,6 +123,7 @@ SsoAuthenticator.prototype = {
             this.apimlHandler.cleanupSession(sessionState);
             cleanupSessionGeneric(sessionState);
           }
+          sessionState.authenticated = apimlResult.success;
           resolve(this._insertHandlerStatus(apimlResult));
         }).catch((e)=> {
           this.apimlHandler.cleanupSession(sessionState);
@@ -142,7 +143,10 @@ SsoAuthenticator.prototype = {
               reject(e);
             });
           } else {
-            console.log('cookies returned as=',sessionState.zssCookies);
+            if (zssResult.success) {
+              sessionState.sessionExpTime = Date.now() + zssResult.expms;
+              sessionState.authenticated = true;
+            }
             resolve(this._insertHandlerStatus(zssResult));
           }
         }).catch((e)=> {
@@ -164,19 +168,19 @@ SsoAuthenticator.prototype = {
       return this._insertHandlerStatus(!apiml.success ? apiml : zss);
     } else {
       sessionState.authenticated = true;
+      let shortestExpms = Math.min(zss.expms, apiml.expms);
       sessionState.sessionExpTime = sessionState.sessionExpTime
-        ? Math.min(sessionState.sessionExpTime, now+zss.expms, now+apiml.expms)
-        : Math.min(now+zss.expms, now+apiml.expms);
+        ? Math.min(sessionState.sessionExpTime, now+shortestExpms)
+        : now+shortestExpms;
       return this._insertHandlerStatus({
         success: true,
         username: sessionState.username,
-        expms: sessionState.sessionExpTime
+        expms: shortestExpms
       });
     }
   },
 
   refreshStatus(request, sessionState) {
-    console.log('refresh enters with cookies=',sessionState.zssCookies);
     return new Promise((resolve, reject) => {
       if (this.usingZss) {
         this.zssHandler.refreshStatus(request, sessionState).then((result)=> {
@@ -205,20 +209,20 @@ SsoAuthenticator.prototype = {
     });
   },
 
-  authorized(request, sessionState) {
+  authorized(request, sessionState, options) {
     //prefer ZSS here because it can do RBAC the way the app fw expects
     if (!this.usingZss) {
-      return this.apimlHandler.authorized(request, sessionState);
+      return this.apimlHandler.authorized(request, sessionState, options);
     } else {
-      return this.zssHandler.authorized(request, sessionState);
+      return this.zssHandler.authorized(request, sessionState, options);
     }
   },
   
   addProxyAuthorizations(req1, req2Options, sessionState) {
     if (this.usingApiml) {
-      this.apimlHandler.addProxyAuthorizations(req1, req2Options, sessionState);
+      this.apimlHandler.addProxyAuthorizations(req1, req2Options, sessionState, this.usingSso);
     }
-    if (this.usingZss) {
+    if (this.usingZss && !this.usingSso) {
       this.zssHandler.addProxyAuthorizations(req1, req2Options, sessionState);
     }
   },
