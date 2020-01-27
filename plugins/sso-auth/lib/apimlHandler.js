@@ -186,13 +186,15 @@ class ApimlHandler {
     }
   }
 
-  addProxyAuthorizations(req1, req2Options, sessionState) {
+  addProxyAuthorizations(req1, req2Options, sessionState, usingSso) {
     if (!sessionState.apimlCookie) {
       return;
     }
     //apimlToken vs apimlAuthenticationToken ???
     req2Options.headers['apimlToken'] = sessionState.apimlToken;
-    req2Options.headers['Authorization'] = 'Bearer '+sessionState.apimlToken
+    if (this.usingSso) {
+      req2Options.headers['Authorization'] = 'Bearer '+sessionState.apimlToken;
+    }
   }  
 }
 
