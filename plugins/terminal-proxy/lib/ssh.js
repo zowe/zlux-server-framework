@@ -225,12 +225,12 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
      case SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_RESPONSE: {
        //numResponses, responses
        if (jsonData.responses) {
-         var msgCodeBuffer = new Buffer(1);
+         var msgCodeBuffer = Buffer.alloc(1);
          msgCodeBuffer.writeUInt8(msgCode);
          var numResponses = jsonData.responses.length;
          var data = [msgCodeBuffer,jsonData.responses.length];
          jsonData.responses.forEach(function(response){
-           data.push(new VarData(new Buffer(response,'utf8')));
+           data.push(new VarData(Buffer.from(response,'utf8')));
          });
          pdu = new SSHv2PDU(msgCode,generateSSHv2PDUBytes(data));
         
@@ -239,13 +239,13 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
      }
      case SSH_MESSAGE.SSH_MSG_USERAUTH_REQUEST:{
        if (jsonData.method === 'password') {
-         var msgCodeBuffer = new Buffer(1);
+         var msgCodeBuffer = Buffer.alloc(1);
          msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_USERAUTH_REQUEST);
-         var username = new VarData(new Buffer(jsonData.username,'utf8'));
-         var sshconnection = new VarData(new Buffer(SSH_CONNECTION,'utf8'));
-         var passwordMethod = new VarData(new Buffer('password','utf8'));//this could be publickey,hostbased, or none. USERAUTH_FAILURE results when this attempt was no good.
+         var username = new VarData(Buffer.from(jsonData.username,'utf8'));
+         var sshconnection = new VarData(Buffer.from(SSH_CONNECTION,'utf8'));
+         var passwordMethod = new VarData(Buffer.from('password','utf8'));//this could be publickey,hostbased, or none. USERAUTH_FAILURE results when this attempt was no good.
          //USERAUTH_SUCCESS means the server approved.
-         var authData = [msgCodeBuffer,username, sshconnection,passwordMethod,   new Boolean(false),new VarData(new Buffer(jsonData.password,'utf8'))];
+         var authData = [msgCodeBuffer,username, sshconnection,passwordMethod,   new Boolean(false),new VarData(Buffer.from(jsonData.password,'utf8'))];
          pdu = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_USERAUTH_REQUEST,generateSSHv2PDUBytes(authData));
        }
        else if (jsonData.method === 'publickey') {
@@ -264,7 +264,7 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
        var channelNumber = sessionData.primaryShellChannel;
        var channel = sessionData.channels[channelNumber];
        if (channel) {
-         var msgCodeBuffer = new Buffer(1);
+         var msgCodeBuffer = Buffer.alloc(1);
          msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_DATA);
          var shellData = [msgCodeBuffer,new Number(channel.serverChannelNumber), new VarData(dataBuffer)];
          if(traceSSHMessage) console.log("sending SSH_MSG_CHANNEL_DATA:\n"+ dataBuffer.toString('hex') +" to channel "+channel.serverChannelNumber);
@@ -276,12 +276,12 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
        break;
      }
      case SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST: {
-       var msgCodeBuffer = new Buffer(1);
+       var msgCodeBuffer = Buffer.alloc(1);
        msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST);
        var channelNumber = sessionData.primaryShellChannel;
        var channel = sessionData.channels[channelNumber];
        if (channel) {
-         var requestData = [msgCodeBuffer,jsonData.channel ? new Number(jsonData.channel) : new Number(channel.serverChannelNumber),new VarData(new Buffer(jsonData.type)),new Boolean(jsonData.reply)];
+         var requestData = [msgCodeBuffer,jsonData.channel ? new Number(jsonData.channel) : new Number(channel.serverChannelNumber),new VarData(Buffer.from(jsonData.type)),new Boolean(jsonData.reply)];
          for (var i = 0; i < jsonData.requestContents.length; i++) {
            requestData.push(jsonData.requestContents[i]);
          }
@@ -331,7 +331,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
 
     sessionData.serverVersion = Buffer.from(serverVersion,'utf8');
    
-    var dataBuffer = new Buffer(clientVersion+'\r\n');
+    var dataBuffer = Buffer.from(clientVersion+'\r\n');
     terminalWebsocketProxy.netSend(dataBuffer);
     terminalWebsocketProxy.sshSessionData=sessionData;
     return sshMessages;
@@ -378,7 +378,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       case SSH_MESSAGE.SSH_MSG_DISCONNECT:{
         sshMessage.reasonCode = sshv2PDU.readInt();
         sshMessage.reasonLine = sshv2PDU.readSizedData();
-        if(traceBasic) console.log("processed SSH_MSG_DISCONNECT: "+ sshMessage.reasonCode +'\n'+ new Buffer(sshMessage.reasonLine,'ascii').toString());
+        if(traceBasic) console.log("processed SSH_MSG_DISCONNECT: "+ sshMessage.reasonCode +'\n'+ Buffer.from(sshMessage.reasonLine,'ascii').toString());
         sshMessages.push(sshMessage);
         break;
       }
@@ -399,7 +399,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       case SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE:{
         if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE ');
         sshMessages.push(sshMessage);
-       // processData = new Buffer(sshv2PDU.data.length);
+       // processData = Buffer.alloc(sshv2PDU.data.length);
        // sshv2PDU.data.copy(processData,0);
         break;
       }
@@ -428,11 +428,11 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
      
         if(traceSSHMessage) console.log('openning new channel, channelNumber: '+channelNumber);
 
-        var msgCodeBuffer = new Buffer(1);
+        var msgCodeBuffer = Buffer.alloc(1);
         msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_OPEN);
  
    
-        var sessionVar = new VarData(new Buffer('session','utf8'));
+        var sessionVar = new VarData(Buffer.from('session','utf8'));
         var openChannelRequestData = [msgCodeBuffer,sessionVar, new Number(channelNumber), new Number (initialWindowSize), new Number (maxPacketSize) ];
         
         var openChannelRequestPDU = new SSHv2PDU( SSH_MESSAGE.SSH_MSG_CHANNEL_OPEN, generateSSHv2PDUBytes(openChannelRequestData));
@@ -484,9 +484,9 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       
  
         sessionData.channels[channelNumber] = channel;
-        var msgCodeBuffer = new Buffer(1);
+        var msgCodeBuffer = Buffer.alloc(1);
         msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST);
-        var terMode = new VarData(new Buffer(TTY_OP_END));//add CS7=90 maybe?
+        var terMode = new VarData(Buffer.from([TTY_OP_END]));//add CS7=90 maybe?
         
         var settings = terminalWebsocketProxy.securitySettings;
         var terminalType;
@@ -513,8 +513,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
             height = VT_HEIGHT_DEFAULT;
           } 
         }
-        var shellPTYRequestData  = [msgCodeBuffer, new Number(peerChannelNumber),new VarData(new Buffer('pty-req')),
-        new Boolean(true),new VarData(new Buffer(terminalType)),new Number(columns),new Number(rows),
+        var shellPTYRequestData  = [msgCodeBuffer, new Number(peerChannelNumber),new VarData(Buffer.from('pty-req')),
+        new Boolean(true),new VarData(Buffer.from(terminalType)),new Number(columns),new Number(rows),
         new Number(width),new Number(height),terMode];
                                   
         var shellPTYRequestPDU = new SSHv2PDU( SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST, generateSSHv2PDUBytes(shellPTYRequestData));                            
@@ -543,7 +543,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       
           writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,clientKexPDU);
         }*/
-      //  if(traceSSHMessage) console.log("processed SSH_MSG_CHANNEL_DATA:\n"+ new Buffer(sshMessage.readData,'ascii').toString());
+      //  if(traceSSHMessage) console.log("processed SSH_MSG_CHANNEL_DATA:\n"+ Buffer.from(sshMessage.readData,'ascii').toString());
         break;
       }
       case SSH_MESSAGE.SSH_MSG_CHANNEL_SUCCESS : {
@@ -551,10 +551,10 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           var currentChannel = sessionData.channels[channelNumber];
           if (!currentChannel.secondShellRequest){
             currentChannel.secondShellRequest = true;
-            var msgCodeBuffer = new Buffer(1);
+            var msgCodeBuffer = Buffer.alloc(1);
             msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST);
-            var terMode  =  new VarData(new Buffer(TTY_OP_END));
-            var shellPTYRequestData =[msgCodeBuffer, new Number(currentChannel.peerChannelNumber),new VarData(new Buffer('shell')),new Boolean(true)];
+            var terMode  =  new VarData(Buffer.from([TTY_OP_END]));
+            var shellPTYRequestData =[msgCodeBuffer, new Number(currentChannel.peerChannelNumber),new VarData(Buffer.from('shell')),new Boolean(true)];
             var shellPTYRequestPDU = new SSHv2PDU( SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST, generateSSHv2PDUBytes(shellPTYRequestData));                            
             writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,shellPTYRequestPDU);
           } else {
@@ -625,7 +625,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           sessionData.isKeyExchangingInitSent = true;
         }
         var dh;
-        var msgCodeBuffer = new Buffer(1);
+        var msgCodeBuffer = Buffer.alloc(1);
         var hashAlgorithem = 'sha1';
         switch (sessionData.keyExchangeAlgorithms[0]) {
           case 'diffie-hellman-group1-sha1':  
@@ -680,7 +680,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
             --len;
           }
           if (publicKeys[idx] & 0x80) {
-            var tempkey = new Buffer(len + 1);
+            var tempkey = Buffer.alloc(len + 1);
             tempkey[0] = 0;
             publicKeys.copy(tempkey, 1, idx);
             publicKeys = tempkey;
@@ -711,7 +711,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           sessionData.generator = sshv2PDU.readSizedData();     
           var dh = crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
           sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY;
-          var msgCodeBuffer = new Buffer(1);
+          var msgCodeBuffer = Buffer.alloc(1);
           msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_INIT);
           dh.generateKeys();
           var publicKeys = dh.getPublicKey();
@@ -723,7 +723,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
             --len;
           }
           if (publicKeys[idx] & 0x80) {
-            var tempkey = new Buffer(len + 1);
+            var tempkey = Buffer.alloc(len + 1);
             tempkey[0] = 0;
             publicKeys.copy(tempkey, 1, idx);
             publicKeys = tempkey;
@@ -861,7 +861,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
 
 
         var cp = 0;
-        var exchangeDataBuffer = new Buffer(exchangeBufferLength);
+        var exchangeDataBuffer = Buffer.alloc(exchangeBufferLength);
 
         exchangeDataBuffer.writeUInt32BE(clientVersionLength, cp, true);
         cp += 4;
@@ -977,7 +977,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           }        
         }
                     
-        var msgCodeBuffer = new Buffer(1);
+        var msgCodeBuffer = Buffer.alloc(1);
         msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_NEWKEYS);
         var clientNewKeyPDU = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_NEWKEYS,generateSSHv2PDUBytes([msgCodeBuffer]));
         writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,clientNewKeyPDU);
@@ -997,7 +997,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         
         if (!terminalWebsocketProxy.sshAuthenticated){
           msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_SERVICE_REQUEST);
-          var sshAuth = new Buffer('ssh-userauth');
+          var sshAuth = Buffer.from('ssh-userauth');
           var authReqLength = sshAuth.length;
           var userauthRequestPDU = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_SERVICE_REQUEST,generateSSHv2PDUBytes([msgCodeBuffer, new Number(authReqLength),sshAuth]));
      
@@ -1020,7 +1020,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
 };
 
 function SSHSessionData(){
-  this.serverCookie = new Buffer(16);
+  this.serverCookie = Buffer.alloc(16);
   this.clientCookie;
   this.serverVersion;
   this.incompletePacketBuffer;
@@ -1107,7 +1107,7 @@ SSHv2PDU.prototype.readInt = function (){
 SSHv2PDU.prototype.getRemainingBytes = function (){
   var currentOffset = this.offset;
   var payload = this.data;
-  var remaining = new Buffer(payload.length-currentOffset);
+  var remaining = Buffer.alloc(payload.length-currentOffset);
   payload.copy(remaining,0,currentOffset);
   return remaining;
 }
@@ -1117,7 +1117,7 @@ SSHv2PDU.prototype.readSizedData = function (){
   var currentOffset = this.offset;
   var payload = this.data;
   var length = payload.readUInt32BE(currentOffset);
-  var res = new Buffer(length);
+  var res = Buffer.alloc(length);
   payload.copy(res,0,currentOffset+4,currentOffset+length+4);
   this.offset+= (length+4);
   return res;
@@ -1128,7 +1128,7 @@ SSHv2PDU.prototype.readNameList = function (){
   var payload = this.data;
   var currentOffset = this.offset;
   var size = payload.readUInt32BE(currentOffset);
-  var kexNames = new Buffer(size);
+  var kexNames = Buffer.alloc(size);
   payload.copy(kexNames,0,currentOffset+4);
  
   var commaSeparatedNames = kexNames.toString('ascii');
@@ -1184,7 +1184,7 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
         firstBlock = rawData.slice(currentPosition,currentPosition+readCipherBlockLength);
       } else {
         bytesRead = rawData.length-currentPosition;
-        sessionData.incompletePacketBuffer = new Buffer(bytesRead);
+        sessionData.incompletePacketBuffer = Buffer.alloc(bytesRead);
         rawData.copy(sessionData.incompletePacketBuffer,0,currentPosition);
         return {Continue: true};;
        
@@ -1204,7 +1204,7 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     var remainingPacketLengthInThisRawDataLength = rawData.length - currentPosition;
     if ((packetLength + sessionData.readingMACLength+4) > remainingPacketLengthInThisRawDataLength){  // sometimes the mac is incomplete, to combine with next packet
       if(traceCrypto) console.log('decrypt packet length large than remainning data , length of remainingPacketLengthInThisRawData = '+remainingPacketLengthInThisRawDataLength);
-      sessionData.incompletePacketBuffer = new Buffer(remainingPacketLengthInThisRawDataLength);
+      sessionData.incompletePacketBuffer = Buffer.alloc(remainingPacketLengthInThisRawDataLength);
       rawData.copy(sessionData.incompletePacketBuffer,0,currentPosition);
       decryptedFirstBlock.copy(sessionData.incompletePacketBuffer,0);
       return {Continue: true};;
@@ -1216,7 +1216,7 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     var readDataLength = packetLength - bytesRead;//because we already read length and some bytes more, depend on readCipherBlockLength
   
     var encryptedBytesRead = 0;
-    var encryptedData = new Buffer(readDataLength);
+    var encryptedData = Buffer.alloc(readDataLength);
     
     
     if (readDataLength>0){
@@ -1227,7 +1227,7 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     
     if (sessionData.readingMACAlgorithm != null) {
       computedMac = crypto.createHmac(SSH_TO_OPENSSL_TABLE[sessionData.readingMACAlgorithm], sessionData.readingMACKey);
-      var seqNumberBuffer = new Buffer(4);
+      var seqNumberBuffer = Buffer.alloc(4);
       seqNumberBuffer.writeUInt32BE(messageSequenceNumber, 0, true);  
       computedMac.update(seqNumberBuffer);
       computedMac.update(Buffer.concat([decryptedFirstBlock,remainingData]));
@@ -1237,7 +1237,7 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
       }
     }
  
-    var decryptedDataPaddedLength = new Buffer (currentPosition);
+    var decryptedDataPaddedLength = Buffer.alloc(currentPosition);
     decryptedData  = Buffer.concat([decryptedDataPaddedLength,decryptedFirstBlock,remainingData]);
     
   } else {
@@ -1250,7 +1250,7 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
 
   if (packetLength > rawData.length){
     // this only happens before key exchange, when kex init is incomplete. 
-     sessionData.incompletePacketBuffer = new Buffer(rawData.length);
+     sessionData.incompletePacketBuffer = Buffer.alloc(rawData.length);
      rawData.copy(sessionData.incompletePacketBuffer,0,0);
      return {Continue: true};;
   }
@@ -1263,13 +1263,13 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
   var paddingLength = decryptedData.readUInt8(currentPosition)&0xff;
   currentPosition+=1;
   var payloadLength = packetLength-(paddingLength+1); // +1 for the padding length byte
-  var payload = new Buffer(payloadLength);
+  var payload = Buffer.alloc(payloadLength);
      
   decryptedData.copy(payload,0,currentPosition);
   currentPosition+=payloadLength+paddingLength;
   if (sessionData.readingMACAlgorithm) {
    
-    var receivedMac = new Buffer(sessionData.readingMACLength);
+    var receivedMac = Buffer.alloc(sessionData.readingMACLength);
     rawData.copy(receivedMac,0,currentPosition);
     currentPosition+=receivedMac.length;
     if (receivedMac.toString('hex')!=computedMac.toString('hex')){
@@ -1304,7 +1304,7 @@ function writeSSHv2PDU(socketWriteFunction,sessionData, pdu) {
      
   var padding = crypto.randomBytes(paddingLength);
   var data = new Array();
-  var packetBuffer = new Buffer (payload.length+paddingLength+5);
+  var packetBuffer = Buffer.alloc(payload.length+paddingLength+5);
      
  // if (sessionData.writingMACAlgorithm != null || sessionData.encryptCipher != null) {// implies encryption too
   //}
@@ -1318,7 +1318,7 @@ function writeSSHv2PDU(socketWriteFunction,sessionData, pdu) {
   if (sessionData.writingMACAlgorithm != null || sessionData.encryptCipher != null) {// implies encryption too       
     if (sessionData.writingMACAlgorithm != null) {
       mac = crypto.createHmac(SSH_TO_OPENSSL_TABLE[sessionData.writingMACAlgorithm], sessionData.writingMACKey);
-      var seqNumberBuffer = new Buffer(4);
+      var seqNumberBuffer = Buffer.alloc(4);
       seqNumberBuffer.writeUInt32BE(messageSequenceNumber, 0, true);  
       mac.update(seqNumberBuffer);
       mac.update(packetBuffer);
@@ -1360,7 +1360,7 @@ function initializeCrypto(sessionData)  {
     --sharedSecretlen;
   }
   var secretlen = (kData[index] & 0x80 ? 1 : 0) + sharedSecretlen;
-  var secretData = new Buffer(4 + secretlen);
+  var secretData = Buffer.alloc(4 + secretlen);
   
   secretData.writeUInt32BE(secretlen, bufPointer, true);
   bufPointer= bufPointer+4;
@@ -1497,12 +1497,12 @@ function initializeCrypto(sessionData)  {
   if (traceCrypto) console.log("decipherAlgo:\n" + decipherAlgo );
   var arcfourBuffer;
   if (clientToServerEncryptionAlgorithm.substr(0, 7) === 'arcfour') {
-    arcfourBuffer = new Buffer(1536);
+    arcfourBuffer = Buffer.alloc(1536);
     arcfourBuffer.fill(0);
     sessionData.encryptCipher.update(arcfourBuffer);
   }
   if (serverToClientEncryptionAlgorithm.substr(0, 7) === 'arcfour') {
-    arcfourBuffer = new Buffer(1536);
+    arcfourBuffer = Buffer.alloc(1536);
     arcfourBuffer.fill(0);
     sessionData.decryptCipher.update(arcfourBuffer);
   }
@@ -1588,9 +1588,9 @@ function initializeCrypto(sessionData)  {
   var serverToClientMACBlock = generateKeyBlock(hashAlgorithm,secretData,h,'F',sessionID,checkKeyLen);          
  // secretData.h = undefined;
    
-  sessionData.writingMACKey = new Buffer(sessionData.writingMACLength);
+  sessionData.writingMACKey = Buffer.alloc(sessionData.writingMACLength);
   clientToServerMACBlock.copy(sessionData.writingMACKey,0,0);
-  sessionData.readingMACKey = new Buffer (sessionData.readingMACLength);
+  sessionData.readingMACKey = Buffer.alloc(sessionData.readingMACLength);
   serverToClientMACBlock.copy(sessionData.readingMACKey,0,0);
   if (traceCrypto) {
     console.log("sessionData.writingMACKey:");
@@ -1725,7 +1725,7 @@ function makeKeyExchangeResponse (sessionData,keyExchangeAlgorithms,
   var clientCookie = crypto.randomBytes(16);
   sessionData.clientCookie = clientCookie;
  
-  var msgCodeBuffer = new Buffer(1);
+  var msgCodeBuffer = Buffer.alloc(1);
   msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_KEXINIT);
   var empty =[];
   
@@ -1760,7 +1760,7 @@ function generateSSHv2PDUBytes(argsArray){
     
     if (object instanceof Number || (typeof object == 'number')){
           //four bytes
-      var objectBuffer = new Buffer(4);
+      var objectBuffer = Buffer.alloc(4);
       objectBuffer.writeInt32BE(object);
   
     } else if (object instanceof Array){
@@ -1773,22 +1773,22 @@ function generateSSHv2PDUBytes(argsArray){
         stringList.push(Buffer.from(string));
       }
       var concatedStringBuffer = Buffer.concat(stringList);
-      objectBuffer = new Buffer (concatedStringBuffer.length+4);
+      objectBuffer = Buffer.alloc(concatedStringBuffer.length+4);
       objectBuffer.writeInt32BE(concatedStringBuffer.length);
       concatedStringBuffer.copy(objectBuffer,4);
     } else if (object instanceof Buffer){
       objectBuffer = Buffer.from(object);   
     } else if (object instanceof Boolean || (typeof object == 'boolean')){
-      var objectBuffer = new Buffer(1);
+      var objectBuffer = Buffer.alloc(1);
       objectBuffer.writeUInt8(object);      
     } else if (object instanceof VarData){
       var varLength = object.data ? object.data.length : 0;
-      var objectBuffer = new Buffer(4+varLength);
+      var objectBuffer = Buffer.alloc(4+varLength);
       objectBuffer.writeInt32BE(varLength);
       if (varLength) { object.data.copy(objectBuffer,4); }
     } else if (typeof object == 'string') {
       var varLength = object ? object.length : 0;
-      var objectBuffer = new Buffer(4+varLength);
+      var objectBuffer = Buffer.alloc(4+varLength);
       objectBuffer.writeInt32BE(varLength);
       if (varLength) { objectBuffer.write(object,4); }
     }
