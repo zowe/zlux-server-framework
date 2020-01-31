@@ -120,9 +120,6 @@ class ApimlHandler {
             sessionState.apimlToken = apimlCookie.split("=")[1];
             resolve({ success: true, username: sessionState.username, expms: DEFAULT_EXPIRATION_MS });
           } else {
-            if (res.statusCode == 405) {
-              reason: 'ConnectionError';
-            }
             let response = {
               success: false,
               reason: 'Unknown',

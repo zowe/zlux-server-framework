@@ -17,7 +17,9 @@ const zssHandlerFactory = require('./zssHandler');
 const apimlHandlerFactory = require('./apimlHandler');
 
 function doesApimlExist(serverConf) {
-  return (serverConf.node.mediationLayer !== undefined)
+  return (process.env['LAUNCH_COMPONENT_GROUPS'] !== undefined)
+    && (process.env['LAUNCH_COMPONENT_GROUPS'].indexOf('GATEWAY') != -1)
+    && (serverConf.node.mediationLayer !== undefined)
     && (serverConf.node.mediationLayer.server !== undefined)
     && (serverConf.node.mediationLayer.server.hostname !== undefined)
     && (serverConf.node.mediationLayer.server.gatewayPort !== undefined)
@@ -45,7 +47,7 @@ function cleanupSessionGeneric(sessionState) {
 function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
-  //TODO does this automatically mean JWT or does this mean JWT+other things, or is it unrelated?
+  //TODO this seems temporary, will need to unconditionally say usingApiml=usingSso when sso support is complete
   this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
   //Sso here meaning just authenticate to apiml, and handle jwt
   this.usingSso = this.apimlSsoEnabled && this.usingApiml;
