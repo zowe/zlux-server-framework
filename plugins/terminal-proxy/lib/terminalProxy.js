@@ -318,7 +318,7 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
       }
       else if (jsonObject.t === this.clientTypeKey) {
         var data = base64ToUint8Array(jsonObject[this.clientDataKey]);
-        var dataBuffer = new Buffer(data);
+        var dataBuffer = Buffer.from(data);
         if (this.usingSSH && this.sshSessionData){
           var sshData = {'msgCode':SSH_MESSAGE.SSH_MSG_CHANNEL_DATA,'data':dataBuffer};
           ssh.sendSSHData(this,sshData);
@@ -426,7 +426,10 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
             break;
           case SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER:
           case SSH_MESSAGE.SSH_MSG_CHANNEL_DATA:
-            var b64Data = utf8ArrayToB64(new Buffer( (sshMessage.type === SSH_MESSAGE.SSH_MSG_CHANNEL_DATA) ? sshMessage.readData : sshMessage.message,'utf8'));
+            var b64Data = utf8ArrayToB64(Buffer.from(
+              (sshMessage.type === SSH_MESSAGE.SSH_MSG_CHANNEL_DATA)
+                ? sshMessage.readData
+                : sshMessage.message,'utf8'));
             var reply = { t: t.hostTypeKey};
             reply[t.hostDataKey] = b64Data;
             replies.push(reply);
@@ -442,7 +445,7 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
             t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_GOING_AWAY,errorMessage);
             break;
           case SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST:
-            var b64Data = utf8ArrayToB64(new Buffer(sshMessage.data,'utf8'));
+            var b64Data = utf8ArrayToB64(Buffer.from(sshMessage.data,'utf8'));
             replies.push({
               "t": "SSH_CH_REQ",
               "ch": sshMessage.recipientChannel,
