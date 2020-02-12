@@ -68,6 +68,64 @@ class ApimlHandler {
     }
   }
 
+  logout(request, sessionState) {
+    return new Promise((resolve, reject) => {
+      const gatewayUrl = this.gatewayUrl;
+      const options = {
+        hostname: this.apimlConf.hostname,
+        port: this.apimlConf.gatewayPort,
+//TODO uncertainty about using apicatalog route instead of something part of the gateway itself
+        path: '/api/v1/apicatalog/auth/logout',
+        method: 'POST',
+        headers: {
+          'apimlAuthenticationToken': sessionState.apimlToken
+        },
+        agent: this.httpsAgent
+      }
+
+      const req = https.request(options, (res) => {
+        res.on('data', (d) => {});
+        res.on('end', () => {
+          let apimlCookie;
+          if (res.statusCode >= 200 && res.statusCode < 300) {
+            resolve({ success: true });
+            return;
+          } else {
+            let response = {
+              success: false,
+              reason: 'Unknown',
+              error: {
+                message: `APIML ${res.statusCode} ${res.statusMessage}`
+              }
+            };
+            //Seems that when auth is first called, it may not be loaded yet, so you get a 405.
+            if (res.statusCode == 405) {
+              response.reason = 'TryAgain';
+            }
+            resolve(response);
+            return;
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        this.logger.warn("APIML logout has failed:");
+        this.logger.warn(error);
+        var details = error.message;
+        if ((error.response !== undefined) && (error.response.data !== undefined)) {
+          details = error.response.data;
+        }
+        resolve({
+          success: false,
+          reason: 'Unknown',
+          error: { message: `APIML ${details}`}
+        });
+        return;
+      });
+      req.end();
+    });
+  }
+
   /**
    * Should be called e.g. when the users enters credentials
    *
@@ -119,6 +177,7 @@ class ApimlHandler {
             sessionState.apimlCookie = apimlCookie;
             sessionState.apimlToken = apimlCookie.split("=")[1];
             resolve({ success: true, username: sessionState.username, expms: DEFAULT_EXPIRATION_MS });
+            return;
           } else {
             let response = {
               success: false,
@@ -132,6 +191,7 @@ class ApimlHandler {
               response.reason = 'TryAgain';
             }
             resolve(response);
+            return;
           }
         });
       });
@@ -148,6 +208,7 @@ class ApimlHandler {
           reason: 'Unknown',
           error: { message: `APIML ${details}`}
         });
+        return;
       });
 
       req.write(data);

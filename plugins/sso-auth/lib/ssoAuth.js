@@ -71,6 +71,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canRefresh": this.usingApiml ? false : true, 
     "canAuthenticate": true,
     "canAuthorize": true,
+    "canLogout": true,
     "proxyAuthorizations": true,
     //TODO do we need to process proxy headers for both?
     "processesProxyHeaders": this.usingZss ? true: false
@@ -100,6 +101,30 @@ SsoAuthenticator.prototype = {
       username: sessionState.username,
       expms: sessionState.sessionExpTime ? expms : undefined
     };
+  },
+
+  logout(request, sessionState) {
+    return new Promise((resolve, reject)=> {
+      if (this.usingSso || !this.usingZss) {
+        this.apimlHandler.logout(request, sessionState).then((result)=> {
+          resolve(this._insertHandlerStatus(result));
+        }).catch((e) => {
+          resolve(this._insertHandlerStatus({success: false, reason: e.message}));
+        });
+      } else {
+        this.zssHandler.logout(request, sessionState).then((zssResult)=> {
+          if (this.usingApiml) {
+            this.apimlHandler.logout(request, sessionState).then((apimlResult)=> {
+              resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success)}));
+            }).catch((e) => {
+              resolve(this._insertHandlerStatus({success: false, reason: e.message}));
+            });
+          }
+        }).catch((e) => {
+          resolve(this._insertHandlerStatus({success: false, reason: e.message}));
+        });
+      }
+    });
   },
 
   _insertHandlerStatus(response) {
@@ -132,7 +157,7 @@ SsoAuthenticator.prototype = {
           cleanupSessionGeneric(sessionState);
           reject(e);
         });
-      } else if (this.usingZss) {
+      } else {
         //case 3: zss present, and maybe apiml also
         this.zssHandler.authenticate(request, sessionState).then((zssResult)=> {
           if (this.usingApiml) {
