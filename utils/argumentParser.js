@@ -126,7 +126,7 @@ function resolveJson(argumentsObj, matchObj) {
     }
     currentLevel[matchParts[matchParts.length-1]] = stringToValue(matchObj.value);
   } catch (e) {
-    console.log("ZWED0007E - SEVERE: Exception occurred trying to generate object from input:",e);
+    console.log("ZWED0111E - SEVERE: Exception occurred trying to generate object from input:",e);
     process.exit(1);
   }
   return returnVal;    

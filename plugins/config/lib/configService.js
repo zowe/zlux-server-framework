@@ -396,7 +396,7 @@ function createMissingFolder(resourcePath, scopeDirectory){
   logger.debug('ZWED0216I', pathName); //logger.debug('About to call mkdir on path='+pathName);
   try {
     fs.mkdirSync(pathName,unixPermissionMode);
-    logger.debug("ZWED0217I", `${pathName}`); //logger.debug(`Directory ${pathName} created `);
+    logger.debug("ZWED0217I", pathName); //logger.debug(`Directory ${pathName} created `);
   }
   catch (e) {
     if (e.code != 'EEXIST') {//disregard existing folder error, it is expected
@@ -419,11 +419,11 @@ function createMissingFolderAsync(resourcePath, scopeDirectory, callback){
 
   fs.mkdir(pathName,unixPermissionMode,(err)=>{
     if (!err) {
-      logger.debug("ZWED0219I", `${pathName}`); //logger.debug(`Directory ${pathName} created `);
+      logger.debug("ZWED0219I", pathName); //logger.debug(`Directory ${pathName} created `);
     }
     else {
       if (err.code != 'EEXIST') {//its expected for a folder to exist. its fine
-        logger.warn('ZWED0090W', err); //logger.warn('Could not create directory, error='+err);
+        logger.warn('ZWED0090W', err.message); //logger.warn('Could not create directory, error='+err);
       }
     }
     callback();    
@@ -704,7 +704,7 @@ function getPathForScope(lastPath, filename, scope, directories){
     }
     break;    
   default:
-    logger.warn(`ZWED0094W`, `${scope}`); //logger.warn(`getpathforscope: Warning, invalid scope of ${scope}`);
+    logger.warn(`ZWED0094W`, scope); //logger.warn(`getpathforscope: Warning, invalid scope of ${scope}`);
   }
   return path;
 }
@@ -727,7 +727,7 @@ function getNextBroadestScope(scope) {
   case CONFIG_SCOPE_PLUGIN:
     return 0;
   default:
-    logger.warn(`ZWED0095W`, `${scope}`); //logger.warn(`Scope=${scope} not found`);
+    logger.warn(`ZWED0095W`, scope); //logger.warn(`Scope=${scope} not found`);
   }
   return 0;
 }
@@ -746,7 +746,7 @@ function getNextNarrowestScope(scope) {
   case CONFIG_SCOPE_PLUGIN:
     return CONFIG_SCOPE_PRODUCT;
   default:
-    logger.warn(`ZWED0096W`, `${scope}`); //logger.warn(`Scope=${scope} not found`);
+    logger.warn(`ZWED0096W`, scope); //logger.warn(`Scope=${scope} not found`);
   }
   return 0;
 }
@@ -799,10 +799,10 @@ function mergeJsonProperties(originalObject, overrideObject) {
         if (Array.isArray(property)) {
           overrideProperty.push.apply(overrideProperty, property);
         } else {
-          logger.debug("ZWED0225I", `${property}`); //logger.debug(`Trying to merge ${property} but it is not an array`);
+          logger.debug("ZWED0225I", property); //logger.debug(`Trying to merge ${property} but it is not an array`);
         }
       } else {
-        logger.debug("ZWED0226I", `${overrideProperty}`); //logger.debug(`Trying to merge ${overrideProperty} but it is not an array`);
+        logger.debug("ZWED0226I", overrideProperty); //logger.debug(`Trying to merge ${overrideProperty} but it is not an array`);
       }
     }
   }
@@ -832,7 +832,7 @@ function getJSONFromFile(path) {
       fileJson = JSON.parse(data);
     }
     catch (parseEx) {
-      logger.warn('ZWED0097W', path, parseEx); //logger.warn('Exception when parsing JSON. File='+path+'. Error='+parseEx);
+      logger.warn('ZWED0097W', path, parseEx.message); //logger.warn('Exception when parsing JSON. File='+path+'. Error='+parseEx);
     }
     fs.closeSync(fd);
     return {data:fileJson, maccess: maccess};
@@ -882,7 +882,7 @@ function getJSONFromFileAsync(path, callback) {
                       fileJson = JSON.parse(data);
                     }
                     catch (parseEx) {
-                      logger.warn('ZWED0099W', path, parseEx); //logger.warn('Exception when parsing JSON. File='+path+'. Error='+parseEx);
+                      logger.warn('ZWED0099W', path, parseEx.message); //logger.warn('Exception when parsing JSON. File='+path+'. Error='+parseEx);
                     }
                     callback({data:fileJson, maccess: maccess});
                   });
@@ -1033,7 +1033,7 @@ function getJsonLocal(lastPath, filename, directories, scope, resource) {
     }
     break;
   default:
-    logger.warn(`ZWED0100W`, `${policy}`); //logger.warn(`Aggregation policy type=${policy} unhandled`);
+    logger.warn(`ZWED0100W`, policy); //logger.warn(`Aggregation policy type=${policy} unhandled`);
   }
   return null;
 }
@@ -1105,7 +1105,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
           jStreamer.jsonEndObject(streamer);
           jStreamer.jsonEnd(streamer);
           finishResponse(response);
-          logger.debug("ZWED0233I", `${location}`); //logger.debug(`Configuration service request complete. Resource=${location}`);
+          logger.debug("ZWED0233I", location); //logger.debug(`Configuration service request complete. Resource=${location}`);
         }
         else {
           respondWithJsonError(response,"ZWED0066E - Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
@@ -1534,7 +1534,7 @@ function getFilesInDirectory(resource, subresourceList, directories, scope, rela
   }
   default:
   {
-    logger.warn(`ZWED0104W`, `${policy}`); //logger.warn(`Aggregation policy type=${policy} unhandled`);
+    logger.warn(`ZWED0104W`, policy); //logger.warn(`Aggregation policy type=${policy} unhandled`);
   }
   }
   return jsonTable;
@@ -1597,7 +1597,7 @@ function respondWithFilesInDirectory(response, filename, resource, subresourceLi
           jStreamer.jsonPrintObject2(streamer,results,"maccessms");
           jStreamer.jsonEnd(streamer);
           finishResponse(response);
-          logger.debug("ZWED0243I", `${location}`); //logger.debug(`Configuration service request complete. Resource=${location}`);
+          logger.debug("ZWED0243I", location); //logger.debug(`Configuration service request complete. Resource=${location}`);
         });
       } else {
         respondWithJsonError(response,"ZWED0069E - Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
@@ -1617,7 +1617,7 @@ function respondWithFilesInDirectory(response, filename, resource, subresourceLi
         jStreamer.jsonEndObject(streamer);
         jStreamer.jsonEnd(streamer);
         finishResponse(response);
-        logger.debug("ZWED0245I", `${location}`); //logger.debug(`Configuration service request complete. Resource=${location}`);
+        logger.debug("ZWED0245I", location); //logger.debug(`Configuration service request complete. Resource=${location}`);
       } else {
         respondWithJsonError(response,"ZWED0070E - Resource not yet defined",HTTP_STATUS_NO_CONTENT,location);
       }
@@ -1710,7 +1710,7 @@ function replaceOrCreateFile(response, filename, directories, scope, relativePat
                     jStreamer.jsonAddString(streamer,"result","Replaced item.");
                     jStreamer.jsonEnd(streamer);
                     finishResponse(response);
-                    logger.debug("ZWED0246I", `${location}`); //logger.debug(`Configuration service request complete. Resource=${location}`);
+                    logger.debug("ZWED0246I", location); //logger.debug(`Configuration service request complete. Resource=${location}`);
                   }
                 });
               }
@@ -1813,7 +1813,7 @@ function checkFolderModifiedTimestamp(topDirectory,timestamp,skipMissing){
 
                           if (timestamp < mtimems) {
                             stop = true;
-                            logger.warn(`ZWED0109W`, `${filePath}`); //logger.warn(`Timestamp mismatch on file=${filePath}`);
+                            logger.warn(`ZWED0109W`, filePath); //logger.warn(`Timestamp mismatch on file=${filePath}`);
                             reject(new Error(`ZWED0054E - Timestamp mismatch`));
                           }
                           else { 
@@ -1938,7 +1938,7 @@ function deleteResourceSuccess(response,location) {
   jStreamer.jsonAddString(streamer,"result","Resource deleted.");
   jStreamer.jsonEnd(streamer);
   finishResponse(response);
-  logger.debug("ZWED0250I", `${location}`); //logger.debug(`Configuration service request complete. Resource=${location}`);
+  logger.debug("ZWED0250I", location); //logger.debug(`Configuration service request complete. Resource=${location}`);
 }
 
 function handleDeleteFolderRequest(response, filename, resource, directories, scope, relativePath, location) {
@@ -2235,7 +2235,7 @@ function addJSONFilesToJSON(startingPath,json) {
           contents = jsonUtils.parseJSONWithComments(filepath);
         } catch (e) {
           //binary or corrupt. this function only for json
-          logger.warn(`ZWED0115W`, `${filepath}`); //logger.warn(`Failed to load ${filepath} as a JSON`);
+          logger.warn(`ZWED0115W`, filepath); //logger.warn(`Failed to load ${filepath} as a JSON`);
         }
         if (contents) {
           json[filename] = {"_objectType": 'org.zowe.configjs.internal.file', "contents":contents};
@@ -2697,19 +2697,19 @@ function ConfigService(context) {
     logger.debug("ZWED0259I", lastPath, itemName); //logger.debug("Reached the GET case. lastPath="+lastPath+". itemName="+itemName);
     if (!request.currentResourceList && itemName.length>0) {
       //respond with one file
-      accessLogger.debug(`ZWED0260I`, `${request.resourceURL}`, `${itemName}`, `${request.scope}`); //accessLogger.debug(`Configuration service handling request for element. Resource${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
+      accessLogger.debug(`ZWED0260I`, request.resourceURL, itemName, request.scope); //accessLogger.debug(`Configuration service handling request for element. Resource${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
       respondWithConfigFile(response,itemName,request.currentResourceObject,
                             request.directories,request.scope,lastPath,
                             request.resourceURL);
     }
     else if (request.currentResourceList && itemName.length===0) {
       //give us a listing of sub resources
-      accessLogger.debug("ZWED0261I", `${request.resourceURL}`); //accessLogger.debug(`Configuration service handling resource listing request. Resource=${request.resourceURL}.`);
+      accessLogger.debug("ZWED0261I", request.resourceURL); //accessLogger.debug(`Configuration service handling resource listing request. Resource=${request.resourceURL}.`);
       respondWithSubDirectoryListing(response, request.currentResourceList,request.resourceURL);
     }
     else {
       let listing = request.query.listing ? (request.query.listing.toLowerCase() == 'true') : false;
-      accessLogger.debug(`ZWED0262I`, `${request.resourceURL}`, `${itemName}`, `${request.scope}`, `${listing}`); //accessLogger.debug(`Configuration service responding with elements in resource. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}. ListingOnly=${listing}.`);
+      accessLogger.debug(`ZWED0262I`, request.resourceURL, itemName, request.scope, listing); //accessLogger.debug(`Configuration service responding with elements in resource. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}. ListingOnly=${listing}.`);
       if (!listing) {
         if (request.currentResourceObject.binary) {
           respondWithJsonError(response,`ZWED0094E - Cannot return multiple binaries in a single request`,HTTP_STATUS_BAD_REQUEST);
@@ -2748,15 +2748,15 @@ function ConfigService(context) {
     logger.debug("ZWED0263I", lastPath, itemName); //logger.debug("Reached the DELETE case. lastPath="+lastPath+". itemName="+itemName);
     if (!request.currentResourceList && itemName.length>0) {
       //delete one file
-      accessLogger.debug(`ZWED0264I`, `${request.resourceURL}`, `${itemName}`, `${request.scope}`); //accessLogger.debug(`Configuration service handling element deletion request. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
+      accessLogger.debug(`ZWED0264I`, request.resourceURL, itemName, request.scope); //accessLogger.debug(`Configuration service handling element deletion request. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
       restCheckModifiedTimestamp(itemName,request.directories,request.scope,lastPath,timestamp).then(()=> {
         handleDeleteFileRequest(response,itemName,request.currentResourceObject,request.directories,request.scope,lastPath,request.resourceURL);
       }, (err)=> {
         if (err && err.message === 'Timestamp mismatch'){
-          logger.warn(`ZWED0123W`, `${request.resourceURL}`, `${itemName}`); //logger.warn(`Could not delete resource (${request.resourceURL}/${itemName}) due to timestamp mismatch`);
+          logger.warn(`ZWED0123W`, request.resourceURL, itemName); //logger.warn(`Could not delete resource (${request.resourceURL}/${itemName}) due to timestamp mismatch`);
           respondWithJsonError(response,`ZWED0097E - Timestamp mismatch`,HTTP_STATUS_BAD_REQUEST,request.resourceURL);
         } else {  
-          logger.warn(`ZWED0124W`, `${request.resourceURL}`, `${itemName}`, `${err.stack}`); //logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, Element=${itemName}, Err=${err.stack}`);
+          logger.warn(`ZWED0124W`, request.resourceURL, itemName, err.stack); //logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, Element=${itemName}, Err=${err.stack}`);
           respondWithJsonError(response,`ZWED0098E - Timestamp check failure`,HTTP_STATUS_INTERNAL_SERVER_ERROR,request.resourceURL);
         }
       });
@@ -2764,15 +2764,15 @@ function ConfigService(context) {
     else if (request.currentResourceList && itemName.length===0) {
       //delete folder if recursive set
       if (isRecursive) {
-        accessLogger.debug(`ZWED0265I`, `${request.resourceURL}`, `${request.scope}`); //accessLogger.debug(`Configuration service handling resource deletion request. Resource=${request.resourceURL}, Scope=${request.scope}.`);
+        accessLogger.debug(`ZWED0265I`, request.resourceURL, request.scope); //accessLogger.debug(`Configuration service handling resource deletion request. Resource=${request.resourceURL}, Scope=${request.scope}.`);
         checkResourceModifiedTimestamp(itemName,request.directories,request.scope,lastPath,timestamp,true).then(()=> {
           handleDeleteFolderRequest(response,itemName,request.currentResourceObject,request.directories,request.scope,lastPath,request.resourceURL);
         }, (err) => {
           if (err && err.message === 'Timestamp mismatch'){
-            logger.warn(`ZWED0125W`, `${request.resourceURL}`); //logger.warn(`Could not delete resource (${request.resourceURL}) due to timestamp mismatch`);
+            logger.warn(`ZWED0125W`, request.resourceURL); //logger.warn(`Could not delete resource (${request.resourceURL}) due to timestamp mismatch`);
             respondWithJsonError(response,`ZWED0099E - Timestamp mismatch`,HTTP_STATUS_BAD_REQUEST,request.resourceURL);
           } else {
-            logger.warn(`ZWED0126W`, `${request.resourceURL}`, `${err.stack}`); //logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, Err=${err.stack}`);
+            logger.warn(`ZWED0126W`, request.resourceURL, err.stack); //logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, Err=${err.stack}`);
             respondWithJsonError(response,`ZWED0100E - Timestamp check failure`,HTTP_STATUS_INTERNAL_SERVER_ERROR,request.resourceURL);
           }
         });
@@ -2783,7 +2783,7 @@ function ConfigService(context) {
     }
     else {
       //delete folder
-      accessLogger.debug(`ZWED0266I`, `${request.resourceURL}`, `${itemName}`, `${request.scope}`); //accessLogger.debug(`Configuration service handling resource deletion request. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
+      accessLogger.debug(`ZWED0266I`, request.resourceURL, itemName, request.scope); //accessLogger.debug(`Configuration service handling resource deletion request. Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
       handleDeleteFolderRequest(response,itemName,request.currentResourceObject,request.directories,request.scope,lastPath,request.resourceURL);          
     }
     return 0;
@@ -2839,7 +2839,7 @@ function ConfigService(context) {
     /* NOTE: here, scope only indicates where to place the files. aggregation policy is ignored */
     if (!request.currentResourceList && itemName.length>0) {
       //Replace or create one file
-      accessLogger.debug("ZWED0268I", `${request.resourceURL}`, `${itemName}`, `${request.scope}`); //accessLogger.debug(`Configuration service handling element write request. `
+      accessLogger.debug("ZWED0268I", request.resourceURL, itemName, request.scope); //accessLogger.debug(`Configuration service handling element write request. `
                          //+`Resource=${request.resourceURL}, Element=${itemName}, Scope=${request.scope}.`);
       restCheckModifiedTimestamp(itemName,request.directories,request.scope,lastPath,timestamp).then(()=> {
           replaceOrCreateFile(response, itemName, request.directories,
@@ -2847,11 +2847,11 @@ function ConfigService(context) {
                               request.body, request.body.length, request.currentResourceObject.binary);
       }, (err)=> {
         if (err && err.message === 'Timestamp mismatch'){
-          logger.warn(`ZWED0127W`, `${request.resourceURL}`, `${itemName}`); //logger.warn(`Could not delete resource due to timestamp mismatch. `
+          logger.warn(`ZWED0127W`, request.resourceURL, itemName); //logger.warn(`Could not delete resource due to timestamp mismatch. `
                       //+`Resource=${request.resourceURL}, Element=${itemName}`);
           respondWithJsonError(response,`ZWED0108E - Timestamp mismatch`,HTTP_STATUS_BAD_REQUEST,request.resourceURL);
         } else {  
-          logger.warn(`ZWED0128W`, `${request.resourceURL}`, `${itemName}`, `${err.stack}`); //logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, `
+          logger.warn(`ZWED0128W`, request.resourceURL, itemName, err.stack); //logger.warn(`Failed to check resource timestamp. Resource=${request.resourceURL}, `
                       //+`Element=${itemName}, Err=${err.stack}`);
           respondWithJsonError(response,`ZWED0109E - Timestamp check failure`,
                                HTTP_STATUS_INTERNAL_SERVER_ERROR,request.resourceURL);

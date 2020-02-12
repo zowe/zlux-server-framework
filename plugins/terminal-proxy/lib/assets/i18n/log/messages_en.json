@@ -17,6 +17,8 @@
   "ZWED0136I":"%s Content to be sent to host socket=\n%s",
   "ZWED0137I":"%s Content to be sent to client=\n%s",
   "ZWED0138I":"%s Content of host data=\n%s",
+  "ZWED0139I":"RESERVED: Input = %s",
+  "ZWED0140I":"RESERVED: Input = %s",
   "ZWED0269I":"%s Websocket client message received. Length=%d",
   "ZWED0270I":"%s Certificate accepted by client, processing buffered host data messages. Messages to process=%d",
   "ZWED0271I":"%s",
@@ -35,7 +37,7 @@
   "ZWED0284I":"Attempting SSH or telnet connect",
   "ZWED0285I":"I see and will read in the CAs",
   
-  "ZWED0129W":"websocket error %s",
+  "ZWED0129W":"websocket error ",
   "ZWED0130W":"Terminal websocket proxy was not supplied with valid message config description",
   "ZWED0131W":"%s Error when destroying host socket. e=%s",
   "ZWED0132W":"%s Error when destroying host socket. e=%s",

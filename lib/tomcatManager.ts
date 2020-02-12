@@ -50,7 +50,7 @@ export class TomcatManager implements JavaServerManager {
         if (service.type == 'java-war') {
           let serviceid = plugin.identifier+':'+service.name;
           let warpath = path.join(plugin.location,'lib',service.filename);
-          log.info(`ZWED0078I`, `${this.id}`, `${serviceid}`, `${warpath}`); //log.info(`Tomcat Manager ID=${this.id} found service=${serviceid}, war=${warpath}`);
+          log.info(`ZWED0078I`, this.id, serviceid, warpath); //log.info(`Tomcat Manager ID=${this.id} found service=${serviceid}, war=${warpath}`);
           this.services[serviceid] = warpath;
         }
       });
@@ -83,7 +83,7 @@ export class TomcatManager implements JavaServerManager {
                   "ZOWE_ZLUX_URL": this.config.zluxUrl };
     const catalina = path.join(this.config.path, 'bin', 'catalina.sh');
     const args = [ 'run',  '-config', this.config.config];
-    log.info(`ZWED0079I`,`${catalina}`, `${JSON.stringify(args)}`, `${JSON.stringify(env)}`);  //log.info(`ZWED0079I`,`Starting tomcat with params:\nCatalina: ${catalina}\nArgs: ${JSON.stringify(args)}\nEnv: ${JSON.stringify(env)}`); 
+    log.info(`ZWED0079I`,catalina, JSON.stringify(args), JSON.stringify(env));  //log.info(`ZWED0079I`,`Starting tomcat with params:\nCatalina: ${catalina}\nArgs: ${JSON.stringify(args)}\nEnv: ${JSON.stringify(env)}`); 
     return spawn(catalina,
                  args,
                  {env: env});
@@ -113,7 +113,7 @@ export class TomcatManager implements JavaServerManager {
                   "ZOWE_ZLUX_URL": this.config.zluxUrl };
     const javaPath = path.join(this.config.runtime.home, 'bin', 'java');
     const cwd = path.join(this.config.path, 'bin');
-    log.info(`ZWED0080I`, `${javaPath}`, `${JSON.stringify(DOptionsArray)}`, `${JSON.stringify(env)}`, `cwd=${cwd}`); //log.info(`Starting tomcat with params:\nJava=${javaPath}\nOptions=${JSON.stringify(DOptionsArray)}\nEnv=${JSON.stringify(env)}\ncwd=${cwd}`);
+    log.info(`ZWED0080I`, javaPath, JSON.stringify(DOptionsArray), JSON.stringify(env), `cwd=${cwd}`); //log.info(`Starting tomcat with params:\nJava=${javaPath}\nOptions=${JSON.stringify(DOptionsArray)}\nEnv=${JSON.stringify(env)}\ncwd=${cwd}`);
     return spawn(javaPath,
                  DOptionsArray,
                  {env: env,
@@ -123,7 +123,7 @@ export class TomcatManager implements JavaServerManager {
 
   public async start() {
     //make folder, make links, start server
-    log.info(`ZWED0081I`, `${this.id}`, this.config); //log.info(`Tomcat Manager with id=${this.id} invoked to startup with config=`,this.config);
+    log.info(`ZWED0081I`, this.id, JSON.stringify(this.config)); //log.info(`Tomcat Manager with id=${this.id} invoked to startup with config=`,this.config);
     await this.makeRoot();
     //TODO should probably extract rather than let tomcat do it, since its a bit dumb with versioning
     //TODO what's the value of knowing the serviceid if the war can have a completely different name?
@@ -141,18 +141,18 @@ export class TomcatManager implements JavaServerManager {
           try {
             dir = await this.extractWar(warpath, key);
           } catch (e) {
-            log.warn(`ZWED0077W`, `${key}`, e); //log.warn(`Could not extract war for service=${key}, error=`,e);
+            log.warn(`ZWED0077W`, key, e); //log.warn(`Could not extract war for service=${key}, error=`,e);
           }
         } else {
           dir = warpath.substring(0,warpath.length-path.extname(warpath).length);
         }
       } catch (e) {
-        log.warn(`ZWED0078W`, `${key}`, e); //log.warn(`Could not access files to determine status for service=${key}, error=`,e);
+        log.warn(`ZWED0078W`, key, e); //log.warn(`Could not access files to determine status for service=${key}, error=`,e);
       }
       if (dir) {
         try {
           let servletname = path.basename(dir);
-          log.info(`ZWED0082I`, `${key}`, `${servletname}`); //log.info(`Service=${key} has Servlet name=${servletname}`);
+          log.info(`ZWED0082I`, key, servletname); //log.info(`Service=${key} has Servlet name=${servletname}`);
           const destination = path.join(this.appdir,
                                         key.replace(/:/g,'_')+'_'+
                                         path.basename(
@@ -160,17 +160,17 @@ export class TomcatManager implements JavaServerManager {
           if (dir != destination) {
             await this.makeLink(dir, destination);
           } else {
-            log.info(`ZWED0083I`, `${destination}`); //log.info(`Skipping linking for extracted war at dest=${destination}`);
+            log.info(`ZWED0083I`, destination); //log.info(`Skipping linking for extracted war at dest=${destination}`);
           }
           successes++;
         } catch (e) {
-          log.warn(`ZWED0079W`, `${key}`, e); //log.warn(`Cannot add servlet for service=${key}, error=`,e);
+          log.warn(`ZWED0079W`, key, e); //log.warn(`Cannot add servlet for service=${key}, error=`,e);
         }
-      } else {log.warn(`ZWED0080W`, `${key}`);} //{log.warn(`Cannot add servlet for service=${key}`);}
+      } else {log.warn(`ZWED0080W`, key);} //{log.warn(`Cannot add servlet for service=${key}`);}
 
     }
     if (successes > 0) {
-      log.info(`ZWED0084I`, `${this.id}`, `${this.getBaseURL()}`); //log.info(`About to tomcat, ID=${this.id}, URL=${this.getBaseURL()}`);
+      log.info(`ZWED0084I`, this.id, this.getBaseURL()); //log.info(`About to tomcat, ID=${this.id}, URL=${this.getBaseURL()}`);
 
       let DOptionsArray = [
         `shutdown.port=-1`,
@@ -190,18 +190,18 @@ export class TomcatManager implements JavaServerManager {
       this.status = "running";
       this.tomcatProcess = tomcatProcess;
       tomcatProcess.stdout.on('data', (data)=> {
-        log.info(`ZWED0085I`, `${this.getIdString()}`, `${data}`); //log.info(`${this.getIdString()} stdout=${data}`);
+        log.info(`ZWED0085I`, this.getIdString(), data); //log.info(`${this.getIdString()} stdout=${data}`);
       });
 
       tomcatProcess.stderr.on('data', (data)=> {
-        log.warn(`ZWED0082W`, `${this.getIdString()}` ,`${data}`); //log.warn(`${this.getIdString()} stderr=${data}`);
+        log.warn(`ZWED0082W`, this.getIdString(), data); //log.warn(`${this.getIdString()} stderr=${data}`);
       });
 
       let onClose = (code)=> {
 	if (tomcatProcess.pid) {
-      log.info(`ZWED0086I`, `${this.getIdString()}`, `${code}`); //log.info(`${this.getIdString()} closed, code=${code}`);
+      log.info(`ZWED0086I`, this.getIdString(), code); //log.info(`${this.getIdString()} closed, code=${code}`);
         } else {
-          log.warn(`ZWED0083W`, `${code}`); //log.warn(`Tomcat could not start. Closing. code=${code}`);
+          log.warn(`ZWED0083W`, code); //log.warn(`Tomcat could not start. Closing. code=${code}`);
         }
       };
 
@@ -209,9 +209,9 @@ export class TomcatManager implements JavaServerManager {
 
       tomcatProcess.on('exit', (code)=> {
 	if (tomcatProcess.pid) {
-    log.info(`ZWED0087I`, `${this.getIdString()}`, `${code}`); //log.info(`${this.getIdString()} exited, code=${code}`);
+    log.info(`ZWED0087I`, this.getIdString(), code); //log.info(`${this.getIdString()} exited, code=${code}`);
         } else {
-          log.warn(`ZWED0084W`, `${code}`); //log.warn(`Tomcat could not start. Exiting. code=${code}`);
+          log.warn(`ZWED0084W`, code); //log.warn(`Tomcat could not start. Exiting. code=${code}`);
         }
         tomcatProcess.removeListener('close', onClose);
         this.tomcatProcess = null;
@@ -219,15 +219,15 @@ export class TomcatManager implements JavaServerManager {
 
      
     } else {
-      log.warn(`ZWED0004W`, `${this.id}`); //log.info(`Tomcat for ID=${this.id} not starting, no services succeeded loading`);
+      log.warn(`ZWED0004W`, this.id); //log.info(`Tomcat for ID=${this.id} not starting, no services succeeded loading`);
     }
   }
 
   private stopForWindows(){
     if (this.tomcatProcess) {
-      log.info(`ZWED0088I`, `${this.getIdString()}`); //log.info(`${this.getIdString()} Manager issuing sigterm`);
+      log.info(`ZWED0088I`, this.getIdString()); //log.info(`${this.getIdString()} Manager issuing sigterm`);
       this.tomcatProcess.on('error', (err)=> {
-        log.warn(`ZWED0085W`, `${this.getIdString()}`, `${err}`); //log.warn(`${this.getIdString()} Error when stopping, error=${err}`);
+        log.warn(`ZWED0085W`, this.getIdString(), err); //log.warn(`${this.getIdString()} Error when stopping, error=${err}`);
       });
       this.tomcatProcess.kill('SIGTERM');
     }
@@ -254,20 +254,20 @@ export class TomcatManager implements JavaServerManager {
       return;
     }
     stopProcess.stdout.on('data', (data)=> {
-      log.info(`ZWED0089I`, `${this.getIdString()}`, `${data}`); //log.info(`${this.getIdString()} stdout=${data}`);
+      log.info(`ZWED0089I`, this.getIdString(), data); //log.info(`${this.getIdString()} stdout=${data}`);
     });
 
     stopProcess.stderr.on('data', (data)=> {
-      log.warn(`ZWED0087W`, `${this.getIdString()}`, `${data}`); //log.warn(`${this.getIdString()} stderr=${data}`);
+      log.warn(`ZWED0087W`, this.getIdString(), data); //log.warn(`${this.getIdString()} stderr=${data}`);
     });
     
     let onClose = (code)=> {
-      log.info(`ZWED0090I`, `${this.getIdString()}`, `${code}`); //log.info(`${this.getIdString()} closed, code=${code}`);
+      log.info(`ZWED0090I`, this.getIdString(), code); //log.info(`${this.getIdString()} closed, code=${code}`);
     };
     stopProcess.on('close', onClose);
 
     stopProcess.on('exit', (code)=> {
-      log.info(`ZWED0091I`, `${this.getIdString()}`,  `${code}`); //log.info(`${this.getIdString()} exited, code=${code}`);              
+      log.info(`ZWED0091I`, this.getIdString(),  code); //log.info(`${this.getIdString()} exited, code=${code}`);              
       this.status = "stopped";
       stopProcess.removeListener('close', onClose);
       stopProcess = null;
@@ -276,14 +276,14 @@ export class TomcatManager implements JavaServerManager {
   }
 
   public stop(): Promise<any> {
-    log.info(`ZWED0092I`, `${this.id}`); //log.info(`Tomcat Manager ID=${this.id} stopping`);
+    log.info(`ZWED0092I`, this.id); //log.info(`Tomcat Manager ID=${this.id} stopping`);
     TomcatManager.isWindows ? this.stopForWindows() : this.stopForUnix();
     return new Promise((resolve, reject) => {
       rimraf(this.appdir, (error)=> {
         if (error) {
           reject(error);
         } else {
-          log.info(`ZWED0093I`, `${this.id}`); //log.info(`Tomcat Manager ID=${this.id} cleanup successful`);
+          log.info(`ZWED0093I`, this.id); //log.info(`Tomcat Manager ID=${this.id} cleanup successful`);
           resolve();
         }
       })
@@ -357,7 +357,7 @@ export class TomcatManager implements JavaServerManager {
                                        warpath.substring(0,warpath.length-path.extname(warpath).length)));
 
           zipfile.on("close", function() {
-            log.info(`ZWED0094I`, `${destPath}`); //log.info(`Extracted war to ${destPath}`);
+            log.info(`ZWED0094I`, destPath); //log.info(`Extracted war to ${destPath}`);
             if (error) {
               reject(error);
             } else {
@@ -390,11 +390,11 @@ export class TomcatManager implements JavaServerManager {
                       error = err;
                       zipfile.close();
                     } else {
-                      log.debug(`ZWED0206I`, `${entry.fileName}`, `${entry.uncompressedSize}`); //log.debug(`Writing: ${entry.fileName}, Size=${entry.uncompressedSize}`);
+                      log.debug(`ZWED0206I`, entry.fileName, entry.uncompressedSize); //log.debug(`Writing: ${entry.fileName}, Size=${entry.uncompressedSize}`);
                       let writeStream = fs.createWriteStream(
                         path.join(destPath,entry.fileName), {mode: FILE_WRITE_MODE});
                       writeStream.on("close", ()=> {
-                        log.debug(`ZWED0207I`, `${entry.fileName}`); //log.debug(`Wrote: ${entry.fileName}`);
+                        log.debug(`ZWED0207I`, entry.fileName); //log.debug(`Wrote: ${entry.fileName}`);
                         zipfile.readEntry();
                       });
                       readStream.pipe(writeStream);
@@ -441,9 +441,9 @@ export class TomcatManager implements JavaServerManager {
   */
   private makeLink(dir: Path, destination: string): Promise<void> {
     if (TomcatManager.isWindows) {
-      log.info(`ZWED0095I`, `${dir}`, `${this.appdir}`); //log.info(`Making junction from ${dir} to ${this.appdir}`);
+      log.info(`ZWED0095I`, dir, this.appdir); //log.info(`Making junction from ${dir} to ${this.appdir}`);
     } else {
-      log.info(`ZWED0096I`, `${dir}`, `${this.appdir}`); //log.info(`Making symlink from ${dir} to ${this.appdir}`);
+      log.info(`ZWED0096I`, dir, this.appdir); //log.info(`Making symlink from ${dir} to ${this.appdir}`);
     }
     return new Promise((resolve, reject)=> {
       fs.symlink(dir, destination,

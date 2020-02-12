@@ -212,7 +212,7 @@ export class JavaManager {
       }    
       break;
     default:
-      log.warn(`ZWED0074W`, `${defaultBehavior}`); //log.warn(`Unknown default behavior=${defaultBehavior}`);
+      log.warn(`ZWED0074W`, defaultBehavior); //log.warn(`Unknown default behavior=${defaultBehavior}`);
     }
   }
 
@@ -272,7 +272,7 @@ export class JavaManager {
           }
           remainingPlugins[plugins[j]] = undefined;
         } else {
-          log.warn(`ZWED0075W`, `${plugins[j]}`); //log.warn(`Services in plugin=${plugins[j]} war grouping skipped. `
+          log.warn(`ZWED0075W`, plugins[j]); //log.warn(`Services in plugin=${plugins[j]} war grouping skipped. `
                        //+ `Plugin missing or already grouped`);
         }
       }

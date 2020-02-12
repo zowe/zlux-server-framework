@@ -81,7 +81,7 @@ function isFile(path) {
     if(calledViaCLI){
       packagingUtils.endWithMessage(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
     } else {
-      logger.warn(`ZWED0146W`, `${path}`,`${e.message}`); //logger.warn(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
+      logger.warn(`ZWED0146W`, path, e.message); //logger.warn(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
       return true;
     }
   }
@@ -95,7 +95,7 @@ function cleanup() {
 function addToServer(appDir, installDir) {
   try {
     let pluginDefinition = JSON.parse(fs.readFileSync(path.join(appDir,'pluginDefinition.json')));
-    logger.info(`ZWED0109I`, `${pluginDefinition.identifier}`); //logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
+    logger.info(`ZWED0109I`, pluginDefinition.identifier); //logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
     let locatorJSONString =
         `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir.replace(/\\/g,'\\\\')}"\n}`;
     let destination;
@@ -104,18 +104,18 @@ function addToServer(appDir, installDir) {
     } else {
       destination = path.join(installDir, pluginDefinition.identifier+'.json');
     }
-    logger.debug('ZWED0286I', `${destination}`, `${locatorJSONString}`); //logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
+    logger.debug('ZWED0286I', destination, locatorJSONString); //logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
     fs.writeFile(destination, locatorJSONString, {mode: FILE_WRITE_MODE}, (err)=> {
       if(err){
         let errMsg = `App extracted but not registered to App Server due to write fail. Error=${err.message}`;
         if(calledViaCLI){
           packagingUtils.endWithMessage(errMsg);
         } else {
-          logger.warn(`ZWED0148W`, `${err.message}`); //logger.warn(errMsg);
+          logger.warn(`ZWED0148W`, err.message); //logger.warn(errMsg);
         return {success: false, message: errMsg};
         }
       }
-      logger.info(`ZWED0110I`, `${pluginDefinition.identifier}`, `${appDir}`); //logger.info(`App ${pluginDefinition.identifier} installed to ${appDir} and registered with App Server`);
+      logger.info(`ZWED0110I`, pluginDefinition.identifier, appDir); //logger.info(`App ${pluginDefinition.identifier} installed to ${appDir} and registered with App Server`);
       if(calledViaCLI){
         process.exit(0);
       }
@@ -126,7 +126,7 @@ function addToServer(appDir, installDir) {
       packagingUtils.endWithMessage(
       `Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`);
     }
-    logger.warn(`ZWED0149W`, `${appDir}`, `${e.message}`); //logger.warn(`Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`)
+    logger.warn(`ZWED0149W`, appDir, e.message); //logger.warn(`Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`)
     return {success: false, message: `Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`};
   }
 }
