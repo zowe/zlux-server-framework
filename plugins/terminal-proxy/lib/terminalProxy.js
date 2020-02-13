@@ -263,7 +263,7 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
     this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'Message not JSON');
   }
   this.logger.debug("ZWED0269I", this.identifierString(), message.length); //this.logger.debug(this.identifierString()+' Websocket client message received. Length='+message.length);
-  this.logger.debug("ZWED0135I", this.identifierString(), message); //this.logger.log(this.logger.FINER,this.identifierString()+' Websocket client message content='+message);
+  this.logger.trace("ZWED0135I", this.identifierString(), message); //this.logger.log(this.logger.FINER,this.identifierString()+' Websocket client message content='+message);
   if (jsonObject) {
     if (this.handlers) {
       let handlerlen = this.handlers.length;
@@ -392,7 +392,7 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
 
 TerminalWebsocketProxy.prototype.netSend = function(buffer) {
   this.logger.debug("ZWED0275I", this.identifierString(), buffer.length); //this.logger.debug(this.identifierString()+' Writing to host socket. Length='+buffer.length);
-  this.logger.debug("ZWED0136I", this.identifierString(), buffer); //this.logger.log(this.logger.FINER,this.identifierString()+' Content to be sent to host socket=\n'+buffer);
+  this.logger.trace("ZWED0136I", this.identifierString(), buffer); //this.logger.log(this.logger.FINER,this.identifierString()+' Content to be sent to host socket=\n'+buffer);
   this.hostSocket.write(buffer);
 };
 
@@ -409,7 +409,7 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
   var t = this;
   try {
     t.logger.debug("ZWED0277I", t.identifierString(), data.length); //t.logger.debug(t.identifierString()+' Received host data. Length='+data.length);
-    t.logger.debug("ZWED0138I", t.identifierString(), data); //t.logger.log(t.logger.FINER,t.identifierString()+' Content of host data=\n'+data);
+    t.logger.trace("ZWED0138I", t.identifierString(), data); //t.logger.log(t.logger.FINER,t.identifierString()+' Content of host data=\n'+data);
 
     var replies = [];
     if (t.usingSSH){

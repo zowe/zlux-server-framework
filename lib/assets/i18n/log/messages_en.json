@@ -243,7 +243,7 @@
   "ZWED0066W":"%s: getCapabilities() is not a function",
   "ZWED0067W":"",
   "ZWED0068W":"Failed to set proxy authorizations. Error=",
-  "ZWED0069W":"Returning null for cipher array because input had non-string: %s",
+  "ZWED0069W":"Returning null for cipher array because input had non-string: ",
   "ZWED0070W":"Error when reading PFX. Server cannot continue. Error=%s",
   "ZWED0071W":"Unexpected error on server %s:%s. E=%s. Stack trace follows.\n%s",
   "ZWED0072W":"Could not stop manager, error=",
