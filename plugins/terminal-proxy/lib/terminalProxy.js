@@ -398,7 +398,7 @@ TerminalWebsocketProxy.prototype.netSend = function(buffer) {
 
 TerminalWebsocketProxy.prototype.wsSend = function(websocket,string) {
   this.logger.debug("ZWED0276I", this.identifierString(), string.length); //this.logger.debug(this.identifierString()+' Websocket sending client message. Length='+string.length);
-  this.logger.info("ZWED0137I", this.identifierString(), string); //this.logger.log(this.identifierString()+' Content to be sent to client=\n'+string);
+  this.logger.trace("ZWED0137I", this.identifierString(), string); //this.logger.log(this.identifierString()+' Content to be sent to client=\n'+string);
   websocket.send(string);
 };
 
