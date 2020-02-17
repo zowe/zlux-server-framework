@@ -38,7 +38,7 @@
   "ZWED0244I":"File table before mapping=%s",
   "ZWED0245I":"Configuration service request complete. Resource=%s",
   "ZWED0246I":"Configuration service request complete. Resource=%s",
-  "ZWED0247I":"file closed",
+  "ZWED0247I":"File closed",
   "ZWED0248I":"Configuration service descending into path for timestamp check. Path=%s",
   "ZWED0249I":"Configuration service finished timestamp check in path=%s",
   "ZWED0250I":"Configuration service request complete. Resource=%s",
