@@ -17,11 +17,12 @@ const jsonUtils = require('../lib/jsonUtils');
 const rmrf = require('rimraf');
 
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
+//TO DO - Sean - bootstrap logger
 const logger = packagingUtils.coreLogger.makeComponentLogger("install-app"); //should only need one for this program
 
 const argParser = require('./argumentParser');
-const usage = 'Usage: --inputApp | -i INPUTAPP --pluginsDir | -p PLUGINSDIR '
-      + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v]';
+//const usage = 'Usage: --inputApp | -i INPUTAPP --pluginsDir | -p PLUGINSDIR '
+//      + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v]';
 
 //TODO if plugins get extracted read-only, then how would we go about doing upgrades? read-write for now!
 const FILE_WRITE_MODE = 0o660;
@@ -44,7 +45,7 @@ if(calledViaCLI){
   userInput = argumentParser.parse(commandArgs);
 
   if (!userInput.inputApp || !(!userInput.pluginsDir ^ !userInput.zluxConfig)) {
-    logger.severe(usage);
+    logger.severe(`ZWED0006E`); //logger.severe(usage);
     process.exit(1);
   }
 
@@ -80,7 +81,7 @@ function isFile(path) {
     if(calledViaCLI){
       packagingUtils.endWithMessage(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
     } else {
-      logger.warn(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
+      logger.warn(`ZWED0146W`, path, e.message); //logger.warn(`Could not stat destination or temp folder ${path}. Error=${e.message}`);
       return true;
     }
   }
@@ -88,13 +89,13 @@ function isFile(path) {
 }
 
 function cleanup() {
-  logger.warn(`Cleanup not yet implemented`);
+  logger.warn(`ZWED0147W`); //logger.warn(`Cleanup not yet implemented`);
 }
 
 function addToServer(appDir, installDir) {
   try {
     let pluginDefinition = JSON.parse(fs.readFileSync(path.join(appDir,'pluginDefinition.json')));
-    logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
+    logger.info(`ZWED0109I`, pluginDefinition.identifier); //logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
     let locatorJSONString =
         `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir.replace(/\\/g,'\\\\')}"\n}`;
     let destination;
@@ -103,18 +104,18 @@ function addToServer(appDir, installDir) {
     } else {
       destination = path.join(installDir, pluginDefinition.identifier+'.json');
     }
-    logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
+    logger.debug('ZWED0286I', destination, locatorJSONString); //logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
     fs.writeFile(destination, locatorJSONString, {mode: FILE_WRITE_MODE}, (err)=> {
       if(err){
         let errMsg = `App extracted but not registered to App Server due to write fail. Error=${err.message}`;
         if(calledViaCLI){
           packagingUtils.endWithMessage(errMsg);
         } else {
-          logger.warn(errMsg);
+          logger.warn(`ZWED0148W`, err.message); //logger.warn(errMsg);
         return {success: false, message: errMsg};
         }
       }
-      logger.info(`App ${pluginDefinition.identifier} installed to ${appDir} and registered with App Server`);
+      logger.info(`ZWED0110I`, pluginDefinition.identifier, appDir); //logger.info(`App ${pluginDefinition.identifier} installed to ${appDir} and registered with App Server`);
       if(calledViaCLI){
         process.exit(0);
       }
@@ -125,7 +126,7 @@ function addToServer(appDir, installDir) {
       packagingUtils.endWithMessage(
       `Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`);
     }
-    logger.warn(`Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`)
+    logger.warn(`ZWED0149W`, appDir, e.message); //logger.warn(`Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`)
     return {success: false, message: `Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`};
   }
 }
