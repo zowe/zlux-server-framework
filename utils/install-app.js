@@ -20,6 +20,14 @@ const rmrf = require('rimraf');
 //TO DO - Sean - bootstrap logger
 const logger = packagingUtils.coreLogger.makeComponentLogger("install-app"); //should only need one for this program
 
+var messages;
+try { // Attempt to get a log message for a language a user may have specified
+  messages = require(`../lib/assets/i18n/log/messages_en.json`);
+} catch (err) { // If we encountered an error...
+  messages = undefined;
+}
+logger._messages = messages;
+
 const argParser = require('./argumentParser');
 //const usage = 'Usage: --inputApp | -i INPUTAPP --pluginsDir | -p PLUGINSDIR '
 //      + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v]';
