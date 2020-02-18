@@ -11,12 +11,19 @@
     {
       "name": "Sean Grady",
       "email": "sgrady@rocketsoftware.com"
+    },
+    {
+      "name": "Leanid Astrakou",
+      "email": "lastrakou@rocketsoftware.com"
+    },
+    {
+      "name": "Tim Gerstel",
+      "email": "tgerstel@rocketsoftware.com"
     }
   ],
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc",
-    "test": "mocha --recursive --exit test"
+    "build": "tsc"
   },
   "dependencies": {
     "accept-language-parser": "~1.5.0",
@@ -32,8 +39,9 @@
     "graceful-fs": "~4.1.15",
     "ipaddr.js": "~1.8.0",
     "js-yaml": "~3.13.1",
-    "normalize-url": "~4.3.0",
     "mkdirp": "~0.5.1",
+    "ncp": "~2.0.0",
+    "normalize-url": "~4.3.0",
     "require-from-string": "~2.0.2",
     "rimraf": "~2.6.3",
     "semver": "~5.5.1",
