@@ -20,7 +20,7 @@ function CLIArgument(longName, shortName, type) {
   if ((type != exports.constants.ARG_TYPE_FLAG
        && type != exports.constants.ARG_TYPE_VALUE
        && type != exports.constants.ARG_TYPE_JSON)) {
-    console.log("WARNING: CLI Argument missing name or has unsupported type="+type);
+    console.log("ZWED0153W - WARNING: CLI Argument missing name or has unsupported type="+type);
     return null;
   }
   var longMatch = longName ? '--'+longName : null;
@@ -126,7 +126,7 @@ function resolveJson(argumentsObj, matchObj) {
     }
     currentLevel[matchParts[matchParts.length-1]] = stringToValue(matchObj.value);
   } catch (e) {
-    console.log("SEVERE: Exception occurred trying to generate object from input:",e);
+    console.log("ZWED0111E - SEVERE: Exception occurred trying to generate object from input:",e);
     process.exit(1);
   }
   return returnVal;    
@@ -164,7 +164,7 @@ function ArgumentParser(validArgs, argArray) {
         }
       }
       if (!found) {
-        console.log("WARNING: Unrecognized command: "+arg);
+        console.log("ZWED0154W - WARNING: Unrecognized command: "+arg);
       }    
     }
     return argumentValues;
@@ -377,9 +377,9 @@ function testEnv() {
                ______aBC______123______: 121,
                _______aBC_______123_______: 122
               };
-  console.log('Input = '+JSON.stringify(input, null, 2));
+  console.log('ZWED0139I - Input = '+JSON.stringify(input, null, 2));
   let output = EnvironmentVarsToObject(undefined, input);
-  console.log('Output = '+JSON.stringify(output, null, 2));
+  console.log('ZWED0140I - Output = '+JSON.stringify(output, null, 2));
 }
 exports.envUnitTest = testEnv;
 /*
