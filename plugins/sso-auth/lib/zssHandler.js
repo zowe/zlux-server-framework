@@ -86,6 +86,28 @@ class ZssHandler {
 
   }
 
+  logout(request, sessionState) {
+    return new Promise((resolve, reject) => {
+      sessionState.authenticated = false;
+      delete sessionState.zssUsername;
+      let options = {
+        method: 'GET',
+        headers: {'cookie': sessionState.zssCookies+''}
+      };
+      delete sessionState.zssCookies;
+      request.zluxData.webApp.callRootService("logout", options).then((response) => {
+        //did logout or already logged out
+        if (response.statusCode === 200 || response.statusCode === 401) {
+          resolve({ success: true });
+        } else {
+          resolve({ success: false, reason: response.statusCode });
+        }
+      }).catch((e) =>  {
+        reject(e);
+      });
+    });
+  }
+
   /**
    * Should be called e.g. when the users enters credentials
    * 

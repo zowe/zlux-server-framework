@@ -34,7 +34,7 @@ JsonStreamer.prototype.write = function(data) {
     this.stream.write(data);
   }
   else {
-    console.log('Json streamer has no stream to write to');
+    console.log('ZWED0288I - Json streamer has no stream to write to');
   }
 };
 
