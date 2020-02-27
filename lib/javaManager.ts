@@ -51,7 +51,7 @@ export class JavaManager {
       try {
         await this.servers[i].manager.stop();
       } catch (e) {
-        log.warn(`Could not stop manager, error=`,e);
+        log.warn(`ZWED0072W`,e); //log.warn(`Could not stop manager, error=`,e);
       }
     }
   }
@@ -113,7 +113,7 @@ export class JavaManager {
       const start = config.portRange[0];
       const finish = config.portRange[1];
       if (start < 0 || finish > 65535 || finish < start) {
-        throw new Error(`JavaManager given port range beyond limits`);
+        throw new Error(`ZWED0038E - JavaManager given port range beyond limits`);
       }
       this.ports = new Array(finish-start+1);
       let j = 0;
@@ -123,7 +123,7 @@ export class JavaManager {
     } else if (config.ports && Array.isArray(config.ports) && config.ports.length != 0) {
       this.ports = config.ports;
     } else {
-      throw new Error(`JavaManager not given any ports with which to run servers`);
+      throw new Error(`ZWED0039E - JavaManager not given any ports with which to run servers`);
     }
   }
 
@@ -168,7 +168,7 @@ export class JavaManager {
     const groupingConfig = this.config.war.pluginGrouping;
     let defaultBehavior = this.config.war.defaultGrouping ? this.config.war.defaultGrouping :  DEFAULT_GROUPING;
     if (defaultBehavior != 'microservice' && defaultBehavior != 'appserver') {
-      throw new Error(`Unknown java war grouping default=${defaultBehavior}`);
+      throw new Error(`ZWED0040E - Unknown java war grouping default=${defaultBehavior}`);
     }
 
     let remainingPlugins = {};
@@ -185,7 +185,7 @@ export class JavaManager {
           this.servers.push(server);
           this.portPos++;
         } else {
-          log.warn(`No server returned for group=`,group);
+          log.warn(`ZWED0073W`,group); //log.warn(`No server returned for group=`,group);
         }
       }
     }
@@ -212,14 +212,14 @@ export class JavaManager {
       }    
       break;
     default:
-      log.warn(`Unknown default behavior=${defaultBehavior}`);
+      log.warn(`ZWED0074W`, defaultBehavior); //log.warn(`Unknown default behavior=${defaultBehavior}`);
     }
   }
 
   private getPortOrThrow() {
     const port = this.ports[this.portPos];
     if (port === undefined) {
-      throw new Error(`Could not find port to use for configuration, at config position=${this.portPos}`);
+      throw new Error(`ZWED0041E - Could not find port to use for configuration, at config position=${this.portPos}`);
     }
     return port;
   }
@@ -259,7 +259,7 @@ export class JavaManager {
     };
     let runtime = this.config.runtimes[java];
     if (!runtime) {
-      throw new Error(`Could not find runtime to satisfy group: ${java}`);
+      throw new Error(`ZWED0042E - Could not find runtime to satisfy group: ${java}`);
     }
     let plugins = group.plugins;
     if (Array.isArray(plugins) && plugins.length > 0) {
@@ -272,8 +272,8 @@ export class JavaManager {
           }
           remainingPlugins[plugins[j]] = undefined;
         } else {
-          log.warn(`Services in plugin=${plugins[j]} war grouping skipped. `
-                       + `Plugin missing or already grouped`);
+          log.warn(`ZWED0075W`, plugins[j]); //log.warn(`Services in plugin=${plugins[j]} war grouping skipped. `
+                       //+ `Plugin missing or already grouped`);
         }
       }
       if (groupArray.length > 0) {
@@ -282,7 +282,7 @@ export class JavaManager {
                 plugins: groupArray, manager:serverManager, port: port};
       }
     } else {
-      log.warn(`Skipping invalid plugin group=`,plugins);
+      log.warn(`ZWED0076W`,plugins); //log.warn(`Skipping invalid plugin group=`,plugins);
     }
   }
 
@@ -305,7 +305,7 @@ export class JavaManager {
       joinedConfig.zluxUrl = this.zluxUrl;
       return new TomcatManager(joinedConfig);
     default:
-      throw new Error(`Unknown java app server type=${serverConfigBase.type} specified in config. `
+      throw new Error(`ZWED0043E - Unknown java app server type=${serverConfigBase.type} specified in config. `
                       + `Cannot continue with java loading`);
     }
   }
@@ -318,7 +318,7 @@ export class JavaManager {
       //find from path
       let JAVA_HOME = process.env.ZOWE_JAVA_HOME ? process.env.ZOWE_JAVA_HOME : process.env.JAVA_HOME;
       if (!JAVA_HOME) {
-        throw new Error(`Java runtimes not specified, and no JAVA_HOME set`);
+        throw new Error(`ZWED0044E - Java runtimes not specified, and no JAVA_HOME set`);
       }
       this.config.runtimes = {"default": {"home": JAVA_HOME}};
     }
@@ -329,10 +329,10 @@ export class JavaManager {
     this.processRuntimes();
     if (config.war) {
       if (!config.war.javaAppServer) {
-        throw new Error(`Java app server not defined in config`);
+        throw new Error(`ZWED0045E - Java app server not defined in config`);
       }      
     } else if (!config.war && !config.jar) {
-      throw new Error(`JavaManager not given either war or jar configuration options, nothing to do`);
+      throw new Error(`ZWED0046E - JavaManager not given either war or jar configuration options, nothing to do`);
     }
     this.processPorts();
   }

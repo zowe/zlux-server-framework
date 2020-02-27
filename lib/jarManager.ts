@@ -109,7 +109,7 @@ export class JarManager implements JavaServerManager {
   }
 
   start(): Promise<any> {
-    console.log(`JarMgr with id=${this.id} invoked to startup with config=`,this.config);
+    console.log(`ZWED0287I - JarMgr with id=${this.id} invoked to startup with config=`,this.config);
     let needTlsConfirmation = this.service.isHttps === undefined;
     return new Promise((resolve,reject)=> {
 /*
