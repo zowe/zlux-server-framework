@@ -177,6 +177,7 @@
   "ZWED0290I":"Plugin (%s) loaded. Successful: %s% (%s/%s) Attempted: %s% (%s/%s)",
   "ZWED0291I":"Server is ready at %s Plugins successfully loaded: %s% (%s/%s)",
   "ZWED0292I":"Plugin (%s) loaded.",
+  "ZWED0293I":"Handling scan plugin request from worker=%d",
   
   "ZWED0003W":"%s: Session security call %s failed for auth handler %s. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
