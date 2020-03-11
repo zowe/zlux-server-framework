@@ -15,7 +15,8 @@ function TrivialAuthenticator(pluginDef, pluginConf, serverConf) {
     "canRefresh": true,
     "canAuthenticate": true,
     "canAuthorize": true,
-    "proxyAuthorizations": false
+    "proxyAuthorizations": false,
+    "canResetPassword": false
   };
 }
 
