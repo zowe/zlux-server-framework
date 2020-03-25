@@ -176,7 +176,9 @@
   "ZWED0289I":"RESERVED: JarMgr with id=%s invoked to startup with config=%s",
   "ZWED0290I":"Plugin (%s) loaded. Successful: %s% (%s/%s) Attempted: %s% (%s/%s)",
   "ZWED0291I":"Server is ready at %s Plugins successfully loaded: %s% (%s/%s)",
-
+  "ZWED0292I":"Plugin (%s) loaded.",
+  "ZWED0293I":"Handling scan plugin request from worker=%d",
+  
   "ZWED0003W":"%s: Session security call %s failed for auth handler %s. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
   "ZWED0005W":"",
@@ -276,6 +278,16 @@
   "ZWED0157W":"RESERVED: 2 function initLoggerMessages - ERROR - %s",
   "ZWED0158W":"RESERVED: %s",
   "ZWED0159W":"Plugin (%s) loading failed. Message: \"%s\" Successful: %s% (%s/%s) Attempted: %s% (%s/%s)",
+  "ZWED0160W":"RESERVED: Master cluster not found to save storage for id: %s, value: %s",
+  "ZWED0161W":"RESERVED: Master cluster not found to save storage",
+  "ZWED0162W":"RESERVED: Master cluster not found to add storage",
+  "ZWED0163W":"RESERVED: Master cluster was not found to delete storage for id: %s",
+  "ZWED0165W":"RESERVED: Unable to retrieve storage data from cluster promise %s",
+  "ZWED0166W":"RESERVED: Error updating the storage: %s",
+  "ZWED0167W":"RESERVED: Error adding to the storage: %s",
+  "ZWED0168W":"RESERVED: Unable to retrieve storage value from cluster %s",
+  "ZWED0169W":"RESERVED: Error deleting the storage with id: %s %s",
+  "ZWED0170W":"Plugin (%s) loading failed. Message: \"%s\"",
   
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
@@ -333,5 +345,6 @@
   "ZWED0111E":"RESERVED: SEVERE: Exception occurred trying to generate object from input:%s",
   "ZWED0112E":"The server found no plugin implementing the specified default authentication type of %s.",
   "ZWED0113E":"The server found no authentication types. Verify that the server configuration file defines server authentication.",
-  "ZWED0114E":"The server found no plugin implementing the specified default authentication type of %s."
+  "ZWED0114E":"The server found no plugin implementing the specified default authentication type of %s.",
+  "ZWED0115E":"RESERVED: Unable to retrieve storage object from cluster. This is probably due to a timeout.\nYou may change the default of '%s' ms by setting 'node.cluster.storageTimeout' within the config. %s"
 }
