@@ -11,7 +11,6 @@
 */
 
 const express = require('express');
-const expressWs = require('express-ws');
 const Promise = require('bluebird');
 var net = require('net');
 const tls = require('tls');
@@ -741,9 +740,11 @@ exports.tn3270WebsocketRouter = function(context) {
     }
 
     let router = express.Router();
+    /*
     if (!router.ws) {
       context.wsRouterPatcher(router);
     }
+    */
     router.use(function abc(req,res,next) {
       context.logger.info('ZWED0106I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);      
       next();
@@ -764,9 +765,11 @@ exports.tn5250WebsocketRouter = function(context) {
     }
 
     let router = express.Router();
+    /*
     if (!router.ws) {
       context.wsRouterPatcher(router);
     }
+    */
     router.use(function abc(req,res,next) {
       context.logger.info('ZWED0107I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
@@ -786,10 +789,12 @@ exports.vtWebsocketRouter = function(context) {
       createSecurityObjects(securityConfig,context.logger);
     }
 
-    let router = express.Router();  
+    let router = express.Router();
+    /*
     if (!router.ws) {
       context.wsRouterPatcher(router);
     }
+    */
     router.use(function abc(req,res,next) {
       context.logger.info('ZWED0108I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
