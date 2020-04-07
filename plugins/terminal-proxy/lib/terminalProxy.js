@@ -740,7 +740,10 @@ exports.tn3270WebsocketRouter = function(context) {
     }
 
     let router = express.Router();
-    /*
+    /* This was a hack for when the router.ws object, which should exist, did not exist.
+       We put the function that creates it into the context object. Hopefully it is not needed anymore
+       But in case it is, this code is commented out for future use
+
     if (!router.ws) {
       context.wsRouterPatcher(router);
     }
