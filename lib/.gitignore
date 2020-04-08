@@ -53,6 +53,12 @@ proxy.conf.json
 .DS_Store
 Thumbs.db
 
+# TS compiler output js files
+javaManager.js
+jarManager.js
+javaTypes.js
+tomcatManager.js
+sync.js
 
 # This program and the accompanying materials are
 # made available under the terms of the Eclipse Public License v2.0 which accompanies
