@@ -28,7 +28,8 @@
   ],
   "main": "lib/index.js",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "start": "tsc --watch"
   },
   "dependencies": {
     "@rocketsoftware/express-ws": "^5.0.0",
