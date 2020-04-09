@@ -8,9 +8,11 @@ interface StorageDict {
   [pluginId: string]: KeyVal;
 }
 
-declare class ClusterManager extends EventEmitter{
+declare class ClusterManager extends EventEmitter {
   isMaster: boolean;
-  setStorageAll: (pluginId: string, dict: KeyVal) => void;
+  setStorageAll: (pluginId: string, dict: KeyVal) => Promise<true>;
+  setStorageByKey: (pluginId: string, key: string, value: string) => Promise<true>;
+  deleteStorageByKey: (pluginId: string, key: string) => Promise<true>;
   getStorageCluster: () => Promise<StorageDict>;
 }
 
