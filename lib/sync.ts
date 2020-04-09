@@ -3,7 +3,7 @@ import * as WebSocket from 'ws';
 import * as EventEmitter from 'events';
 
 interface LogEntry {
-  type: 'session' | 'sessions' | 'service',
+  type: 'session' | 'sessions' | 'storage',
   data: any;
 }
 
@@ -17,6 +17,17 @@ export interface SessionsLogEntry extends LogEntry {
   data: SessionData[];
 }
 
+export interface StorageLogEntry extends LogEntry {
+  type: 'storage',
+  data: Storage;
+}
+
+interface Storage {
+  [pluginId: string]: {
+    [key: string]: any;
+  }
+}
+
 interface SessionData {
   sid: string,
   session: any;
@@ -28,6 +39,10 @@ function isSessionLogEntry(entry: LogEntry): entry is SessionLogEntry {
 
 function isSessionsLogEntry(entry: LogEntry): entry is SessionsLogEntry {
   return entry.type === 'sessions';
+}
+
+function isStorageLogEntry(entry: LogEntry): entry is StorageLogEntry {
+  return entry.type === 'storage';
 }
 
 let connected = false;
@@ -51,6 +66,12 @@ export function updateSessionsForNewClient(ws: WebSocket, data: SessionData[]): 
   ws.send(JSON.stringify(sessionsLogEntry));
 }
 
+export function updateStorageForNewClient(ws: WebSocket, data: Storage): void {
+  const storageLogEntry: StorageLogEntry = { type: 'storage', data };
+  console.log(`updateStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
+  ws.send(JSON.stringify(storageLogEntry));
+}
+
 export class SyncEndpoint {
   constructor(
     private ws: WebSocket,
@@ -63,12 +84,26 @@ export class SyncEndpoint {
     const listener = this.onSessionChange.bind(this);
     emitter.emit('connected', this.ws);
     emitter.addListener('session', listener);
+    this.sendStorage();
     this.ws.on('close', () => emitter.removeListener('session', listener));
   }
 
   private onSessionChange(entry: SessionLogEntry) {
     console.log(`SyncEndpoint:onSessionChange: send to client entry ${JSON.stringify(entry)}`);
     this.ws.send(JSON.stringify(entry, null, 2));
+  }
+
+  private sendStorage() {
+    if ((process as any).clusterManager) {
+      const clusterManager = (process as any).clusterManager;
+      console.log(`process.clusterManager is good, master ${clusterManager.isMaster} getStorageCluster ${typeof clusterManager.getStorageCluster}`);
+      clusterManager.getStorageCluster().then((storage: any) => {
+        console.log(`[cluster storage: ${JSON.stringify(storage)}]`);
+        updateStorageForNewClient(this.ws, storage);
+      });
+    } else {
+      console.log(`process.clusterManager is not good`);
+    }
   }
 }
 
@@ -91,6 +126,11 @@ export class SyncClient {
       } else if (isSessionsLogEntry(entry)) {
         for (const session of entry.data) {
           syncEmitter.emit('session', session);
+        }
+      } else if (isStorageLogEntry(entry)) {
+        const clusterManager = (process as any).clusterManager;
+        for (const pluginId of Object.keys(entry.data)) {
+          clusterManager.setStorageAll(pluginId, entry.data[pluginId])
         }
       }
     });
