@@ -1,6 +1,7 @@
 import * as express from 'express';
 import * as WebSocket from 'ws';
 import * as EventEmitter from 'events';
+import { StorageDict } from './clusterManager';
 
 interface LogEntry {
   type: 'session' | 'sessions' | 'storage',
@@ -66,7 +67,7 @@ export function updateSessionsForNewClient(ws: WebSocket, data: SessionData[]): 
   ws.send(JSON.stringify(sessionsLogEntry));
 }
 
-export function updateStorageForNewClient(ws: WebSocket, data: Storage): void {
+export function updateStorageForNewClient(ws: WebSocket, data: StorageDict): void {
   const storageLogEntry: StorageLogEntry = { type: 'storage', data };
   console.log(`updateStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
   ws.send(JSON.stringify(storageLogEntry));
@@ -94,16 +95,11 @@ export class SyncEndpoint {
   }
 
   private sendStorage() {
-    if ((process as any).clusterManager) {
-      const clusterManager = (process as any).clusterManager;
-      console.log(`process.clusterManager is good, master ${clusterManager.isMaster} getStorageCluster ${typeof clusterManager.getStorageCluster}`);
-      clusterManager.getStorageCluster().then((storage: any) => {
-        console.log(`[cluster storage: ${JSON.stringify(storage)}]`);
-        updateStorageForNewClient(this.ws, storage);
-      });
-    } else {
-      console.log(`process.clusterManager is not good`);
-    }
+    const clusterManager = process.clusterManager;
+    clusterManager.getStorageCluster().then(storage => {
+      console.log(`[cluster storage: ${JSON.stringify(storage)}]`);
+      updateStorageForNewClient(this.ws, storage);
+    });
   }
 }
 
@@ -128,7 +124,7 @@ export class SyncClient {
           syncEmitter.emit('session', session);
         }
       } else if (isStorageLogEntry(entry)) {
-        const clusterManager = (process as any).clusterManager;
+        const clusterManager = process.clusterManager;
         for (const pluginId of Object.keys(entry.data)) {
           clusterManager.setStorageAll(pluginId, entry.data[pluginId])
         }
