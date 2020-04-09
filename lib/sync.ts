@@ -3,20 +3,31 @@ import * as WebSocket from 'ws';
 import * as EventEmitter from 'events';
 
 interface LogEntry {
-  type: 'session' | 'service',
+  type: 'session' | 'sessions' | 'service',
   data: any;
 }
 
 export interface SessionLogEntry extends LogEntry {
   type: 'session',
-  data: {
-    sid: string,
-    session: any;
-  }
+  data: SessionData;
+}
+
+export interface SessionsLogEntry extends LogEntry {
+  type: 'sessions',
+  data: SessionData[];
+}
+
+interface SessionData {
+  sid: string,
+  session: any;
 }
 
 function isSessionLogEntry(entry: LogEntry): entry is SessionLogEntry {
   return entry.type === 'session';
+}
+
+function isSessionsLogEntry(entry: LogEntry): entry is SessionsLogEntry {
+  return entry.type === 'sessions';
 }
 
 let connected = false;
@@ -34,11 +45,10 @@ export function updateSession(sid: string, session: any): void {
   emitter.emit('session', sessionLogEntry);
 }
 
-export function updateSessionForNewClient(ws: WebSocket, sid: string, session: any): void {
-  const data = { sid, session };
-  const sessionLogEntry: SessionLogEntry = { type: 'session', data };
-  console.log(`updateSessionForNewClient log entry ${JSON.stringify(sessionLogEntry)}`);
-  ws.send(JSON.stringify(sessionLogEntry));
+export function updateSessionsForNewClient(ws: WebSocket, data: SessionData[]): void {
+  const sessionsLogEntry: SessionsLogEntry = { type: 'sessions', data };
+  console.log(`updateSessionsForNewClient log entry ${JSON.stringify(sessionsLogEntry)}`);
+  ws.send(JSON.stringify(sessionsLogEntry));
 }
 
 export class SyncEndpoint {
@@ -78,6 +88,10 @@ export class SyncClient {
       const entry: LogEntry = JSON.parse(data.toString());
       if (isSessionLogEntry(entry)) {
         syncEmitter.emit('session', entry.data);
+      } else if (isSessionsLogEntry(entry)) {
+        for (const session of entry.data) {
+          syncEmitter.emit('session', session);
+        }
       }
     });
   }
