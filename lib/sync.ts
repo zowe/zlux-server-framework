@@ -1,30 +1,32 @@
 import * as express from 'express';
 import * as WebSocket from 'ws';
 import * as EventEmitter from 'events';
+const sessionStore = require('./sessionStore').sessionStore;
 import { StorageDict, KeyVal } from './clusterManager';
 
 interface LogEntry {
   type: 'session' | 'sessions' | 'storage',
-  data: any;
+  payload: any;
 }
 
 export interface SessionLogEntry extends LogEntry {
   type: 'session',
-  data: SessionData;
+  payload: SessionData;
 }
 
 export interface SessionsLogEntry extends LogEntry {
   type: 'sessions',
-  data: SessionData[];
+  payload: SessionData[];
 }
 
 export interface StorageLogEntry extends LogEntry {
   type: 'storage',
-  data: StorageAction;
+  payload: StorageAction;
 }
 
 interface StorageAction {
   type: 'init' | 'set-all' | 'set' | 'delete-all' | 'delete'
+  data: any;
 }
 
 interface StorageActionInit extends StorageAction {
@@ -116,22 +118,9 @@ export function updateSession(sid: string, session: any): void {
     return;
   }
   const data = { sid, session };
-  const sessionLogEntry: SessionLogEntry = { type: 'session', data };
+  const sessionLogEntry: SessionLogEntry = { type: 'session', payload: data };
   console.log(`updateSession log entry ${JSON.stringify(sessionLogEntry)}`);
   emitter.emit('session', sessionLogEntry);
-}
-
-export function updateSessionsForNewClient(ws: WebSocket, data: SessionData[]): void {
-  const sessionsLogEntry: SessionsLogEntry = { type: 'sessions', data };
-  console.log(`updateSessionsForNewClient log entry ${JSON.stringify(sessionsLogEntry)}`);
-  ws.send(JSON.stringify(sessionsLogEntry));
-}
-
-export function initStorageForNewClient(ws: WebSocket, storage: Storage): void {
-  const action: StorageActionInit = { type: 'init', data: storage };
-  const storageLogEntry: StorageLogEntry = { type: 'storage', data: action };
-  console.log(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
-  ws.send(JSON.stringify(storageLogEntry));
 }
 
 export function setAllStorageForPlugin(pluginId: string, dict: KeyVal): void {
@@ -139,7 +128,7 @@ export function setAllStorageForPlugin(pluginId: string, dict: KeyVal): void {
     return;
   }
   const action: StorageActionSetAll = { type: 'set-all', data: { pluginId, dict } };
-  const storageLogEntry: StorageLogEntry = { type: 'storage', data: action };
+  const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
   console.log(`setAllStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   emitter.emit('storage', storageLogEntry);
 }
@@ -149,7 +138,7 @@ export function setStorageForPlugin(pluginId: string, key: string, value: string
     return;
   }
   const action: StorageActionSet = { type: 'set', data: { pluginId, key, value } };
-  const storageLogEntry: StorageLogEntry = { type: 'storage', data: action };
+  const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
   console.log(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   emitter.emit('storage', storageLogEntry);
 }
@@ -159,7 +148,7 @@ export function deleteAllStorageForPlugin(pluginId: string): void {
     return;
   }
   const action: StorageActionDeleteAll = { type: 'delete-all', data: { pluginId } };
-  const storageLogEntry: StorageLogEntry = { type: 'storage', data: action };
+  const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
   console.log(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   emitter.emit('storage', storageLogEntry);
 }
@@ -169,14 +158,14 @@ export function deleteStorageForPlugin(pluginId: string, key: string): void {
     return;
   }
   const action: StorageActionDelete = { type: 'delete', data: { pluginId, key } };
-  const storageLogEntry: StorageLogEntry = { type: 'storage', data: action };
+  const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
   console.log(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   emitter.emit('storage', storageLogEntry);
 }
 
 export class SyncEndpoint {
   constructor(
-    private ws: WebSocket,
+    private clientWS: WebSocket,
     private req: express.Request,
   ) {
     this.init();
@@ -185,11 +174,10 @@ export class SyncEndpoint {
   private init(): void {
     const sessionChangeListener = this.onSessionChange.bind(this);
     const storageChangeListener = this.onStorageChange.bind(this);
-    emitter.emit('connected', this.ws);
-    this.initStorage();
+    this.sendCurrentStateToClient();
     emitter.addListener('session', sessionChangeListener);
     emitter.addListener('storage', storageChangeListener);
-    this.ws.on('close', () => {
+    this.clientWS.on('close', () => {
       emitter.removeListener('session', sessionChangeListener);
       emitter.removeListener('storage', storageChangeListener);
     });
@@ -197,24 +185,45 @@ export class SyncEndpoint {
 
   private onSessionChange(entry: SessionLogEntry) {
     console.log(`SyncEndpoint:onSessionChange: send to client entry ${JSON.stringify(entry)}`);
-    this.ws.send(JSON.stringify(entry, null, 2));
+    this.clientWS.send(JSON.stringify(entry, null, 2));
   }
 
   private onStorageChange(entry: StorageLogEntry) {
     console.log(`SyncEndpoint:onStorageChange: send to client entry ${JSON.stringify(entry)}`);
-    this.ws.send(JSON.stringify(entry, null, 2));
+    this.clientWS.send(JSON.stringify(entry, null, 2));
   }
 
-  private initStorage(): void {
+  private sendCurrentStateToClient(): void {
+    console.log(`New client connected. sendCurrentStateToClient`);
+    this.sendCurrentSessionsToClient();
+    this.sendCurrentStorageStateToClient();
+  }
+
+  private sendCurrentSessionsToClient(): void {
+    console.log(`sendCurrentSessionsToClient`);
+    sessionStore.all((err: Error | null, sessions: { [sid: string]: any }) => {
+      const sessionData: SessionData[] = [];
+      Object.keys(sessions).forEach(sid => {
+        const session = sessions[sid];
+        sessionData.push({ sid, session });
+      });
+      console.log(`send all sessions as array ${JSON.stringify(sessionData)}`);
+      const sessionsLogEntry: SessionsLogEntry = { type: 'sessions', payload: sessionData };
+      this.clientWS.send(JSON.stringify(sessionsLogEntry));
+    });
+  }
+
+  private sendCurrentStorageStateToClient(): void {
     const clusterManager = process.clusterManager;
     clusterManager.getStorageCluster().then(storage => {
       console.log(`[cluster storage: ${JSON.stringify(storage)}]`);
-      initStorageForNewClient(this.ws, storage);
+      const action: StorageActionInit = { type: 'init', data: storage };
+      const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
+      console.log(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
+      this.clientWS.send(JSON.stringify(storageLogEntry));
     });
   }
 }
-
-export const syncEmitter = new EventEmitter();
 
 export class SyncClient {
   private ws: WebSocket;
@@ -229,25 +238,26 @@ export class SyncClient {
       console.log(`message ${data}`);
       const entry: LogEntry = JSON.parse(data.toString());
       if (isSessionLogEntry(entry)) {
-        syncEmitter.emit('session', entry.data);
+        const sessionData = entry.payload;
+        sessionStore.set(sessionData.sid, sessionData.session, () => { });
       } else if (isSessionsLogEntry(entry)) {
-        for (const session of entry.data) {
-          syncEmitter.emit('session', session);
+        for (const sessionData of entry.payload) {
+          sessionStore.set(sessionData.sid, sessionData.session, () => { });
         }
       } else if (isStorageLogEntry(entry)) {
         const clusterManager = process.clusterManager;
-        if (isStorageActionInit(entry.data)) {
-          for (const pluginId of Object.keys(entry.data.data)) {
-            clusterManager.setStorageAll(pluginId, entry.data[pluginId])
+        if (isStorageActionInit(entry.payload)) {
+          for (const pluginId of Object.keys(entry.payload.data)) {
+            clusterManager.setStorageAll(pluginId, entry.payload[pluginId])
           }
-        } else if (isStorageActionSetAll(entry.data)) {
-          clusterManager.setStorageAll(entry.data.data.pluginId, entry.data.data.dict);
-        } else if (isStorageActionSet(entry.data)) {
-          clusterManager.setStorageByKey(entry.data.data.pluginId, entry.data.data.key, entry.data.data.value);
-        } else if (isStorageActionDeleteAll(entry.data)) {
-          clusterManager.setStorageAll(entry.data.data.pluginId, {});
-        } else if (isStorageActionDelete(entry.data)) {
-          clusterManager.deleteStorageByKey(entry.data.data.pluginId, entry.data.data.key);
+        } else if (isStorageActionSetAll(entry.payload)) {
+          clusterManager.setStorageAll(entry.payload.data.pluginId, entry.payload.data.dict);
+        } else if (isStorageActionSet(entry.payload)) {
+          clusterManager.setStorageByKey(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
+        } else if (isStorageActionDeleteAll(entry.payload)) {
+          clusterManager.setStorageAll(entry.payload.data.pluginId, {});
+        } else if (isStorageActionDelete(entry.payload)) {
+          clusterManager.deleteStorageByKey(entry.payload.data.pluginId, entry.payload.data.key);
         }
       }
     });
