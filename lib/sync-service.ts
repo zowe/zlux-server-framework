@@ -9,6 +9,8 @@ import {
   StorageActionInit,
   StorageLogEntry,
 } from './sync-types';
+const zluxUtil = require('./util');
+const syncLog = zluxUtil.loggers.utilLogger;
 
 export class SyncService {
   constructor(
@@ -31,30 +33,30 @@ export class SyncService {
   }
 
   private onSessionChange(entry: SessionLogEntry) {
-    console.log(`SyncEndpoint:onSessionChange: send to client entry ${JSON.stringify(entry)}`);
+    syncLog.info(`SyncEndpoint:onSessionChange: send to client entry ${JSON.stringify(entry)}`);
     this.clientWS.send(JSON.stringify(entry, null, 2));
   }
 
   private onStorageChange(entry: StorageLogEntry) {
-    console.log(`SyncEndpoint:onStorageChange: send to client entry ${JSON.stringify(entry)}`);
+    syncLog.info(`SyncEndpoint:onStorageChange: send to client entry ${JSON.stringify(entry)}`);
     this.clientWS.send(JSON.stringify(entry, null, 2));
   }
 
   private sendCurrentStateToClient(): void {
-    console.log(`New client connected. sendCurrentStateToClient`);
+    syncLog.info(`New client connected. sendCurrentStateToClient`);
     this.sendCurrentSessionsToClient();
     this.sendCurrentStorageStateToClient();
   }
 
   private sendCurrentSessionsToClient(): void {
-    console.log(`sendCurrentSessionsToClient`);
+    syncLog.info(`sendCurrentSessionsToClient`);
     sessionStore.all((err: Error | null, sessions: { [sid: string]: any }) => {
       const sessionData: SessionData[] = [];
       Object.keys(sessions).forEach(sid => {
         const session = sessions[sid];
         sessionData.push({ sid, session });
       });
-      console.log(`send all sessions as array ${JSON.stringify(sessionData)}`);
+      syncLog.info(`send all sessions as array ${JSON.stringify(sessionData)}`);
       const sessionsLogEntry: SessionsLogEntry = { type: 'sessions', payload: sessionData };
       this.clientWS.send(JSON.stringify(sessionsLogEntry));
     });
@@ -63,10 +65,10 @@ export class SyncService {
   private sendCurrentStorageStateToClient(): void {
     const clusterManager = process.clusterManager;
     clusterManager.getStorageCluster().then(storage => {
-      console.log(`[cluster storage: ${JSON.stringify(storage)}]`);
+      syncLog.info(`[cluster storage: ${JSON.stringify(storage)}]`);
       const action: StorageActionInit = { type: 'init', data: storage };
       const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
-      console.log(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
+      syncLog.info(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
       this.clientWS.send(JSON.stringify(storageLogEntry));
     });
   }
