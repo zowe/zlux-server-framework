@@ -72,6 +72,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canAuthenticate": true,
     "canAuthorize": true,
     "canLogout": true,
+    "canResetPassword": this.usingZss ? true : false,
     "proxyAuthorizations": true,
     //TODO do we need to process proxy headers for both?
     "processesProxyHeaders": this.usingZss ? true: false
@@ -204,6 +205,14 @@ SsoAuthenticator.prototype = {
         username: sessionState.username,
         expms: shortestExpms
       });
+    }
+  },
+
+  passwordReset(request, sessionState) {
+    if (this.usingZss) {
+      return this.zssHandler.passwordReset(request, sessionState);
+    } else {
+      return Promise.reject(new Error('Password reset not yet supported through APIML'));
     }
   },
 

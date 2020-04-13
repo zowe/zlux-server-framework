@@ -14,6 +14,7 @@ const url = require('url');
 const makeProfileNameForRequest = require('./safprofile').makeProfileNameForRequest;
 const DEFAULT_CLASS = "ZOWE";
 const DEFAULT_EXPIRATION_MS = 3600000 //hour;
+const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
 
 class ZssHandler {
   constructor(pluginDef, pluginConf, serverConf, context) {
@@ -153,6 +154,12 @@ class ZssHandler {
         body: request.body
       };
       request.zluxData.webApp.callRootService("login", options).then((response) => {
+        if (response.statusCode == HTTP_STATUS_PRECONDITION_REQUIRED) {
+          sessionState.authenticated = false;
+          delete sessionState.zssUsername;
+          delete sessionState.zssCookies;
+          resolve({ success: false, reason: 'Expired Password', canChangePassword: true});
+        }
         let zssCookie;
         if (typeof response.headers['set-cookie'] === 'object') {
           for (const cookie of response.headers['set-cookie']) {
@@ -169,8 +176,8 @@ class ZssHandler {
           }
           //intended to be known as result of network call
           sessionState.zssCookies = zssCookie;
-          console.log('cookies set to=',sessionState.zssCookies);
-          resolve({ success: true, username: sessionState.username, expms: DEFAULT_EXPIRATION_MS })
+          resolve({ success: true, username: sessionState.username,
+                    expms: DEFAULT_EXPIRATION_MS, canChangePassword: true })
         } else {
           let res = { success: false, error: {message: `ZSS ${response.statusCode} ${response.statusMessage}`}};
           if (response.statusCode === 500) {
@@ -194,6 +201,24 @@ class ZssHandler {
       return;
     }
     req2Options.headers['cookie'] = sessionState.zssCookies;
+  }
+
+  passwordReset(request, sessionState) {
+    return new Promise((resolve, reject) => {
+      let options = {
+        method: 'POST',
+        body: request.body
+      };
+      request.zluxData.webApp.callRootService("password", options).then((response) => {
+        if (response.statusCode === 200) {
+          resolve({ success: true , response: JSON.parse(response.body)['status'] });
+        } else {
+          resolve({ success: false, responseCode: response.statusCode, response: JSON.parse(response.body)['status'] });
+        }
+      }).catch((e) =>  {
+        reject(e);
+      });
+    });
   }
 
   processProxiedHeaders(req, headers, sessionState) {

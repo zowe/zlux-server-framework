@@ -3,7 +3,7 @@
   "pluginType": "nodeAuthentication",
   "authenticationCategory": "saf",
   "apiVersion": "1.0.0",
-  "pluginVersion": "1.0.0",
+  "pluginVersion": "1.1.0",
   "license": "EPL-2.0",
   "filename": "ssoAuth.js",
   "dataServices": [

@@ -139,44 +139,153 @@ class ApimlHandler {
    * { success: true }. Should not reject the promise.
    */
   authenticate(request, sessionState) {
+    if (request.cookies && request.cookies.apimlAuthenticationToken) {
+      return new Promise((resolve, reject) => {
+        this.queryCookie(request.cookies.apimlAuthenticationToken).then(data=> {
+          let expiration;
+          const expirationDate = new Date(data.expiration);
+          const creationDate = new Date(data.creation);
+          if (creationDate.getTime() > expirationDate.getTime()) {
+            expiration = -1;
+          } else {
+            const now = new Date();
+            expiration = expirationDate.getTime() - now.getTime();
+          }
+          if (expiration < 1) {
+            this.doLogin(request, sessionState).then(result=> resolve(result))
+              .catch(e => reject(e));
+          } else {
+            this.setState(expiration, request.cookies.apimlAuthenticationToken,
+                          data.userId, sessionState);
+            resolve({success: true, username: sessionState.username, expms: expiration});
+          }
+        }).catch(e=> {
+          this.logger.warn('APIML query failed, trying login. Error=',e);
+          this.doLogin(request, sessionState).then(result=> resolve(result))
+            .catch(e => reject(e));
+        });
+      });
+    } else {
+      return this.doLogin(request, sessionState);
+    }
+  }
+
+  setState(expiration, token, username, sessionState) {
+    sessionState.username = username.toUppercase();
+    sessionState.apimlCookie =  'apimlAuthenticationToken='+token;
+    sessionState.apimlExpr = expiration;
+  }
+
+  makeOptions(path, method, cookie, dataLength) {
+    let headers = undefined;
+    if (cookie) {
+      headers = {'cookie': cookie};
+    }
+    if (data) {
+      if (!headers) {headers = {};}
+      headers['Content-Type']= 'application/json';
+      headers['Content-Length']= dataLength;
+    }
+    
+    return {
+      hostname: this.apimlConf.hostname,
+      port: this.apimlConf.gatewayPort,
+      path: path,
+      method: method,
+      headers: headers,
+      agent: this.httpsAgent
+    };
+  }
+
+
+  /**
+     Data in the form of
+     {
+     "domain": "PRODUCTION",
+     "userId": "DAVE",
+     "creation": 1497030118362,
+     "expiration": 1497116518362
+     }
+     Or, creation and expiration may be a timezone string like:
+     "2020-03-21T15:44:27.000+0000"
+  **/
+  queryToken(token) {
+    return new Promise((resolve, reject) => {
+      const options = this.makeOptions('/api/v1/gateway/auth/query',
+                                       'GET',
+                                       'apimlAuthenticationToken='+token);
+
+      let data = [];
+      const req = https.request(options, (res) => {
+        res.on('data', (chunk) => data.push(chunk));
+        res.on('end', () => {
+          if (res.statusCode == 200) {
+            if (data.length > 0) {
+              try {
+                const dataJson = JSON.parse(Buffer.concat(data).toString());
+                resolve(dataJson);
+              } catch (e) {
+                reject(new Error('Could not parse body as JSON'));
+              }
+            } else {
+              reject(new Error('No body in response'));
+            }
+          } else {
+            resolve({valid:false});
+          }
+        });
+      });
+
+      req.on('error', (error) => {
+        this.logger.warn("APIML query failed:", error);
+        reject(error);
+      });
+      req.end();
+    });
+  }
+
+  doLogin(request, sessionState) {
     return new Promise((resolve, reject) => {
       const gatewayUrl = this.gatewayUrl;
       const data = JSON.stringify({
         username: request.body.username,
         password: request.body.password
       });
-      const options = {
-        hostname: this.apimlConf.hostname,
-        port: this.apimlConf.gatewayPort,
-        path: '/api/v1/apicatalog/auth/login',
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': data.length
-        },
-        agent: this.httpsAgent
-      }
+      const options = this.makeOptions('/api/v1/gateway/auth/login','POST', undefined, data.length);
 
       const req = https.request(options, (res) => {
         res.on('data', (d) => {});
         res.on('end', () => {
-          let apimlCookie;
+          let token;
           if (res.statusCode == 204) {
             if (typeof res.headers['set-cookie'] === 'object') {
               for (const cookie of res.headers['set-cookie']) {
                 const content = cookie.split(';')[0];
                 if (content.indexOf('apimlAuthenticationToken') >= 0) {
-                  apimlCookie = content;
+                  token = content;
                 }
               }
             }
           }
 
-          if (apimlCookie) {
-            sessionState.username = request.body.username;
-            sessionState.apimlCookie = apimlCookie;
-            sessionState.apimlToken = apimlCookie.split("=")[1];
-            resolve({ success: true, username: sessionState.username, expms: DEFAULT_EXPIRATION_MS });
+          if (token) {
+            this.queryToken(token).then(data=> {
+              let expiration;
+              const expirationDate = new Date(data.expiration);
+              const creationDate = new Date(data.creation);
+              if (creationDate.getTime() > expirationDate.getTime()) {
+                expiration = -1;
+              } else {
+                const now = new Date();
+                expiration = expirationDate.getTime() - now.getTime();
+              }
+              if (expiration > 0) {
+                this.setState(expiration, token, data.userId, sessionState);
+                resolve({ success: true, username: sessionState.username, expms: expiration });
+              } else {
+                resolve({ success: false, reason: 'Unknown'});
+              }
+            });
             return;
           } else {
             let response = {
@@ -216,8 +325,11 @@ class ApimlHandler {
     });
   }
 
+  getCookieExpiration(cookie) {
+    
+  }
+
   cleanupSession(sessionState) {
-    delete sessionState.apimlToken;
     delete sessionState.apimlCookie;
   }
 
