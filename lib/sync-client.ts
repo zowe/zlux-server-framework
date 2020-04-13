@@ -18,8 +18,13 @@ export class SyncClient {
   private ws: WebSocket;
 
   constructor() {
-    this.ws = new WebSocket('wss://localhost:8544/sync', { rejectUnauthorized: false });
-    this.ws.on('open', () => syncLog.info('connection to master established'));
+    
+  }
+  
+  start(host: string, port: number, secure: boolean): void {
+    const serverAddress = `${secure ? 'wss' : 'ws'}://${host}:${port}/sync`;
+    this.ws = new WebSocket(serverAddress, { rejectUnauthorized: false });
+    this.ws.on('open', () => syncLog.info(`connection to master ${serverAddress} established`));
     this.ws.on('message', (data: Buffer) => {
       syncLog.info(`message ${data}`);
       const entry: LogEntry = JSON.parse(data.toString());

@@ -4,6 +4,8 @@ import { SessionLogEntry, StorageActionSetAll, StorageLogEntry, StorageActionSet
 const zluxUtil = require('./util');
 const syncLog = zluxUtil.loggers.utilLogger;
 
+type Role = 'Master' | 'Backup';
+
 let isMaster = false;
 
 export function setAsBackup() {
@@ -11,6 +13,10 @@ export function setAsBackup() {
 }
 export function setAsMaster(): void {
   isMaster = true;
+}
+
+export function getRole(): Role {
+  return isMaster ? 'Master' : 'Backup';
 }
 
 export const syncEventEmitter = new EventEmitter();
