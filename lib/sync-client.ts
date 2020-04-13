@@ -11,15 +11,17 @@ import {
   LogEntry,
 } from './sync-types';
 const sessionStore = require('./sessionStore').sessionStore;
+const zluxUtil = require('./util');
+const syncLog = zluxUtil.loggers.utilLogger;
 
 export class SyncClient {
   private ws: WebSocket;
 
   constructor() {
     this.ws = new WebSocket('wss://localhost:8544/sync', { rejectUnauthorized: false });
-    this.ws.on('open', () => console.log('connection to master established'));
+    this.ws.on('open', () => syncLog.info('connection to master established'));
     this.ws.on('message', (data: Buffer) => {
-      console.log(`message ${data}`);
+      syncLog.info(`message ${data}`);
       const entry: LogEntry = JSON.parse(data.toString());
       if (isSessionLogEntry(entry)) {
         const sessionData = entry.payload;
