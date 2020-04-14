@@ -161,7 +161,6 @@
   "ZWED0108E":"RESERVED: Timestamp mismatch",
   "ZWED0109E":"RESERVED: Timestamp check failure",
   "ZWED0110E":"RESERVED: Response type not implemented.",
-  "ZWED0115E":"RESERVED: Only GET method supported",
   "ZWED0116E":"RESERVED: Cannot reload server unless cluster mode is in use.",
   "ZWED0117E":"RESERVED: Only GET method supported",
   "ZWED0118E":"RESERVED: Only GET method supported",
@@ -188,5 +187,6 @@
   "ZWED0139E":"RESERVED: Improper access permissions for path %s",
   "ZWED0140E":"RESERVED: Cannot reload server unless cluster mode is in use.",
   "ZWED0141E":"RESERVED: Internal Server Error",
-  "ZWED0142E":"RESERVED: Invalid session action type attempted"
+  "ZWED0142E":"RESERVED: Invalid session action type attempted",
+  "ZWED0143E":"RESERVED: Only GET method supported",
 }
