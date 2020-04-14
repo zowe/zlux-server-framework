@@ -30,6 +30,7 @@ export class SyncService {
       syncEventEmitter.removeListener('session', sessionChangeListener);
       syncEventEmitter.removeListener('storage', storageChangeListener);
     });
+    this.clientWS.on('ping', () => this.onPing()); 
   }
 
   private onSessionChange(entry: SessionLogEntry) {
@@ -71,5 +72,9 @@ export class SyncService {
       syncLog.info(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
       this.clientWS.send(JSON.stringify(storageLogEntry));
     });
+  }
+  
+  private onPing(): void {
+    this.clientWS.pong();
   }
 }
