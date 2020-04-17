@@ -18,7 +18,7 @@ const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
 
 class ZssHandler {
   constructor(pluginDef, pluginConf, serverConf, context) {
-    this.log = context.logger;
+    this.logger = context.logger;
     this.sessionExpirationMS = DEFAULT_EXPIRATION_MS; //ahead of time assumption of unconfigurable zss session length
     this.authorized = Promise.coroutine(function *authorized(request, sessionState, 
                                                              options) {
@@ -28,6 +28,8 @@ class ZssHandler {
         const { syncOnly } = options;
         let bypassUrls = [
           '/login',
+          '/logout',
+          '/password',
           '/unixfile',
           '/datasetContents',
           '/VSAMdatasetContents',
@@ -65,7 +67,7 @@ class ZssHandler {
         if (syncOnly) {
           // can't do anything further: the user is authenticated but we can't 
           // make an actual RBAC check
-          this.log.info(`Can't make a call to the OS agent for access check. ` +
+          this.logger.info(`Can't make a call to the OS agent for access check. ` +
                    `Allowing ${sessionState.username} access to ${resourceName} ` +
                    'unconditinally');
           result.authorized = true;
@@ -74,10 +76,9 @@ class ZssHandler {
         const httpResponse = yield this._callAgent(request.zluxData, 
                                                    sessionState.username,  resourceName);
         this._processAgentResponse(httpResponse, result, sessionState.username);
-        //console.log("returning result", result)
         return result;
       } catch (e) {
-        this.log.warn(`User ${sessionState.username}, `
+        this.logger.warn(`User ${sessionState.username}, `
                  + `authorization problem: ${e.message}`, e);
         result.authorized = false;
         result.message = "Problem checking auth permissions";
@@ -123,7 +124,7 @@ class ZssHandler {
    */ 
   authenticate(request, sessionState) {
     return this._authenticateOrRefresh(request, sessionState, false).catch ((e)=> {
-      this.log.warn(e);
+      this.logger.warn(e);
       return { success: false };
     });
   }
@@ -134,7 +135,7 @@ class ZssHandler {
 
   refreshStatus(request, sessionState) {
     return this._authenticateOrRefresh(request, sessionState, true).catch ((e)=> {
-      this.log.warn(e);
+      this.logger.warn(e);
       //dont un-auth or delete cookie... perhaps this was a network error. Let session expire naturally if no success
       return { success: false };
     });
@@ -154,6 +155,7 @@ class ZssHandler {
         body: request.body
       };
       request.zluxData.webApp.callRootService("login", options).then((response) => {
+        this.logger.debug(`Login rc=`,response.statusCode);
         if (response.statusCode == HTTP_STATUS_PRECONDITION_REQUIRED) {
           sessionState.authenticated = false;
           delete sessionState.zssUsername;
@@ -245,7 +247,7 @@ class ZssHandler {
     if (requestIP.range() == "loopback") {
       result.authorized = true;
     } else {
-      this.log.warn(`Access to /saf-auth blocked, caller:  ${request.ip}`)
+      this.logger.warn(`Access to /saf-auth blocked, caller:  ${request.ip}`)
       result.authorized = false;
     }
   }
@@ -284,7 +286,7 @@ class ZssHandler {
       } else {
         result.authorized = false;
         result.message = "Problem checking access permissions";
-        this.log.warn(`User ${username}, `
+        this.logger.warn(`User ${username}, `
             + `authorization problem: ${responseBody.message}`);
       }
     }

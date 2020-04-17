@@ -17,12 +17,12 @@ const zssHandlerFactory = require('./zssHandler');
 const apimlHandlerFactory = require('./apimlHandler');
 
 function doesApimlExist(serverConf) {
-  return (process.env['LAUNCH_COMPONENT_GROUPS'] !== undefined)
-    && (process.env['LAUNCH_COMPONENT_GROUPS'].indexOf('GATEWAY') != -1)
-    && (serverConf.node.mediationLayer !== undefined)
+  return ((serverConf.node.mediationLayer !== undefined)
     && (serverConf.node.mediationLayer.server !== undefined)
     && (serverConf.node.mediationLayer.server.hostname !== undefined)
     && (serverConf.node.mediationLayer.server.gatewayPort !== undefined)
+    && (serverConf.node.mediationLayer.server.port !== undefined)
+    && (serverConf.node.mediationLayer.enabled == true))
 }
 
 /*
@@ -56,17 +56,20 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.instanceID = serverConf.instanceID;
   this.authPluginID = pluginDef.identifier;
   this.logger = context.logger;
-
+  this.categories = ['saf'];
   if (this.usingApiml) {
     this.apimlHandler = apimlHandlerFactory(pluginDef, pluginConf, serverConf, context);
+    this.categories.push('apiml');
   }
 
   if (this.usingZss) {
     this.zssHandler = zssHandlerFactory(pluginDef, pluginConf, serverConf, context);
+    this.categories.push('zss');
   }
-  
+
   this.capabilities = {
     "canGetStatus": true,
+    "canGetCategories": true,
     //when zosmf cookie becomes invalid, we can purge zss cookie even if it is valid to be consistent
     "canRefresh": this.usingApiml ? false : true, 
     "canAuthenticate": true,
@@ -80,6 +83,10 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
 }
 
 SsoAuthenticator.prototype = {
+
+  getCategories() {
+    return this.categories;
+  },
 
   getCapabilities(){
     return this.capabilities;
@@ -97,11 +104,11 @@ SsoAuthenticator.prototype = {
       cleanupSessionGeneric(sessionState);
       return { authenticated: false };
     }
-    return {
+    return this._insertHandlerStatus({
       authenticated: !!sessionState.authenticated,
       username: sessionState.username,
       expms: sessionState.sessionExpTime ? expms : undefined
-    };
+    });
   },
 
   logout(request, sessionState) {
@@ -200,10 +207,22 @@ SsoAuthenticator.prototype = {
       sessionState.sessionExpTime = sessionState.sessionExpTime
         ? Math.min(sessionState.sessionExpTime, now+shortestExpms)
         : now+shortestExpms;
+      let cookies = undefined;
+      if (zss.cookies) {
+        cookies = zss.cookies;
+      }
+      if (apiml.cookies) {
+        if (!cookies) {
+          cookies = apiml.cookies;
+        } else {
+          cookies = cookies.concat(apiml.cookies);
+        }
+      }
       return this._insertHandlerStatus({
         success: true,
         username: sessionState.username,
-        expms: shortestExpms
+        expms: shortestExpms,
+        cookies: cookies
       });
     }
   },
