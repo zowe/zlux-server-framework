@@ -93,7 +93,11 @@ class ApimlHandler {
         res.on('end', () => {
           let apimlCookie;
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve({ success: true, cookies: [{name:TOKEN_NAME, value:'non-token', options: {httpOnly: true}}]});
+            resolve({ success: true, cookies: [{name:TOKEN_NAME,
+                                                value:'non-token',
+                                                options: {httpOnly: true,
+                                                          secure: true,
+                                                          expires: new Date(1)}}]});
             return;
           } else {
             let response = {

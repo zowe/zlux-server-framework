@@ -126,7 +126,9 @@ SsoAuthenticator.prototype = {
           if (this.usingApiml) {
             this.apimlHandler.logout(request, sessionState).then((apimlResult)=> {
               this.apimlHandler.cleanupSession(sessionState);
-              resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success)}));
+              const cookies = this._mergeCookies(zssResult, apimlResult);
+              resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success),
+                                                 cookies: cookies}));
             }).catch((e) => {
               resolve(this._insertHandlerStatus({success: false, reason: e.message}));
             });
@@ -141,8 +143,8 @@ SsoAuthenticator.prototype = {
   _insertHandlerStatus(response) {
     response.apiml = this.usingApiml;
     response.zss = this.usingZss;
-    response.canChangePassword = this.usingZss;
     response.sso = this.usingSso;
+    response.canChangePassword = this.usingZss;
     return response;
   },
   
@@ -196,6 +198,21 @@ SsoAuthenticator.prototype = {
       }
     });
   },
+
+  _mergeCookies(zss, apiml) {
+    let cookies = undefined;
+    if (zss.cookies) {
+      cookies = zss.cookies;
+    }
+    if (apiml.cookies) {
+      if (!cookies) {
+        cookies = apiml.cookies;
+      } else {
+        cookies = cookies.concat(apiml.cookies);
+      }
+    }
+    return cookies;
+  },
   
   _mergeAuthenticate(zss, apiml, sessionState) {
     const now = Date.now();
@@ -211,17 +228,7 @@ SsoAuthenticator.prototype = {
       sessionState.sessionExpTime = sessionState.sessionExpTime
         ? Math.min(sessionState.sessionExpTime, now+shortestExpms)
         : now+shortestExpms;
-      let cookies = undefined;
-      if (zss.cookies) {
-        cookies = zss.cookies;
-      }
-      if (apiml.cookies) {
-        if (!cookies) {
-          cookies = apiml.cookies;
-        } else {
-          cookies = cookies.concat(apiml.cookies);
-        }
-      }
+      const cookies = this._mergeCookies(zss, apiml);
       return this._insertHandlerStatus({
         success: true,
         username: sessionState.username,
