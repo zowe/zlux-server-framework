@@ -180,7 +180,7 @@ class ApimlHandler {
           resolve({success: true, username: sessionState.username, expms: expiration});
         }
       }).catch(e=> {
-        this.logger.warn('APIML query failed, trying login.');
+        this.logger.debug('APIML query failed, trying login.');
         this.doLogin(request, sessionState).then(result=> resolve(result))
           .catch(e => reject(e));
       });
