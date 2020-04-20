@@ -180,7 +180,7 @@ class ApimlHandler {
           resolve({success: true, username: sessionState.username, expms: expiration});
         }
       }).catch(e=> {
-        this.logger.warn('APIML query failed, trying login. Error=',e);
+        this.logger.warn('APIML query failed, trying login.');
         this.doLogin(request, sessionState).then(result=> resolve(result))
           .catch(e => reject(e));
       });
@@ -249,13 +249,13 @@ class ApimlHandler {
               reject(new Error('No body in response'));
             }
           } else {
-            reject(new Error('Status code='+res.statusCode));
+            reject(new Error('Status code:'+res.statusCode));
           }
         });
       });
 
       req.on('error', (error) => {
-        this.logger.warn("APIML query failed:", error);
+        this.logger.warn("APIML query error:", error.message);
         reject(error);
       });
       req.end();
@@ -306,6 +306,8 @@ class ApimlHandler {
               } else {
                 resolve({ success: false, reason: 'Unknown'});
               }
+            }).catch(e=> {
+              reject({ success: false, reason: 'Unknown', error: {message:e.message.toString()}});
             });
             return;
           } else {
