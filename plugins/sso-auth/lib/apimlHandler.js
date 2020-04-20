@@ -249,7 +249,7 @@ class ApimlHandler {
               reject(new Error('No body in response'));
             }
           } else {
-            reject(new Error('Status code=',res.statusCode));
+            reject(new Error('Status code='+res.statusCode));
           }
         });
       });
