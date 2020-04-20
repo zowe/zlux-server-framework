@@ -55,12 +55,12 @@ export class SyncService {
 
   private sendCurrentStateToClient(): void {
     syncLog.info(`New client connected. sendCurrentStateToClient`);
-    this.sendCurrentSessionsToClient();
-    this.sendCurrentStorageStateToClient();
+    this.sendSessionStorageSnapshotToClient();
+    this.sendDataserviceStorageSnapshotToClient();
   }
 
-  private sendCurrentSessionsToClient(): void {
-    syncLog.info(`sendCurrentSessionsToClient`);
+  private sendSessionStorageSnapshotToClient(): void {
+    syncLog.info(`sendSessionStorageSnapshotToClient`);
     sessionStore.all((err: Error | null, sessions: { [sid: string]: any }) => {
       const sessionData: SessionData[] = [];
       Object.keys(sessions).forEach(sid => {
@@ -72,8 +72,9 @@ export class SyncService {
       this.clientWS.send(JSON.stringify(sessionsLogEntry));
     });
   }
-
-  private sendCurrentStorageStateToClient(): void {
+  
+  private sendDataserviceStorageSnapshotToClient(): void {
+    syncLog.info(`sendDataserviceStorageSnapshotToClient`);
     const clusterManager = process.clusterManager;
     clusterManager.getStorageCluster().then(storage => {
       syncLog.info(`[cluster storage: ${JSON.stringify(storage)}]`);
