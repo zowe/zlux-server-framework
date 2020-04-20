@@ -72,6 +72,9 @@ class ApimlHandler {
 
   logout(request, sessionState) {
     return new Promise((resolve, reject) => {
+      if (!(request.cookies && request.cookies[TOKEN_NAME])) {
+        return resolve({success: true});
+      }
       const gatewayUrl = this.gatewayUrl;
       const options = {
         hostname: this.apimlConf.hostname,
@@ -80,7 +83,7 @@ class ApimlHandler {
         path: '/api/v1/apicatalog/auth/logout',
         method: 'POST',
         headers: {
-          'apimlAuthenticationToken': sessionState.apimlToken
+          'apimlAuthenticationToken': request.cookies[TOKEN_NAME]
         },
         agent: this.httpsAgent
       }
@@ -90,7 +93,7 @@ class ApimlHandler {
         res.on('end', () => {
           let apimlCookie;
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve({ success: true });
+            resolve({ success: true, cookies: [{name:TOKEN_NAME, value:'non-token', options: {httpOnly: true}}]});
             return;
           } else {
             let response = {
@@ -98,8 +101,7 @@ class ApimlHandler {
               reason: 'Unknown',
               error: {
                 message: `APIML ${res.statusCode} ${res.statusMessage}`
-              },
-              cookies: [{name:TOKEN_NAME, value:'non-token', options: {httpOnly: true}}]
+              }
             };
             //Seems that when auth is first called, it may not be loaded yet, so you get a 405.
             if (res.statusCode == 405) {
@@ -368,7 +370,7 @@ class ApimlHandler {
   authorized(request, sessionState) {
     if (sessionState.authenticated) {
       request.username = sessionState.username;
-      request.ssoToken = sessionState.apimlToken;
+      request.ssoToken = request.cookies[TOKEN_NAME];
       return Promise.resolve({ authenticated: true, authorized: true });
     } else {
       return Promise.resolve({ authenticated: false, authorized: false });
@@ -383,7 +385,7 @@ class ApimlHandler {
     if (this.usingSso) {
       req2Options.headers['Authorization'] = 'Bearer '+sessionState.apimlToken;
     }
-  }  
+  }
 }
 
 module.exports = function(pluginDef, pluginConf, serverConf, context) {

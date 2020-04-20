@@ -115,14 +115,17 @@ SsoAuthenticator.prototype = {
     return new Promise((resolve, reject)=> {
       if (this.usingSso || !this.usingZss) {
         this.apimlHandler.logout(request, sessionState).then((result)=> {
+          this.apimlHandler.cleanupSession(sessionState);
           resolve(this._insertHandlerStatus(result));
         }).catch((e) => {
           resolve(this._insertHandlerStatus({success: false, reason: e.message}));
         });
       } else {
         this.zssHandler.logout(request, sessionState).then((zssResult)=> {
+          this.zssHandler.cleanupSession(sessionState);
           if (this.usingApiml) {
             this.apimlHandler.logout(request, sessionState).then((apimlResult)=> {
+              this.apimlHandler.cleanupSession(sessionState);
               resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success)}));
             }).catch((e) => {
               resolve(this._insertHandlerStatus({success: false, reason: e.message}));
