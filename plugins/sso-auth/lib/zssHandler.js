@@ -160,7 +160,7 @@ class ZssHandler {
           sessionState.authenticated = false;
           delete sessionState.zssUsername;
           delete sessionState.zssCookies;
-          resolve({ success: false, reason: 'Expired Password', canChangePassword: true});
+          resolve({ success: false, reason: 'Expired Password'});
         }
         let zssCookie;
         if (typeof response.headers['set-cookie'] === 'object') {
@@ -179,7 +179,7 @@ class ZssHandler {
           //intended to be known as result of network call
           sessionState.zssCookies = zssCookie;
           resolve({ success: true, username: sessionState.username,
-                    expms: DEFAULT_EXPIRATION_MS, canChangePassword: true })
+                    expms: DEFAULT_EXPIRATION_MS})
         } else {
           let res = { success: false, error: {message: `ZSS ${response.statusCode} ${response.statusMessage}`}};
           if (response.statusCode === 500) {

@@ -138,6 +138,7 @@ SsoAuthenticator.prototype = {
   _insertHandlerStatus(response) {
     response.apiml = this.usingApiml;
     response.zss = this.usingZss;
+    response.canChangePassword = this.usingZss;
     response.sso = this.usingSso;
     return response;
   },
