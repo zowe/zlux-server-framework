@@ -48,7 +48,10 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
   //TODO this seems temporary, will need to unconditionally say usingApiml=usingSso when sso support is complete
-  this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
+  //this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
+
+  //TODO temporary, once zss is finished we can switch over to true
+  this.apimlSsoEnabled = false;
   //Sso here meaning just authenticate to apiml, and handle jwt
   this.usingSso = this.apimlSsoEnabled && this.usingApiml;
 
