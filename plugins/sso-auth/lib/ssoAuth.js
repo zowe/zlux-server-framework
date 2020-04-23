@@ -17,12 +17,12 @@ const zssHandlerFactory = require('./zssHandler');
 const apimlHandlerFactory = require('./apimlHandler');
 
 function doesApimlExist(serverConf) {
-  return (process.env['LAUNCH_COMPONENT_GROUPS'] !== undefined)
-    && (process.env['LAUNCH_COMPONENT_GROUPS'].indexOf('GATEWAY') != -1)
-    && (serverConf.node.mediationLayer !== undefined)
+  return ((serverConf.node.mediationLayer !== undefined)
     && (serverConf.node.mediationLayer.server !== undefined)
     && (serverConf.node.mediationLayer.server.hostname !== undefined)
     && (serverConf.node.mediationLayer.server.gatewayPort !== undefined)
+    && (serverConf.node.mediationLayer.server.port !== undefined)
+    && (serverConf.node.mediationLayer.enabled == true))
 }
 
 /*
@@ -48,7 +48,10 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
   //TODO this seems temporary, will need to unconditionally say usingApiml=usingSso when sso support is complete
-  this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
+  //this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
+
+  //TODO temporary, once zss is finished we can switch over to true
+  this.apimlSsoEnabled = false;
   //Sso here meaning just authenticate to apiml, and handle jwt
   this.usingSso = this.apimlSsoEnabled && this.usingApiml;
 
@@ -56,22 +59,26 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.instanceID = serverConf.instanceID;
   this.authPluginID = pluginDef.identifier;
   this.logger = context.logger;
-
+  this.categories = ['saf'];
   if (this.usingApiml) {
     this.apimlHandler = apimlHandlerFactory(pluginDef, pluginConf, serverConf, context);
+    this.categories.push('apiml');
   }
 
   if (this.usingZss) {
     this.zssHandler = zssHandlerFactory(pluginDef, pluginConf, serverConf, context);
+    this.categories.push('zss');
   }
-  
+
   this.capabilities = {
     "canGetStatus": true,
+    "canGetCategories": true,
     //when zosmf cookie becomes invalid, we can purge zss cookie even if it is valid to be consistent
     "canRefresh": this.usingApiml ? false : true, 
     "canAuthenticate": true,
     "canAuthorize": true,
     "canLogout": true,
+    "canResetPassword": this.usingZss ? true : false,
     "proxyAuthorizations": true,
     //TODO do we need to process proxy headers for both?
     "processesProxyHeaders": this.usingZss ? true: false
@@ -79,6 +86,10 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
 }
 
 SsoAuthenticator.prototype = {
+
+  getCategories() {
+    return this.categories;
+  },
 
   getCapabilities(){
     return this.capabilities;
@@ -96,26 +107,31 @@ SsoAuthenticator.prototype = {
       cleanupSessionGeneric(sessionState);
       return { authenticated: false };
     }
-    return {
+    return this._insertHandlerStatus({
       authenticated: !!sessionState.authenticated,
       username: sessionState.username,
       expms: sessionState.sessionExpTime ? expms : undefined
-    };
+    });
   },
 
   logout(request, sessionState) {
     return new Promise((resolve, reject)=> {
       if (this.usingSso || !this.usingZss) {
         this.apimlHandler.logout(request, sessionState).then((result)=> {
+          this.apimlHandler.cleanupSession(sessionState);
           resolve(this._insertHandlerStatus(result));
         }).catch((e) => {
           resolve(this._insertHandlerStatus({success: false, reason: e.message}));
         });
       } else {
         this.zssHandler.logout(request, sessionState).then((zssResult)=> {
+          this.zssHandler.cleanupSession(sessionState);
           if (this.usingApiml) {
             this.apimlHandler.logout(request, sessionState).then((apimlResult)=> {
-              resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success)}));
+              this.apimlHandler.cleanupSession(sessionState);
+              const cookies = this._mergeCookies(zssResult, apimlResult);
+              resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success),
+                                                 cookies: cookies}));
             }).catch((e) => {
               resolve(this._insertHandlerStatus({success: false, reason: e.message}));
             });
@@ -131,6 +147,7 @@ SsoAuthenticator.prototype = {
     response.apiml = this.usingApiml;
     response.zss = this.usingZss;
     response.sso = this.usingSso;
+    response.canChangePassword = this.usingZss;
     return response;
   },
   
@@ -184,6 +201,21 @@ SsoAuthenticator.prototype = {
       }
     });
   },
+
+  _mergeCookies(zss, apiml) {
+    let cookies = undefined;
+    if (zss.cookies) {
+      cookies = zss.cookies;
+    }
+    if (apiml.cookies) {
+      if (!cookies) {
+        cookies = apiml.cookies;
+      } else {
+        cookies = cookies.concat(apiml.cookies);
+      }
+    }
+    return cookies;
+  },
   
   _mergeAuthenticate(zss, apiml, sessionState) {
     const now = Date.now();
@@ -199,11 +231,21 @@ SsoAuthenticator.prototype = {
       sessionState.sessionExpTime = sessionState.sessionExpTime
         ? Math.min(sessionState.sessionExpTime, now+shortestExpms)
         : now+shortestExpms;
+      const cookies = this._mergeCookies(zss, apiml);
       return this._insertHandlerStatus({
         success: true,
         username: sessionState.username,
-        expms: shortestExpms
+        expms: shortestExpms,
+        cookies: cookies
       });
+    }
+  },
+
+  passwordReset(request, sessionState) {
+    if (this.usingZss) {
+      return this.zssHandler.passwordReset(request, sessionState);
+    } else {
+      return Promise.reject(new Error('Password reset not yet supported through APIML'));
     }
   },
 
