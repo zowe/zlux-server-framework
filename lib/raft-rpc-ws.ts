@@ -59,8 +59,8 @@ interface PendingRequest {
 export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   private static seq = 1;
   private ws: WebSocket;
-  private address: string;
   private isConnected = false;
+  readonly address: string;
 
   private pendingRequests = new Map<number, PendingRequest>();
 
@@ -145,7 +145,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     }
     this.pendingRequests.delete(seq);
     pendingRequest.resolve(message);
-    raftLog.info(`resolve pending request with seq ${seq}, ignore it`);
+    raftLog.info(`successfully resolve pending request with seq ${seq}`);
   }
 
   private onClose(code: number, reason: string): void {
@@ -170,28 +170,30 @@ export class RaftRPCWebSocketService {
     private req: express.Request,
     private raft: Raft,
   ) {
+    this.log('constructor');
     this.init();
   }
 
   private init(): void {
+    this.log(`connected client`);
     this.clientWS.on('close', () => this.onClose());
     this.clientWS.on('message', (data: Buffer) => this.onMessage(data));
   }
 
   private onClose(): void {
-    throw new Error("Method not implemented.");
+    this.log('connection closed');
   }
 
   private onMessage(data: Buffer): void {
-    raftLog.info(`message ${data}`);
+    this.log(`received message ${data}`);
     let message: WebSocketMessage;
     try {
       message = JSON.parse(data.toString());
     } catch (e) {
-      raftLog.error(`ignore invalid message`);
+      this.log(`ignore invalid message`);
       return;
     }
-    raftLog.info(`got message ${JSON.stringify(message)}`);
+    this.log(`got message ${JSON.stringify(message)}`);
     if (isWebSocketRequestVoteArgsMessage(message)) {
       raftLog.info(`got request vote message ${JSON.stringify(message)}`);
       this.processRequestVoteMessage(message);
@@ -223,5 +225,9 @@ export class RaftRPCWebSocketService {
       message: reply,
     };
     this.clientWS.send(JSON.stringify(replyMessage));
+  }
+  
+  private log(msg: string): void {
+    raftLog.info(`RaftRPCWebSocketService: ${msg}`);
   }
 }

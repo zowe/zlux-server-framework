@@ -23,8 +23,8 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
 }
 
 export interface RaftLogEntry {
-  Term: number;
-  Command: any;
+  term: number;
+  command: any;
 }
 
 export interface RequestVoteArgs {
@@ -35,22 +35,22 @@ export interface RequestVoteArgs {
 }
 
 export interface RequestVoteReply {
-  Term: number;  // currentTerm, for candidate to update itself
-  VoteGranted: boolean; // true means candidate received vote
+  term: number;  // currentTerm, for candidate to update itself
+  voteGranted: boolean; // true means candidate received vote
 }
 
 export interface AppendEntriesArgs {
-  Term: number;        // Leader’s term
-  LeaderID: number;        // so follower can redirect clients
-  PrevLogIndex: number;        // index of log entry immediately preceding new ones
-  PrevLogTerm: number;        // term of prevLogIndex entry
-  Entries: RaftLogEntry[]; // entries to store (empty for heartbeat; may send more than one for efficiency)
-  LeaderCommit: number;        // leader’s commitIndex
+  term: number;        // Leader’s term
+  leaderId: number;        // so follower can redirect clients
+  prevLogIndex: number;        // index of log entry immediately preceding new ones
+  prevLogTerm: number;        // term of prevLogIndex entry
+  entries: RaftLogEntry[]; // entries to store (empty for heartbeat; may send more than one for efficiency)
+  leaderCommit: number;        // leader’s commitIndex
 }
 
 export interface AppendEntriesReply {
-  Term: number;  // currentTerm, for leader to update itself
-  Success: boolean; // true if follower contained entry matching prevLogIndex and prevLogTerm
+  term: number;  // currentTerm, for leader to update itself
+  success: boolean; // true if follower contained entry matching prevLogIndex and prevLogTerm
 }
 
 export interface RaftRPCDriver {
@@ -58,7 +58,7 @@ export interface RaftRPCDriver {
   sendAppendEntries: (args: AppendEntriesArgs) => Promise<AppendEntriesReply>;
 }
 
-export type State = 'Leader' | 'Follower' | 'Candidate'
+export type State = 'Leader' | 'Follower' | 'Candidate';
 
 const minElectionTimeout = 150;
 const maxElectionTimeout = 300;
@@ -131,24 +131,25 @@ export class Raft {
         continue;
       }
       setImmediate(async () => {
+        const peerAddress = this.peers[server].address;
         const voteGranted = await this.callRequestVote(server, term);
         if (!voteGranted) {
-          this.print("vote by peer %d not granted", server);
+          this.print("vote by peer %s not granted", peerAddress);
           return;
         }
         votes++;
         if (done) {
-          this.print("got vote from peer %d but election already finished", server);
+          this.print("got vote from peer %s but election already finished", peerAddress);
           return;
         } else if (this.state == 'Follower') {
           this.print("got heartbeat, stop election")
           done = true;
           return;
         } else if (votes <= peerCount / 2) {
-          this.print("got vote from %d but not enough votes yet to become Leader", server);
+          this.print("got vote from %s but not enough votes yet to become Leader", peerAddress);
           return;
         }
-        this.print("got final vote from %d and became Leader of term %d", server, this.currentTerm);
+        this.print("got final vote from %s and became Leader of term %d", peerAddress, this.currentTerm);
         done = true;
         this.convertToLeader();
       });
@@ -194,18 +195,18 @@ export class Raft {
     const prevLogIndex = index - 1;
     let prevLogTerm = -1;
     if (prevLogIndex >= 0) {
-      prevLogTerm = this.log[prevLogIndex].Term
+      prevLogTerm = this.log[prevLogIndex].term
     }
     const args: AppendEntriesArgs = {
-      LeaderID: this.me,
-      Term: this.currentTerm,
-      Entries: entries,
-      LeaderCommit: this.commitIndex,
-      PrevLogIndex: prevLogIndex,
-      PrevLogTerm: prevLogTerm,
+      leaderId: this.me,
+      term: this.currentTerm,
+      entries: entries,
+      leaderCommit: this.commitIndex,
+      prevLogIndex: prevLogIndex,
+      prevLogTerm: prevLogTerm,
     };
     const peer = this.peers[server];
-    return peer.sendAppendEntries(args).then(reply => reply.Success).catch(() => false);
+    return peer.sendAppendEntries(args).then(reply => reply.success).catch(() => false);
   }
 
   async callRequestVote(server: number, term: number): Promise<boolean> {
@@ -215,45 +216,45 @@ export class Raft {
       term: term,
     }
     return peer.sendRequestVote(requestVoteArgs)
-      .then(reply => reply.VoteGranted)
+      .then(reply => reply.voteGranted)
       .catch(() => false);
   }
 
   appendEntries(args: AppendEntriesArgs): AppendEntriesReply {
-    this.print("got append entries request from leader %d at term %d", args.LeaderID, args.Term)
+    this.print("got append entries request from leader %d at term %d", args.leaderId, args.term)
     // 1. Reply false if term < currentTerm (§5.1)
-    if (args.Term < this.currentTerm) {
+    if (args.term < this.currentTerm) {
       return {
-        Success: false,
-        Term: this.currentTerm,
+        success: false,
+        term: this.currentTerm,
       }
     }
-    if (args.PrevLogIndex >= 0) {
+    if (args.prevLogIndex >= 0) {
       // 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
-      if (args.PrevLogIndex >= this.log.length) {
+      if (args.prevLogIndex >= this.log.length) {
         return {
-          Success: false,
-          Term: this.currentTerm,
+          success: false,
+          term: this.currentTerm,
         }
       }
       // 3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
-      const prevLogTerm = this.log[args.PrevLogIndex].Term;
-      if (prevLogTerm != args.PrevLogTerm) {
-        this.log = this.log.slice(0, args.PrevLogIndex);
+      const prevLogTerm = this.log[args.prevLogIndex].term;
+      if (prevLogTerm != args.prevLogTerm) {
+        this.log = this.log.slice(0, args.prevLogIndex);
       }
     }
     // 4. Append any new entries not already in the log
-    this.log = this.log.concat(args.Entries);
+    this.log = this.log.concat(args.entries);
     // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
     const lastNewEntryIndex = this.log.length - 1;
-    if (args.LeaderCommit > this.commitIndex) {
-      this.commitIndex = Math.min(args.LeaderCommit, lastNewEntryIndex);
+    if (args.leaderCommit > this.commitIndex) {
+      this.commitIndex = Math.min(args.leaderCommit, lastNewEntryIndex);
     }
 
     this.convertToFollower();
     return {
-      Success: true,
-      Term: args.Term,
+      success: true,
+      term: args.term,
     };
   }
 
@@ -280,8 +281,8 @@ export class Raft {
     if (args.term < this.currentTerm) {
       this.print("got vote request from %d at term %d", args.candidateId, args.term);
       return {
-        Term: this.currentTerm,
-        VoteGranted: false,
+        term: this.currentTerm,
+        voteGranted: false,
       };
     }
     if (args.term > this.currentTerm) {
@@ -291,13 +292,13 @@ export class Raft {
       this.votedFor = args.candidateId;
       this.currentTerm = args.term;
       return {
-        Term: this.currentTerm,
-        VoteGranted: true
+        term: this.currentTerm,
+        voteGranted: true
       };
     }
     return {
-      Term: this.currentTerm,
-      VoteGranted: false,
+      term: this.currentTerm,
+      voteGranted: false,
     };
   }
 
