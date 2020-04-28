@@ -63,6 +63,6 @@
     "typescript": "2.7.1"
   },
   "optionalDependencies": {
-    "zcrypto": "~1.0.0"
+    "keyring_js": "~1.0.0"
   }
 }
