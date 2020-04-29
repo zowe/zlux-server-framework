@@ -9,6 +9,7 @@
 */
 
 import { RaftRPCWebSocketDriver } from "./raft-rpc-ws";
+import { EventEmitter } from "events";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -275,8 +276,8 @@ export class Raft {
     }
     this.ensureRequestTerm(args.term);
     this.convertToFollower();
-    this.print("got %s request from leader %d at term %d, my term %d, entries %+v, prevLogIndex %d",
-      requestType, args.leaderId, args.term, this.currentTerm, args.entries, args.prevLogIndex)
+    this.print("got %s request from leader %d at term %d, my term %d, entries %s, prevLogIndex %d",
+      requestType, args.leaderId, args.term, this.currentTerm, JSON.stringify(args.entries), args.prevLogIndex)
 
     // 1. Reply false if term < currentTerm (§5.1)
     if (args.term < this.currentTerm) {
@@ -304,7 +305,7 @@ export class Raft {
     }
     if (args.entries.length > 0) {
       // 4. Append any new entries not already in the log
-      this.print("4. Append any new entries not already in the log: %+v", args.entries);
+      this.print("4. Append any new entries not already in the log: %s", JSON.stringify(args.entries));
       this.log = this.log.concat(args.entries);
     }
     // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
@@ -387,6 +388,112 @@ export class Raft {
       voteGranted: false,
     };
   }
+
+  startCommand(command: Command): { index: number, term: number, isLeader: boolean } {
+    let index = -1;
+    const term = this.currentTerm;
+    const isLeader = this.isLeader();
+    if (isLeader) {
+      // If command received from client: append entry to local log,
+      // respond after entry applied to state machine (§5.3)
+      index = this.appendLogEntry(command);
+      this.print("got command %s, would appear at index %d", JSON.stringify(command), index);
+      setImmediate(async () => this.startAgreement(index));
+    }
+    return { index, term, isLeader };
+  }
+
+  private appendLogEntry(command: Command): number {
+    const entry: RaftLogEntry = {
+      term: this.currentTerm,
+      command: command,
+    }
+    this.log.push(entry);
+    this.print("leader appended a new entry %s %s", JSON.stringify(entry), JSON.stringify(this.log));
+    return this.log.length - 1;
+  }
+
+  private async startAgreement(index: number): Promise<void> {
+    await this.waitForPreviousAgreement(index - 1);
+    this.print("starts agreement on entry %d, nextIndex %s, matchIndex %s", index, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
+    const minPeers = this.peers.length / 2;
+    let donePeers = 0;
+    const agreementEmitter = new EventEmitter();
+    agreementEmitter.on('done', () => {
+      donePeers++
+      if (donePeers == minPeers) {
+        this.print("agreement for entry [%d]=%s reached", index, JSON.stringify(this.log[index]))
+        this.commitIndex = index;
+        const applyMsg: ApplyMsg = {
+          commandValid: true,
+          commandIndex: index + 1,
+          command: this.log[index].command,
+        };
+        this.applyCommand(applyMsg);
+        this.print("leader applied %s", JSON.stringify(applyMsg));
+        this.lastApplied = index
+      }
+    });
+    for (let server = 0; server < peers.length; server++) {
+      if (server == this.me) {
+        continue;
+      }
+      setImmediate(async () => this.startAgreementForServer(server, index, agreementEmitter));
+    }
+  }
+  
+  private async startAgreementForServer(server: number, index: number, agreementEmitter: EventEmitter): Promise<void> {
+    const matchIndex = this.matchIndex[server];
+    const nextIndex = this.nextIndex[server];
+    this.print("starts agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d",
+      index, JSON.stringify(this.log[index]), server, this.currentTerm, nextIndex, matchIndex)
+    const currentTerm = this.currentTerm;
+    const isLeader = this.isLeader();
+    if (!isLeader) {
+      this.print("cancel agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d, because not leader anymore",
+        index, JSON.stringify(this.log[index]), server, this.currentTerm, nextIndex, matchIndex)
+      return;
+    }
+    const { ok, success } = await this.callAppendEntries(server, currentTerm, 'appendentries');
+    if (!ok) {
+      this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
+    } else {
+      if (success) {
+        this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
+        this.matchIndex[server] = index;
+        this.nextIndex[server] = index + 1;
+        agreementEmitter.emit('done');
+      } else {
+        this.print("agreement for entry [%d]=%s for server %d at term %d - failed, try previous entry", index, JSON.stringify(this.log[index]), server, this.currentTerm)
+        if (index > 0) {
+          this.nextIndex[server]--;
+          setImmediate(() => this.startAgreementForServer(server, index - 1, agreementEmitter));
+        } else {
+          this.print("ops! previous index %d is not so good", index - 1);
+        }
+      }
+    }
+  }
+
+  private async waitForPreviousAgreement(index: number): Promise<void> {
+    if (index < 0) {
+      this.print("don't need to wait for agreement because no entries yet committed")
+      return;
+    }
+    return new Promise<void>((resolve, reject) => this.checkPreviousAgreement(index, resolve));
+  }
+
+  private checkPreviousAgreement(index: number, resolve: () => void): void {
+    const lastCommitted = this.commitIndex;
+    if (index == lastCommitted) {
+      this.print("entry %d is committed, ready to start agreement on next entry", index)
+      resolve();
+    } else {
+      this.print("wait because previous entry %d is not committed yet, commitIndex %d", index, lastCommitted);
+      setTimeout(() => this.checkPreviousAgreement(index, resolve), 10);
+    }
+  }
+
 
   private print(...args: any[]): void {
     if (this.debug) {
