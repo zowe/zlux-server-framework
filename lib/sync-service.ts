@@ -8,8 +8,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-import * as express from 'express';
-import * as WebSocket from 'ws';
 const sessionStore = require('./sessionStore').sessionStore;
 import { syncEventEmitter } from './sync';
 import {
@@ -19,13 +17,13 @@ import {
   StorageActionInit,
   StorageLogEntry,
 } from './sync-types';
+import { Raft, State } from './raft';
 const zluxUtil = require('./util');
 const syncLog = zluxUtil.loggers.utilLogger;
 
 export class SyncService {
   constructor(
-    private clientWS: WebSocket,
-    private req: express.Request,
+    private raft: Raft,
   ) {
     this.init();
   }
@@ -33,28 +31,30 @@ export class SyncService {
   private init(): void {
     const sessionChangeListener = this.onSessionChange.bind(this);
     const storageChangeListener = this.onStorageChange.bind(this);
-    this.sendCurrentStateToClient();
-    syncEventEmitter.addListener('session', sessionChangeListener);
-    syncEventEmitter.addListener('storage', storageChangeListener);
-    this.clientWS.on('close', () => {
-      syncEventEmitter.removeListener('session', sessionChangeListener);
-      syncEventEmitter.removeListener('storage', storageChangeListener);
+    this.raft.stateEmitter.on('state', (state: State) => {
+      if (state === 'Leader') {
+        this.sendCurrentStateToClient();
+        syncEventEmitter.addListener('session', sessionChangeListener);
+        syncEventEmitter.addListener('storage', storageChangeListener);
+      } else {
+        syncEventEmitter.removeListener('session', sessionChangeListener);
+        syncEventEmitter.removeListener('storage', storageChangeListener);
+      }
     });
-    this.clientWS.on('ping', () => this.onPing()); 
   }
 
   private onSessionChange(entry: SessionLogEntry) {
-    syncLog.info(`SyncEndpoint:onSessionChange: send to client entry ${JSON.stringify(entry)}`);
-    this.clientWS.send(JSON.stringify(entry, null, 2));
+    syncLog.info(`SyncEndpoint:onSessionChange: send command ${JSON.stringify(entry)}`);
+    this.raft.startCommand(entry);
   }
 
   private onStorageChange(entry: StorageLogEntry) {
-    syncLog.info(`SyncEndpoint:onStorageChange: send to client entry ${JSON.stringify(entry)}`);
-    this.clientWS.send(JSON.stringify(entry, null, 2));
+    syncLog.info(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
+    this.raft.startCommand(entry);
   }
 
   private sendCurrentStateToClient(): void {
-    syncLog.info(`New client connected. sendCurrentStateToClient`);
+    syncLog.info(`SendCurrentStateToClient`);
     this.sendSessionStorageSnapshotToClient();
     this.sendDataserviceStorageSnapshotToClient();
   }
@@ -69,10 +69,10 @@ export class SyncService {
       });
       syncLog.info(`send all sessions as array ${JSON.stringify(sessionData)}`);
       const sessionsLogEntry: SessionsLogEntry = { type: 'sessions', payload: sessionData };
-      this.clientWS.send(JSON.stringify(sessionsLogEntry));
+      this.raft.startCommand(sessionsLogEntry);
     });
   }
-  
+
   private sendDataserviceStorageSnapshotToClient(): void {
     syncLog.info(`sendDataserviceStorageSnapshotToClient`);
     const clusterManager = process.clusterManager;
@@ -81,12 +81,8 @@ export class SyncService {
       const action: StorageActionInit = { type: 'init', data: storage };
       const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
       syncLog.info(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
-      this.clientWS.send(JSON.stringify(storageLogEntry));
+      this.raft.startCommand(storageLogEntry);
     });
-  }
-  
-  private onPing(): void {
-    this.clientWS.pong();
   }
 }
 

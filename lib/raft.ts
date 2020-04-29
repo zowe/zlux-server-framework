@@ -22,6 +22,7 @@ import {
   isStorageActionDelete
 } from "./sync-types";
 const sessionStore = require('./sessionStore').sessionStore;
+import { EurekaInstanceConfig } from 'eureka-js-client';
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -29,9 +30,18 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   constructor(
     host: string,
     port: number,
-    secure: boolean
+    secure: boolean,
+    public readonly instanceId: string,
   ) {
     super(host, port, secure);
+  }
+  
+  static make(masterInstance: EurekaInstanceConfig): RaftPeer {
+      const host = masterInstance.hostName;
+      const secure = masterInstance.securePort['@enabled'];
+      const port = secure ? masterInstance.securePort.$ : masterInstance.port.$;
+      const instanceId = masterInstance.instanceId;
+      return new RaftPeer(host, port, secure, instanceId);
   }
 }
 
@@ -83,6 +93,7 @@ const minElectionTimeout = 150;
 const maxElectionTimeout = 300;
 
 export class Raft {
+  public readonly stateEmitter = new EventEmitter();
   private peers: RaftPeer[]; // RPC end points of all peers
   private me: number;  // this peer's index into peers[]
   private state: State = 'Follower'
@@ -144,7 +155,8 @@ export class Raft {
     const term = this.currentTerm;
     const peerCount = this.peers.length;
     this.print("attempting election at term %d", this.currentTerm)
-
+    this.emitState();
+    
     for (let server = 0; server < peerCount; server++) {
       if (server == this.me) {
         continue;
@@ -185,7 +197,12 @@ export class Raft {
     }
     this.print("nextIndex %s", JSON.stringify(this.nextIndex));
     this.print("matchIndex %s", JSON.stringify(this.matchIndex));
+    this.emitState();
     this.sendHeartbeat();
+  }
+  
+  private emitState(): void {
+    this.stateEmitter.emit('state', this.state);
   }
 
   sendHeartbeat(): void {
@@ -364,6 +381,7 @@ export class Raft {
     this.state = 'Follower';
     this.cancelCurrentElectionTimeoutAndReschedule();
     this.cancelHeartbeat();
+    this.emitState();
   }
 
   cancelHeartbeat(): void {
@@ -449,7 +467,7 @@ export class Raft {
         this.lastApplied = index
       }
     });
-    for (let server = 0; server < peers.length; server++) {
+    for (let server = 0; server < this.peers.length; server++) {
       if (server == this.me) {
         continue;
       }
@@ -548,9 +566,9 @@ export class Raft {
 
 
 export const peers: RaftPeer[] = [
-  new RaftPeer('localhost', 8544, true),
-  new RaftPeer('localhost', 8545, true),
-  new RaftPeer('localhost', 8546, true),
+  new RaftPeer('localhost', 8544, true, "localhost:zlux:8544"),
+  new RaftPeer('localhost', 8545, true, "localhost:zlux:8545"),
+  new RaftPeer('localhost', 8546, true, "localhost:zlux:8546"),
 ];
 
 export const raft = new Raft();
