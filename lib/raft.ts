@@ -10,6 +10,18 @@
 
 import { RaftRPCWebSocketDriver } from "./raft-rpc-ws";
 import { EventEmitter } from "events";
+import {
+  LogEntry,
+  isSessionLogEntry,
+  isSessionsLogEntry,
+  isStorageLogEntry,
+  isStorageActionInit,
+  isStorageActionSetAll,
+  isStorageActionSet,
+  isStorageActionDeleteAll,
+  isStorageActionDelete
+} from "./sync-types";
+const sessionStore = require('./sessionStore').sessionStore;
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -23,7 +35,7 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   }
 }
 
-export type Command = any;
+export type Command = LogEntry;
 export interface ApplyMsg {
   command: Command;
   commandValid: boolean;
@@ -334,6 +346,9 @@ export class Raft {
   }
 
   applyCommand(applyMsg: ApplyMsg): void {
+    if (!this.isLeader()) {
+      this.applyCommandToFollower(applyMsg);
+    }
     this.print("applied %s", JSON.stringify(applyMsg));
   }
 
@@ -441,7 +456,7 @@ export class Raft {
       setImmediate(async () => this.startAgreementForServer(server, index, agreementEmitter));
     }
   }
-  
+
   private async startAgreementForServer(server: number, index: number, agreementEmitter: EventEmitter): Promise<void> {
     const matchIndex = this.matchIndex[server];
     const nextIndex = this.nextIndex[server];
@@ -491,6 +506,34 @@ export class Raft {
     } else {
       this.print("wait because previous entry %d is not committed yet, commitIndex %d", index, lastCommitted);
       setTimeout(() => this.checkPreviousAgreement(index, resolve), 10);
+    }
+  }
+
+  private applyCommandToFollower(applyMsg: ApplyMsg): void {
+    this.print(`applyToFollower ${JSON.stringify(applyMsg)}`);
+    const entry: LogEntry = applyMsg.command;
+    if (isSessionLogEntry(entry)) {
+      const sessionData = entry.payload;
+      sessionStore.set(sessionData.sid, sessionData.session, () => { });
+    } else if (isSessionsLogEntry(entry)) {
+      for (const sessionData of entry.payload) {
+        sessionStore.set(sessionData.sid, sessionData.session, () => { });
+      }
+    } else if (isStorageLogEntry(entry)) {
+      const clusterManager = process.clusterManager;
+      if (isStorageActionInit(entry.payload)) {
+        for (const pluginId of Object.keys(entry.payload.data)) {
+          clusterManager.setStorageAll(pluginId, entry.payload[pluginId])
+        }
+      } else if (isStorageActionSetAll(entry.payload)) {
+        clusterManager.setStorageAll(entry.payload.data.pluginId, entry.payload.data.dict);
+      } else if (isStorageActionSet(entry.payload)) {
+        clusterManager.setStorageByKey(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
+      } else if (isStorageActionDeleteAll(entry.payload)) {
+        clusterManager.setStorageAll(entry.payload.data.pluginId, {});
+      } else if (isStorageActionDelete(entry.payload)) {
+        clusterManager.deleteStorageByKey(entry.payload.data.pluginId, entry.payload.data.key);
+      }
     }
   }
 
