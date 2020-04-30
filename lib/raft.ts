@@ -12,15 +12,15 @@ import { RaftRPCWebSocketDriver } from "./raft-rpc-ws";
 import { EventEmitter } from "events";
 import {
   SyncCommand,
-  isSessionLogEntry,
-  isSessionsLogEntry,
-  isStorageLogEntry,
+  isSessionSyncCommand,
+  isSessionsSyncCommand,
+  isStorageSyncCommand,
   isStorageActionInit,
   isStorageActionSetAll,
   isStorageActionSet,
   isStorageActionDeleteAll,
   isStorageActionDelete
-} from "./sync-types";
+} from "./raft-commands";
 const sessionStore = require('./sessionStore').sessionStore;
 import { EurekaInstanceConfig } from 'eureka-js-client';
 import { ApimlConnector } from "./apiml";
@@ -595,14 +595,14 @@ export class Raft {
   private applyCommandToFollower(applyMsg: ApplyMsg): void {
     this.print(`applyToFollower ${JSON.stringify(applyMsg)}`);
     const entry: SyncCommand = applyMsg.command;
-    if (isSessionLogEntry(entry)) {
+    if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
       sessionStore.set(sessionData.sid, sessionData.session, () => { });
-    } else if (isSessionsLogEntry(entry)) {
+    } else if (isSessionsSyncCommand(entry)) {
       for (const sessionData of entry.payload) {
         sessionStore.set(sessionData.sid, sessionData.session, () => { });
       }
-    } else if (isStorageLogEntry(entry)) {
+    } else if (isStorageSyncCommand(entry)) {
       const clusterManager = process.clusterManager;
       if (isStorageActionInit(entry.payload)) {
         for (const pluginId of Object.keys(entry.payload.data)) {

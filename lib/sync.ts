@@ -10,7 +10,7 @@
 
 import * as EventEmitter from 'events';
 import { KeyVal } from './clusterManager';
-import { SessionSyncCommand, StorageActionSetAll, StorageSyncCommand, StorageActionSet, StorageActionDeleteAll, StorageActionDelete } from './sync-types';
+import { SessionSyncCommand, StorageActionSetAll, StorageSyncCommand, StorageActionSet, StorageActionDeleteAll, StorageActionDelete } from './raft-commands';
 const zluxUtil = require('./util');
 const syncLog = zluxUtil.loggers.utilLogger;
 

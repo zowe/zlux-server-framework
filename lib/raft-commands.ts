@@ -82,15 +82,15 @@ export interface SessionData {
   session: any;
 }
 
-export function isSessionLogEntry(entry: SyncCommand): entry is SessionSyncCommand {
+export function isSessionSyncCommand(entry: SyncCommand): entry is SessionSyncCommand {
   return entry.type === 'session';
 }
 
-export function isSessionsLogEntry(entry: SyncCommand): entry is SessionsSyncCommand {
+export function isSessionsSyncCommand(entry: SyncCommand): entry is SessionsSyncCommand {
   return entry.type === 'sessions';
 }
 
-export function isStorageLogEntry(entry: SyncCommand): entry is StorageSyncCommand {
+export function isStorageSyncCommand(entry: SyncCommand): entry is StorageSyncCommand {
   return entry.type === 'storage';
 }
 

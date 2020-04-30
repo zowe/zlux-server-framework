@@ -16,7 +16,7 @@ import {
   SessionsSyncCommand,
   StorageActionInit,
   StorageSyncCommand,
-} from './sync-types';
+} from './raft-commands';
 import { Raft, State } from './raft';
 const zluxUtil = require('./util');
 const syncLog = zluxUtil.loggers.utilLogger;
