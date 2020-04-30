@@ -11,7 +11,7 @@
 import { RaftRPCWebSocketDriver } from "./raft-rpc-ws";
 import { EventEmitter } from "events";
 import {
-  LogEntry,
+  SyncCommand,
   isSessionLogEntry,
   isSessionsLogEntry,
   isStorageLogEntry,
@@ -45,7 +45,7 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   }
 }
 
-export type Command = LogEntry;
+export type Command = SyncCommand;
 export interface ApplyMsg {
   command: Command;
   commandValid: boolean;
@@ -529,7 +529,7 @@ export class Raft {
 
   private applyCommandToFollower(applyMsg: ApplyMsg): void {
     this.print(`applyToFollower ${JSON.stringify(applyMsg)}`);
-    const entry: LogEntry = applyMsg.command;
+    const entry: SyncCommand = applyMsg.command;
     if (isSessionLogEntry(entry)) {
       const sessionData = entry.payload;
       sessionStore.set(sessionData.sid, sessionData.session, () => { });

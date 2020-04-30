@@ -10,22 +10,22 @@
 
 import { StorageDict, KeyVal } from './clusterManager';
 
-export interface LogEntry {
+export interface SyncCommand {
   type: 'session' | 'sessions' | 'storage',
   payload: any;
 }
 
-export interface SessionLogEntry extends LogEntry {
+export interface SessionSyncCommand extends SyncCommand {
   type: 'session',
   payload: SessionData;
 }
 
-export interface SessionsLogEntry extends LogEntry {
+export interface SessionsSyncCommand extends SyncCommand {
   type: 'sessions',
   payload: SessionData[];
 }
 
-export interface StorageLogEntry extends LogEntry {
+export interface StorageSyncCommand extends SyncCommand {
   type: 'storage',
   payload: StorageAction;
 }
@@ -82,15 +82,15 @@ export interface SessionData {
   session: any;
 }
 
-export function isSessionLogEntry(entry: LogEntry): entry is SessionLogEntry {
+export function isSessionLogEntry(entry: SyncCommand): entry is SessionSyncCommand {
   return entry.type === 'session';
 }
 
-export function isSessionsLogEntry(entry: LogEntry): entry is SessionsLogEntry {
+export function isSessionsLogEntry(entry: SyncCommand): entry is SessionsSyncCommand {
   return entry.type === 'sessions';
 }
 
-export function isStorageLogEntry(entry: LogEntry): entry is StorageLogEntry {
+export function isStorageLogEntry(entry: SyncCommand): entry is StorageSyncCommand {
   return entry.type === 'storage';
 }
 

@@ -18,7 +18,7 @@ import {
   isStorageActionSet,
   isStorageActionSetAll,
   isStorageLogEntry,
-  LogEntry,
+  SyncCommand,
 } from './sync-types';
 import { EurekaInstanceConfig } from 'eureka-js-client';
 const sessionStore = require('./sessionStore').sessionStore;
@@ -78,7 +78,7 @@ export class SyncClient {
 
   private onMessage(data: Buffer): void {
     syncLog.info(`message ${data}`);
-    const entry: LogEntry = JSON.parse(data.toString());
+    const entry: SyncCommand = JSON.parse(data.toString());
     if (isSessionLogEntry(entry)) {
       const sessionData = entry.payload;
       sessionStore.set(sessionData.sid, sessionData.session, () => { });

@@ -12,10 +12,10 @@ const sessionStore = require('./sessionStore').sessionStore;
 import { syncEventEmitter } from './sync';
 import {
   SessionData,
-  SessionLogEntry,
-  SessionsLogEntry,
+  SessionSyncCommand,
+  SessionsSyncCommand,
   StorageActionInit,
-  StorageLogEntry,
+  StorageSyncCommand,
 } from './sync-types';
 import { Raft, State } from './raft';
 const zluxUtil = require('./util');
@@ -43,12 +43,12 @@ export class SyncService {
     });
   }
 
-  private onSessionChange(entry: SessionLogEntry) {
+  private onSessionChange(entry: SessionSyncCommand) {
     syncLog.info(`SyncEndpoint:onSessionChange: send command ${JSON.stringify(entry)}`);
     this.raft.startCommand(entry);
   }
 
-  private onStorageChange(entry: StorageLogEntry) {
+  private onStorageChange(entry: StorageSyncCommand) {
     syncLog.info(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
     this.raft.startCommand(entry);
   }
@@ -68,7 +68,7 @@ export class SyncService {
         sessionData.push({ sid, session });
       });
       syncLog.info(`send all sessions as array ${JSON.stringify(sessionData)}`);
-      const sessionsLogEntry: SessionsLogEntry = { type: 'sessions', payload: sessionData };
+      const sessionsLogEntry: SessionsSyncCommand = { type: 'sessions', payload: sessionData };
       this.raft.startCommand(sessionsLogEntry);
     });
   }
@@ -79,7 +79,7 @@ export class SyncService {
     clusterManager.getStorageCluster().then(storage => {
       syncLog.info(`[cluster storage: ${JSON.stringify(storage)}]`);
       const action: StorageActionInit = { type: 'init', data: storage };
-      const storageLogEntry: StorageLogEntry = { type: 'storage', payload: action };
+      const storageLogEntry: StorageSyncCommand = { type: 'storage', payload: action };
       syncLog.info(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
       this.raft.startCommand(storageLogEntry);
     });
