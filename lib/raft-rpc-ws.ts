@@ -118,7 +118,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
       const pendingRequest: PendingRequest = { message, resolve, reject };
       this.pendingRequests.set(seq, pendingRequest);
     });
-    raftLog.info(`send websocket message ${JSON.stringify(message)} to ${this.address}`);
+    raftLog.debug(`send websocket message ${JSON.stringify(message)} to ${this.address}`);
     this.ws.send(JSON.stringify(message));
     return promise;
   }
@@ -129,7 +129,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   }
 
   private onMessage(data: Buffer): void {
-    raftLog.info(`message ${data}`);
+    raftLog.debug(`message ${data}`);
     let message: WebSocketMessage;
     try {
       message = JSON.parse(data.toString());
@@ -145,11 +145,11 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     }
     this.pendingRequests.delete(seq);
     pendingRequest.resolve(message);
-    raftLog.info(`successfully resolve pending request with seq ${seq}`);
+    raftLog.debug(`successfully resolve pending request with seq ${seq}`);
   }
 
   private onClose(code: number, reason: string): void {
-    raftLog.info(`connection to ${this.address} closed ${code} ${reason}`);
+    raftLog.debug(`connection to ${this.address} closed ${code} ${reason}`);
     this.isConnected = false;
     this.ws = undefined;
     this.pendingRequests.forEach((request => {
@@ -159,7 +159,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   }
 
   private onError(ws: WebSocket, err: Error): void {
-    raftLog.info(`connection error ${JSON.stringify(err)}`);
+    raftLog.debug(`connection error ${JSON.stringify(err)}`);
   }
 
 }
@@ -195,10 +195,10 @@ export class RaftRPCWebSocketService {
     }
     this.log(`got message ${JSON.stringify(message)}`);
     if (isWebSocketRequestVoteArgsMessage(message)) {
-      raftLog.info(`got request vote message ${JSON.stringify(message)}`);
+      raftLog.debug(`got request vote message ${JSON.stringify(message)}`);
       this.processRequestVoteMessage(message);
     } else if (isWebSocketAppendEntriesArgsMessage(message)) {
-      raftLog.info(`got append entries message ${JSON.stringify(message)}`);
+      raftLog.debug(`got append entries message ${JSON.stringify(message)}`);
       this.processAppendEntriesMessage(message);
     }
 
@@ -228,6 +228,6 @@ export class RaftRPCWebSocketService {
   }
   
   private log(msg: string): void {
-    raftLog.info(`RaftRPCWebSocketService: ${msg}`);
+    raftLog.debug(`RaftRPCWebSocketService: ${msg}`);
   }
 }

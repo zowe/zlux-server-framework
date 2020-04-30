@@ -45,11 +45,11 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
     const instanceId = masterInstance.instanceId;
     return new RaftPeer(host, port, secure, instanceId, apiml);
   }
-  
+
   async takeOutOfService(): Promise<void> {
     return this.apimlClient.takeInstanceOutOfService(this.instanceId);
   }
-  
+
   async takeIntoService(): Promise<void> {
     return this.apimlClient.takeInstanceIntoService(this.instanceId);
   }
@@ -99,8 +99,8 @@ export interface RaftRPCDriver {
 
 export type State = 'Leader' | 'Follower' | 'Candidate';
 
-const minElectionTimeout = 150;
-const maxElectionTimeout = 300;
+const minElectionTimeout = 1000;
+const maxElectionTimeout = 2000;
 
 export class Raft {
   public readonly stateEmitter = new EventEmitter();
@@ -108,7 +108,8 @@ export class Raft {
   private me: number;  // this peer's index into peers[]
   private state: State = 'Follower'
   private readonly electionTimeout = Math.floor(Math.random() * (maxElectionTimeout - minElectionTimeout) + minElectionTimeout);
-  private debug = true
+  private debug = true;
+  private started = false;
 
   // persistent state
   private currentTerm: number = 0;
@@ -123,21 +124,24 @@ export class Raft {
   private nextIndex: number[] = [];  //  for each server, index of the next log entry to send to that server (initialized to leader last log index + 1)
   private matchIndex: number[] = []; // for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
   private electionTimeoutId: NodeJS.Timer;
-  private readonly heartbeatInterval: number = 50;
+  private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .75);
   private heartbeatTimeoutId: NodeJS.Timer;
 
+  static counter = 1;
 
   constructor() {
-
+    console.log(`raft created ${Raft.counter++}`);
   }
 
   start(peers: RaftPeer[], me: number): void {
-    raftLog.info(`starting peer ${me}`);
+    raftLog.info(`starting peer ${me} electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
     this.peers = peers;
     this.me = me;
     this.scheduleElectionOnTimeout();
+    this.started = true;
+    this.print(`peer ${me} started ${this.started}`);
   }
-  
+
   getPeers(): RaftPeer[] {
     return this.peers;
   }
@@ -148,6 +152,7 @@ export class Raft {
     }
     this.electionTimeoutId = setTimeout(() => {
       if (this.isLeader()) {
+        // this.scheduleElectionOnTimeout();
       } else {
         this.attemptElection();
       }
@@ -160,7 +165,10 @@ export class Raft {
   }
 
   attemptElection(): void {
-    this.state = 'Candidate';
+    if (this.state !== 'Candidate') {
+      this.state = 'Candidate';
+      this.emitState();
+    }
     this.currentTerm++;
     this.votedFor = this.me;
     let votes = 1;
@@ -168,10 +176,9 @@ export class Raft {
     const term = this.currentTerm;
     const peerCount = this.peers.length;
     this.print("attempting election at term %d", this.currentTerm)
-    this.emitState();
 
     for (let server = 0; server < peerCount; server++) {
-      if (server == this.me) {
+      if (server === this.me) {
         continue;
       }
       setImmediate(async () => {
@@ -193,9 +200,11 @@ export class Raft {
           this.print("got vote from %s but not enough votes yet to become Leader", peerAddress);
           return;
         }
-        this.print("got final vote from %s and became Leader of term %d", peerAddress, this.currentTerm);
-        done = true;
-        this.convertToLeader();
+        if (this.state === 'Candidate') {
+          this.print("got final vote from %s and became Leader of term %d", peerAddress, term);
+          done = true;
+          this.convertToLeader();
+        }
       });
     }
     this.scheduleElectionOnTimeout();
@@ -354,9 +363,9 @@ export class Raft {
       requestType = "appendentries";
     }
     this.ensureRequestTerm(args.term);
-    this.convertToFollower();
     this.print("got %s request from leader %d at term %d, my term %d, entries %s, prevLogIndex %d",
-      requestType, args.leaderId, args.term, this.currentTerm, JSON.stringify(args.entries), args.prevLogIndex)
+      requestType, args.leaderId, args.term, this.currentTerm, JSON.stringify(args.entries), args.prevLogIndex);
+    this.cancelCurrentElectionTimeoutAndReschedule();
     this.print("my log is %s", JSON.stringify(this.log))
     // 1. Reply false if term < currentTerm (§5.1)
     if (args.term < this.currentTerm) {
@@ -366,6 +375,7 @@ export class Raft {
         term: this.currentTerm,
       }
     }
+    this.convertToFollower();
     if (args.prevLogIndex >= 0) {
       // 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
       if (args.prevLogIndex >= this.log.length) {
@@ -428,10 +438,13 @@ export class Raft {
   }
 
   convertToFollower(): void {
-    this.state = 'Follower';
-    this.cancelCurrentElectionTimeoutAndReschedule();
-    this.cancelHeartbeat();
-    this.emitState();
+    if (this.state != 'Follower') {
+      this.print('convert to Follower');
+      this.state = 'Follower';
+      this.cancelCurrentElectionTimeoutAndReschedule();
+      this.cancelHeartbeat();
+      this.emitState();
+    }
   }
 
   cancelHeartbeat(): void {
@@ -447,7 +460,14 @@ export class Raft {
   }
 
   requestVote(args: RequestVoteArgs): RequestVoteReply {
-    this.print("got vote request from %d at term %d, my term is %d", args.candidateId, args.term, this.currentTerm)
+    this.print("got vote request from %d at term %d, my term is %d", args.candidateId, args.term, this.currentTerm);
+    if (!this.started) {
+      this.print("not started yet!, reply false");
+      return {
+        term: this.currentTerm,
+        voteGranted: false,
+      };
+    }
     if (args.term < this.currentTerm) {
       this.print("got vote request from %d at term %d", args.candidateId, args.term);
       return {
@@ -602,7 +622,7 @@ export class Raft {
       }
     }
   }
-  
+
   async takeIntoService(): Promise<void> {
     for (let server = 0; server < this.peers.length; server++) {
       if (server == this.me) {
@@ -612,7 +632,7 @@ export class Raft {
       }
     }
   }
-  
+
   async takeOutOfService(): Promise<void> {
     await this.peers[this.me].takeOutOfService();
   }
@@ -620,7 +640,7 @@ export class Raft {
 
   private print(...args: any[]): void {
     if (this.debug) {
-      console.log(...args);
+      raftLog.info(...args);
     }
   }
 

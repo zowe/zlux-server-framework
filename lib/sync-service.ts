@@ -47,43 +47,43 @@ export class SyncService {
   }
 
   private onSessionChange(entry: SessionSyncCommand) {
-    syncLog.info(`SyncEndpoint:onSessionChange: send command ${JSON.stringify(entry)}`);
+    syncLog.debug(`SyncEndpoint:onSessionChange: send command ${JSON.stringify(entry)}`);
     this.raft.startCommand(entry);
   }
 
   private onStorageChange(entry: StorageSyncCommand) {
-    syncLog.info(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
+    syncLog.debug(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
     this.raft.startCommand(entry);
   }
 
   private sendCurrentStateToClient(): void {
-    syncLog.info(`SendCurrentStateToClient`);
+    syncLog.debug(`SendCurrentStateToClient`);
     this.sendSessionStorageSnapshotToClient();
     this.sendDataserviceStorageSnapshotToClient();
   }
 
   private sendSessionStorageSnapshotToClient(): void {
-    syncLog.info(`sendSessionStorageSnapshotToClient`);
+    syncLog.debug(`sendSessionStorageSnapshotToClient`);
     sessionStore.all((err: Error | null, sessions: { [sid: string]: any }) => {
       const sessionData: SessionData[] = [];
       Object.keys(sessions).forEach(sid => {
         const session = sessions[sid];
         sessionData.push({ sid, session });
       });
-      syncLog.info(`send all sessions as array ${JSON.stringify(sessionData)}`);
+      syncLog.debug(`send all sessions as array ${JSON.stringify(sessionData)}`);
       const sessionsLogEntry: SessionsSyncCommand = { type: 'sessions', payload: sessionData };
       this.raft.startCommand(sessionsLogEntry);
     });
   }
 
   private sendDataserviceStorageSnapshotToClient(): void {
-    syncLog.info(`sendDataserviceStorageSnapshotToClient`);
+    syncLog.debug(`sendDataserviceStorageSnapshotToClient`);
     const clusterManager = process.clusterManager;
     clusterManager.getStorageCluster().then(storage => {
-      syncLog.info(`[cluster storage: ${JSON.stringify(storage)}]`);
+      syncLog.debug(`[cluster storage: ${JSON.stringify(storage)}]`);
       const action: StorageActionInit = { type: 'init', data: storage };
       const storageLogEntry: StorageSyncCommand = { type: 'storage', payload: action };
-      syncLog.info(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
+      syncLog.debug(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
       this.raft.startCommand(storageLogEntry);
     });
   }
