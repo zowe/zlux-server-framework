@@ -35,13 +35,13 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   ) {
     super(host, port, secure);
   }
-  
+
   static make(masterInstance: EurekaInstanceConfig): RaftPeer {
-      const host = masterInstance.hostName;
-      const secure = masterInstance.securePort['@enabled'];
-      const port = secure ? masterInstance.securePort.$ : masterInstance.port.$;
-      const instanceId = masterInstance.instanceId;
-      return new RaftPeer(host, port, secure, instanceId);
+    const host = masterInstance.hostName;
+    const secure = masterInstance.securePort['@enabled'];
+    const port = secure ? masterInstance.securePort.$ : masterInstance.port.$;
+    const instanceId = masterInstance.instanceId;
+    return new RaftPeer(host, port, secure, instanceId);
   }
 }
 
@@ -156,7 +156,7 @@ export class Raft {
     const peerCount = this.peers.length;
     this.print("attempting election at term %d", this.currentTerm)
     this.emitState();
-    
+
     for (let server = 0; server < peerCount; server++) {
       if (server == this.me) {
         continue;
@@ -200,7 +200,7 @@ export class Raft {
     this.emitState();
     this.sendHeartbeat();
   }
-  
+
   private emitState(): void {
     this.stateEmitter.emit('state', this.state);
   }
@@ -224,7 +224,9 @@ export class Raft {
             this.print("got unsuccessful heartbeat response from %d at term %d, decrease nextIndex", server, this.currentTerm);
           }
         } else if (ok && success) {
-          this.print("got successful heartbeat response from %d at term %d, update nextIndex", server, this.currentTerm);
+          this.print("got successful heartbeat response from %d at term %d, nextIndex = %d, matchIndex = %d, commitIndex = %d",
+            server, this.currentTerm, this.nextIndex[server], this.matchIndex[server], this.commitIndex)
+          this.checkIfCommitted();
         }
       });
     }
@@ -235,13 +237,41 @@ export class Raft {
     this.heartbeatTimeoutId = setTimeout(() => this.sendHeartbeat(), this.heartbeatInterval)
   }
 
+  checkIfCommitted(): void {
+    const minPeers = this.peers.length / 2;
+    const m = new Map<number, number>();
+    for (let mi = 0; mi < this.matchIndex.length; mi++) {
+      const matchIndex = this.matchIndex[mi];
+      if (matchIndex > this.commitIndex) {
+        if (m.has(matchIndex)) {
+          m[matchIndex]++;
+        } else {
+          m[matchIndex] = 1;
+        }
+      }
+    }
+    m.forEach((count, matchIndex) => {
+      if (matchIndex > this.commitIndex && count >= minPeers) {
+        this.commitIndex = matchIndex
+        this.print("checkIfComitted: adjust commitIndex to %d", this.commitIndex)
+        const applyMsg: ApplyMsg = {
+          commandValid: true,
+          commandIndex: this.commitIndex + 1,
+          command: this.log[this.commitIndex].command,
+        }
+        this.applyCommand(applyMsg);
+        this.lastApplied = this.commitIndex
+      }
+    });
+  }
+
   async callAppendEntries(server: number, currentTerm: number, kind: AppendEntriesKind): Promise<{ ok: boolean, success: boolean }> {
     const entries: RaftLogEntry[] = [];
     let last = this.log.length;
     if (kind == "appendentries") {
       last = this.commitIndex + 1;
     } else {
-      last = this.commitIndex;
+      last = last - 1;
     }
     let start = this.nextIndex[server];
     if (start < 0) {
@@ -265,7 +295,14 @@ export class Raft {
     };
     const peer = this.peers[server];
     return peer.sendAppendEntries(args)
-      .then(reply => ({ ok: true, success: reply.success }))
+      .then(reply => {
+        this.ensureResponseTerm(reply.term);
+        if (reply.success) {
+          this.nextIndex[server] = last + 1;
+          this.matchIndex[server] = last;
+        }
+        return { ok: true, success: reply.success };
+      })
       .catch(() => ({ ok: false, success: false }));
   }
 
@@ -307,7 +344,7 @@ export class Raft {
     this.convertToFollower();
     this.print("got %s request from leader %d at term %d, my term %d, entries %s, prevLogIndex %d",
       requestType, args.leaderId, args.term, this.currentTerm, JSON.stringify(args.entries), args.prevLogIndex)
-
+    this.print("my log is %s", JSON.stringify(this.log))
     // 1. Reply false if term < currentTerm (§5.1)
     if (args.term < this.currentTerm) {
       this.print("1. Reply false if term < currentTerm (§5.1)")
@@ -493,8 +530,6 @@ export class Raft {
     } else {
       if (success) {
         this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
-        this.matchIndex[server] = index;
-        this.nextIndex[server] = index + 1;
         agreementEmitter.emit('done');
       } else {
         this.print("agreement for entry [%d]=%s for server %d at term %d - failed, try previous entry", index, JSON.stringify(this.log[index]), server, this.currentTerm)
