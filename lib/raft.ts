@@ -127,10 +127,7 @@ export class Raft {
   private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .75);
   private heartbeatTimeoutId: NodeJS.Timer;
 
-  static counter = 1;
-
   constructor() {
-    console.log(`raft created ${Raft.counter++}`);
   }
 
   start(peers: RaftPeer[], me: number): void {
