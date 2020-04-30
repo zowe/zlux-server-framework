@@ -23,6 +23,7 @@ import {
 } from "./sync-types";
 const sessionStore = require('./sessionStore').sessionStore;
 import { EurekaInstanceConfig } from 'eureka-js-client';
+import { ApimlConnector } from "./apiml";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -32,16 +33,25 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
     port: number,
     secure: boolean,
     public readonly instanceId: string,
+    private apimlClient: ApimlConnector,
   ) {
     super(host, port, secure);
   }
 
-  static make(masterInstance: EurekaInstanceConfig): RaftPeer {
+  static make(masterInstance: EurekaInstanceConfig, apiml: ApimlConnector): RaftPeer {
     const host = masterInstance.hostName;
     const secure = masterInstance.securePort['@enabled'];
     const port = secure ? masterInstance.securePort.$ : masterInstance.port.$;
     const instanceId = masterInstance.instanceId;
-    return new RaftPeer(host, port, secure, instanceId);
+    return new RaftPeer(host, port, secure, instanceId, apiml);
+  }
+  
+  async takeOutOfService(): Promise<void> {
+    return this.apimlClient.takeInstanceOutOfService(this.instanceId);
+  }
+  
+  async takeIntoService(): Promise<void> {
+    return this.apimlClient.takeInstanceIntoService(this.instanceId);
   }
 }
 
@@ -127,6 +137,10 @@ export class Raft {
     this.me = me;
     this.scheduleElectionOnTimeout();
   }
+  
+  getPeers(): RaftPeer[] {
+    return this.peers;
+  }
 
   private scheduleElectionOnTimeout(): void {
     if (this.isLeader()) {
@@ -134,7 +148,6 @@ export class Raft {
     }
     this.electionTimeoutId = setTimeout(() => {
       if (this.isLeader()) {
-        // this.scheduleElectionOnTimeout();
       } else {
         this.attemptElection();
       }
@@ -589,6 +602,20 @@ export class Raft {
       }
     }
   }
+  
+  async takeIntoService(): Promise<void> {
+    for (let server = 0; server < this.peers.length; server++) {
+      if (server == this.me) {
+        await this.peers[server].takeIntoService();
+      } else {
+        await this.peers[server].takeOutOfService();
+      }
+    }
+  }
+  
+  async takeOutOfService(): Promise<void> {
+    await this.peers[this.me].takeOutOfService();
+  }
 
 
   private print(...args: any[]): void {
@@ -598,13 +625,6 @@ export class Raft {
   }
 
 }
-
-
-export const peers: RaftPeer[] = [
-  new RaftPeer('localhost', 8544, true, "localhost:zlux:8544"),
-  new RaftPeer('localhost', 8545, true, "localhost:zlux:8545"),
-  new RaftPeer('localhost', 8546, true, "localhost:zlux:8546"),
-];
 
 export const raft = new Raft();
 

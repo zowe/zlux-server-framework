@@ -33,12 +33,15 @@ export class SyncService {
     const storageChangeListener = this.onStorageChange.bind(this);
     this.raft.stateEmitter.on('state', (state: State) => {
       if (state === 'Leader') {
-        this.sendCurrentStateToClient();
-        syncEventEmitter.addListener('session', sessionChangeListener);
-        syncEventEmitter.addListener('storage', storageChangeListener);
+        this.raft.takeIntoService().then(() => {
+          this.sendCurrentStateToClient();
+          syncEventEmitter.addListener('session', sessionChangeListener);
+          syncEventEmitter.addListener('storage', storageChangeListener);
+        });
       } else {
         syncEventEmitter.removeListener('session', sessionChangeListener);
         syncEventEmitter.removeListener('storage', storageChangeListener);
+        this.raft.takeOutOfService().then(() => {});
       }
     });
   }
