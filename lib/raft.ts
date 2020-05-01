@@ -271,15 +271,18 @@ export class Raft {
     }
     m.forEach((count, matchIndex) => {
       if (matchIndex > this.commitIndex && count >= minPeers) {
-        this.commitIndex = matchIndex
-        this.print("checkIfComitted: adjust commitIndex to %d", this.commitIndex)
-        const applyMsg: ApplyMsg = {
-          commandValid: true,
-          commandIndex: this.commitIndex + 1,
-          command: this.log[this.commitIndex].command,
+        for (; this.commitIndex < matchIndex; ) {
+          this.commitIndex++;
+          this.print("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.log[this.commitIndex]));
+          const applyMsg: ApplyMsg = {
+            commandValid: true,
+            commandIndex: this.commitIndex + 1,
+            command: this.log[this.commitIndex].command,
+          }
+          this.applyCommand(applyMsg);
+          this.lastApplied = this.commitIndex;
         }
-        this.applyCommand(applyMsg);
-        this.lastApplied = this.commitIndex
+        this.print("checkIfCommitted: adjust commitIndex to %d", matchIndex);
       }
     });
   }
@@ -304,6 +307,7 @@ export class Raft {
     if (prevLogIndex >= 0) {
       prevLogTerm = this.log[prevLogIndex].term;
     }
+    this.print("CallAppendEntries %s for follower %d entries %s", kind, server, JSON.stringify(entries));
     const args: AppendEntriesArgs = {
       leaderId: this.me,
       term: this.currentTerm,
@@ -316,10 +320,12 @@ export class Raft {
     return peer.sendAppendEntries(args)
       .then(reply => {
         this.ensureResponseTerm(reply.term);
-        if (reply.success) {
+        if (reply.success && entries.length > 0) {
           this.nextIndex[server] = last + 1;
           this.matchIndex[server] = last;
         }
+        this.print("successfully appended entries to server %d nextIndex %s matchIndex %s",
+          server, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
         return { ok: true, success: reply.success };
       })
       .catch(() => ({ ok: false, success: false }));
@@ -514,7 +520,11 @@ export class Raft {
   }
 
   private async startAgreement(index: number): Promise<void> {
-    await this.waitForPreviousAgreement(index - 1);
+    const alreadyCommitted = await this.waitForPreviousAgreement(index - 1);
+    if (alreadyCommitted) {
+      this.print("entry %d already committed", index);
+      return;
+    }
     this.print("starts agreement on entry %d, nextIndex %s, matchIndex %s", index, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
     const minPeers = this.peers.length / 2;
     let donePeers = 0;
@@ -573,19 +583,21 @@ export class Raft {
     }
   }
 
-  private async waitForPreviousAgreement(index: number): Promise<void> {
+  private async waitForPreviousAgreement(index: number): Promise<boolean> {
     if (index < 0) {
       this.print("don't need to wait for agreement because no entries yet committed")
-      return;
+      return false;
     }
-    return new Promise<void>((resolve, reject) => this.checkPreviousAgreement(index, resolve));
+    return new Promise<boolean>((resolve, reject) => this.checkPreviousAgreement(index, resolve));
   }
 
-  private checkPreviousAgreement(index: number, resolve: () => void): void {
+  private checkPreviousAgreement(index: number, resolve: (alreadyAgreed: boolean) => void): void {
     const lastCommitted = this.commitIndex;
-    if (index == lastCommitted) {
+    if (index < lastCommitted) {
+      resolve(true);
+    } else if (index == lastCommitted) {
       this.print("entry %d is committed, ready to start agreement on next entry", index)
-      resolve();
+      resolve(false);
     } else {
       this.print("wait because previous entry %d is not committed yet, commitIndex %d", index, lastCommitted);
       setTimeout(() => this.checkPreviousAgreement(index, resolve), 10);
