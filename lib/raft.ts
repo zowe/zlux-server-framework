@@ -232,10 +232,11 @@ export class Raft {
         continue;
       }
       setImmediate(async () => {
-        this.print("sends heartbeat to %d at term %d", server, this.currentTerm);
         if (!this.isLeader()) {
+          this.print("cancel heartbeat to %d at term %d because not leader anymore", server, this.currentTerm);
           return;
         }
+        this.print("sends heartbeat to %d at term %d", server, this.currentTerm);
         const { ok, success } = await this.callAppendEntries(server, this.currentTerm, 'heartbeat');
         if (ok && !success) {
           if (this.isLeader()) {
@@ -271,7 +272,7 @@ export class Raft {
     }
     m.forEach((count, matchIndex) => {
       if (matchIndex > this.commitIndex && count >= minPeers) {
-        for (; this.commitIndex < matchIndex; ) {
+        for (; this.commitIndex < matchIndex;) {
           this.commitIndex++;
           this.print("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.log[this.commitIndex]));
           const applyMsg: ApplyMsg = {
@@ -307,7 +308,8 @@ export class Raft {
     if (prevLogIndex >= 0) {
       prevLogTerm = this.log[prevLogIndex].term;
     }
-    this.print("CallAppendEntries %s for follower %d entries %s", kind, server, JSON.stringify(entries));
+    this.print("CallAppendEntries %s for follower %d entries %s, my log %s",
+      kind, server, JSON.stringify(entries), JSON.stringify(this.log));
     const args: AppendEntriesArgs = {
       leaderId: this.me,
       term: this.currentTerm,
@@ -333,7 +335,7 @@ export class Raft {
 
   async callRequestVote(server: number, term: number): Promise<boolean> {
     const peer = this.peers[server];
-    let lastTerm = 0;
+    let lastTerm = -1;
     const lastCommitted = this.commitIndex;
     if (lastCommitted >= 0) {
       lastTerm = this.log[lastCommitted].term;
@@ -391,8 +393,10 @@ export class Raft {
       // 3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
       const prevLogTerm = this.log[args.prevLogIndex].term;
       if (prevLogTerm != args.prevLogTerm) {
-        this.print("3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)")
+        this.print("3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)");
+        this.print("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice[args.prevLogIndex]));
         this.log = this.log.slice(0, args.prevLogIndex);
+        this.print("remaining entries %s", JSON.stringify(this.log));
       }
     }
     if (args.entries.length > 0) {
@@ -463,7 +467,8 @@ export class Raft {
   }
 
   requestVote(args: RequestVoteArgs): RequestVoteReply {
-    this.print("got vote request from %d at term %d, my term is %d", args.candidateId, args.term, this.currentTerm);
+    this.print("got vote request from %d at term %d, lastLogIndex %d, my term is %d, my commit index %d",
+      args.candidateId, args.term, args.lastLogIndex, this.currentTerm, this.commitIndex);
     if (!this.started) {
       this.print("not started yet!, reply false");
       return {
@@ -479,9 +484,19 @@ export class Raft {
       };
     }
     if (args.term > this.currentTerm) {
+      this.print("new term observed, I haven't voted at term %d", args.term);
       this.votedFor = -1;
     }
-    if (this.votedFor == -1 || this.votedFor == this.me && args.lastLogIndex >= this.commitIndex && args.lastLogTerm >= this.currentTerm) {
+    this.print("vote args %s", JSON.stringify(args));
+    if (this.votedFor != -1 && this.votedFor != this.me) {
+      this.print("don't grant vote because already voted at term %d", this.currentTerm);
+      return {
+        voteGranted: false,
+        term: this.currentTerm
+      };
+    }
+    if (this.checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args)) {
+      this.print("grant vote to %d because its log is up to date at least as mine log", args.candidateId);
       this.votedFor = args.candidateId;
       this.currentTerm = args.term;
       return {
@@ -489,10 +504,21 @@ export class Raft {
         voteGranted: true
       };
     }
+    this.print("don't grant vote to %d because candidate's log is stale", args.candidateId)
+    this.ensureRequestTerm(args.term)
     return {
       term: this.currentTerm,
       voteGranted: false,
     };
+  }
+
+  private checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args: RequestVoteArgs): boolean {
+    const myLastLogIndex = this.commitIndex;
+    let myLastLogTerm = -1;
+    if (myLastLogIndex >= 0) {
+      myLastLogTerm = this.log[myLastLogIndex].term;
+    }
+    return args.lastLogIndex >= myLastLogIndex && args.lastLogTerm >= myLastLogTerm;
   }
 
   startCommand(command: Command): { index: number, term: number, isLeader: boolean } {
@@ -523,6 +549,10 @@ export class Raft {
     const alreadyCommitted = await this.waitForPreviousAgreement(index - 1);
     if (alreadyCommitted) {
       this.print("entry %d already committed", index);
+      return;
+    }
+    if (!this.isLeader()) {
+      this.print("not leader anymore cancel agreement on entry %d", index);
       return;
     }
     this.print("starts agreement on entry %d, nextIndex %s, matchIndex %s", index, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
@@ -593,6 +623,10 @@ export class Raft {
 
   private checkPreviousAgreement(index: number, resolve: (alreadyAgreed: boolean) => void): void {
     const lastCommitted = this.commitIndex;
+    if (!this.isLeader()) {
+      resolve(false);
+      return;
+    }
     if (index < lastCommitted) {
       resolve(true);
     } else if (index == lastCommitted) {
