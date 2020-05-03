@@ -300,12 +300,12 @@ export class Raft {
     if (start < 0) {
       start = 0;
     }
-    for (let ni = start; ni <= last; ni++) {
+    for (let ni = start; ni <= last && ni < this.log.length; ni++) {
       entries.push(this.log[ni]);
     }
     let prevLogIndex = this.nextIndex[server] - 1;
     let prevLogTerm = -1;
-    if (prevLogIndex >= 0) {
+    if (prevLogIndex >= 0 && prevLogIndex < this.log.length) {
       prevLogTerm = this.log[prevLogIndex].term;
     }
     this.print("CallAppendEntries %s for follower %d entries %s, my log %s",
@@ -368,9 +368,8 @@ export class Raft {
       requestType = "appendentries";
     }
     this.ensureRequestTerm(args.term);
-    this.print("got %s request from leader %d at term %d, my term %d, entries %s, prevLogIndex %d",
-      requestType, args.leaderId, args.term, this.currentTerm, JSON.stringify(args.entries), args.prevLogIndex);
-    this.cancelCurrentElectionTimeoutAndReschedule();
+    this.print("got %s request from leader %d at term %d, my term %d, prevLogIndex %d, entries %s",
+      requestType, args.leaderId, args.term, this.currentTerm, args.prevLogIndex, JSON.stringify(args.entries));
     this.print("my log is %s", JSON.stringify(this.log))
     // 1. Reply false if term < currentTerm (§5.1)
     if (args.term < this.currentTerm) {
@@ -381,6 +380,7 @@ export class Raft {
       }
     }
     this.convertToFollower();
+    this.cancelCurrentElectionTimeoutAndReschedule();
     if (args.prevLogIndex >= 0) {
       // 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
       if (args.prevLogIndex >= this.log.length) {
@@ -397,17 +397,29 @@ export class Raft {
         this.print("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice[args.prevLogIndex]));
         this.log = this.log.slice(0, args.prevLogIndex);
         this.print("remaining entries %s", JSON.stringify(this.log));
+        this.print("reply false");
+        return {
+          success: false,
+          term: this.currentTerm,
+        }
       }
     }
+    this.print("leader commit %d my commit %d", args.leaderCommit, this.commitIndex);
     if (args.entries.length > 0) {
       // 4. Append any new entries not already in the log
-      this.print("4. Append any new entries not already in the log: %s", JSON.stringify(args.entries));
+      const lastLogIndex = this.log.length - 1;
+      if (args.prevLogIndex >= 0 && args.prevLogIndex < lastLogIndex) {
+        this.log = this.log.slice(0, args.prevLogIndex + 1);
+        this.print("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.log[lastLogIndex]));
+      }
+      this.print("4. Append any new entries not already in the log at index %d: %s", this.log.length, JSON.stringify(args.entries));
       this.log = this.log.concat(args.entries);
     }
     // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
     const lastNewEntryIndex = this.log.length - 1;
     if (args.leaderCommit > this.commitIndex) {
-      this.print("5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry) = %d", this.commitIndex);
+      this.print("5. If leaderCommit(%d) > commitIndex(%d), set commitIndex = min(leaderCommit, index of last new entry) = %d",
+        args.leaderCommit, this.commitIndex, Math.min(args.leaderCommit, lastNewEntryIndex));
       this.commitIndex = Math.min(args.leaderCommit, lastNewEntryIndex);
     }
 
