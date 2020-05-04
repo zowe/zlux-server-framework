@@ -335,17 +335,18 @@ export class Raft {
 
   async callRequestVote(server: number, term: number): Promise<boolean> {
     const peer = this.peers[server];
-    let lastTerm = -1;
-    const lastCommitted = this.commitIndex;
-    if (lastCommitted >= 0) {
-      lastTerm = this.log[lastCommitted].term;
+    let lastLogTerm = -1;
+    const lastLogIndex = this.log.length - 1;
+    if (lastLogIndex >= 0) {
+      lastLogTerm = this.log[lastLogIndex].term;
     }
     const requestVoteArgs: RequestVoteArgs = {
       candidateId: this.me,
       term: term,
-      lastLogIndex: lastCommitted,
-      lastLogTerm: lastTerm,
+      lastLogIndex: lastLogIndex,
+      lastLogTerm: lastLogTerm,
     }
+    this.print("CallRequestVote: my log %s", JSON.stringify(this.log));
     return peer.sendRequestVote(requestVoteArgs)
       .then(reply => {
         this.ensureResponseTerm(reply.term);
@@ -488,6 +489,7 @@ export class Raft {
         voteGranted: false,
       };
     }
+    this.print("my log %s", JSON.stringify(this.log));
     if (args.term < this.currentTerm) {
       this.print("got vote request from %d at term %d", args.candidateId, args.term);
       return {
@@ -525,7 +527,7 @@ export class Raft {
   }
 
   private checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args: RequestVoteArgs): boolean {
-    const myLastLogIndex = this.commitIndex;
+    const myLastLogIndex = this.log.length - 1;
     let myLastLogTerm = -1;
     if (myLastLogIndex >= 0) {
       myLastLogTerm = this.log[myLastLogIndex].term;
