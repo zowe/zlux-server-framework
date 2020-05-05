@@ -113,7 +113,7 @@ export class FilePersister implements Persister {
     try {
       fs.writeFileSync(this.filename, data, 'utf-8');
     } catch (e) {
-      raftLog.error(`unable to save raft persistent state: ${e}`, JSON.stringify(e));
+      raftLog.warn(`unable to save raft persistent state: ${e}`, JSON.stringify(e));
     }
   }
 
@@ -287,6 +287,9 @@ export class Raft {
         if (ok && !success) {
           if (this.isLeader()) {
             this.nextIndex[server]--;
+            if ((this.nextIndex[server]) < 0) {
+              this.nextIndex[server] = 0;
+            }
             this.print("got unsuccessful heartbeat response from %d at term %d, decrease nextIndex", server, this.currentTerm);
           }
         } else if (ok && success) {
@@ -318,8 +321,8 @@ export class Raft {
     }
     m.forEach((count, matchIndex) => {
       if (matchIndex > this.commitIndex && count >= minPeers) {
-        for (; this.commitIndex < matchIndex;) {
-          this.commitIndex++;
+        for (let i = this.commitIndex + 1; i <= matchIndex; i++) {
+          this.commitIndex = i;
           this.print("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.log[this.commitIndex]));
           const applyMsg: ApplyMsg = {
             commandValid: true,
@@ -455,9 +458,13 @@ export class Raft {
     if (args.entries.length > 0) {
       // 4. Append any new entries not already in the log
       const lastLogIndex = this.log.length - 1;
-      if (args.prevLogIndex >= 0 && args.prevLogIndex < lastLogIndex) {
+      if (args.prevLogIndex < lastLogIndex) {
         this.log = this.log.slice(0, args.prevLogIndex + 1);
-        this.print("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.log[lastLogIndex]));
+        if (args.prevLogIndex >= 0) {
+          this.print("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.log[lastLogIndex]));
+        } else {
+          this.print("truncate log: make long empty");
+        }
       }
       this.print("4. Append any new entries not already in the log at index %d: %s", this.log.length, JSON.stringify(args.entries));
       this.log = this.log.concat(args.entries);
@@ -590,7 +597,10 @@ export class Raft {
     if (myLastLogIndex >= 0) {
       myLastLogTerm = this.log[myLastLogIndex].term;
     }
-    return args.lastLogIndex >= myLastLogIndex && args.lastLogTerm >= myLastLogTerm;
+    if (myLastLogTerm == args.lastLogTerm) {
+      return args.lastLogIndex >= myLastLogIndex;
+    }
+    return args.lastLogTerm >= myLastLogTerm
   }
 
   startCommand(command: Command): { index: number, term: number, isLeader: boolean } {
@@ -669,7 +679,11 @@ export class Raft {
     }
     const { ok, success } = await this.callAppendEntries(server, currentTerm, 'appendentries');
     if (!ok) {
-      this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
+      if (index >= this.log.length) {
+        this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, "(removed)", server, this.currentTerm)
+      } else {
+        this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
+      }
     } else {
       if (success) {
         this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)

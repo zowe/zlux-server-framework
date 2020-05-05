@@ -134,13 +134,13 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     try {
       message = JSON.parse(data.toString());
     } catch (e) {
-      raftLog.error(`ignore invalid message`);
+      raftLog.warn(`ignore invalid message`);
       return;
     }
     const seq = message.seq;
     const pendingRequest = this.pendingRequests.get(seq);
     if (!pendingRequest) {
-      raftLog.error(`no request found with seq ${seq}, ignore it`);
+      raftLog.warn(`no request found with seq ${seq}, ignore it`);
       return;
     }
     this.pendingRequests.delete(seq);
