@@ -806,7 +806,7 @@ export class Raft {
     return (request: Request, response: Response, next: NextFunction) => {
       // console.log(`raft ${request.method} ${request.path}`);
       if (this.started) {
-        if (!this.isLeader()) {
+        if (!this.isLeader() && !request.path.startsWith('/raft')) {
           if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
             const leader = this.peers[this.leaderId];
             response.redirect(`${leader.baseAddress}${request.path}`);
