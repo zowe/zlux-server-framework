@@ -206,7 +206,7 @@ export class RaftRPCWebSocketService {
   private processAppendEntriesMessage(message: WebSocketAppendEntriesArgsMessage): void {
     const seq = message.seq;
     const args = message.message;
-    const reply = this.raft.appendEntries(args);
+    const reply = this.raft.appendEntriesAndWritePersistentState(args);
     const replyMessage: WebSocketAppendEntriesReplyMessage = {
       type: 'AppendEntriesReply',
       seq,
@@ -218,7 +218,7 @@ export class RaftRPCWebSocketService {
   private processRequestVoteMessage(message: WebSocketRequestVoteArgsMessage): void {
     const seq = message.seq;
     const args = message.message;
-    const reply = this.raft.requestVote(args);
+    const reply = this.raft.requestVoteAndWritePersistentState(args);
     const replyMessage: WebSocketRequestVoteReplyMessage = {
       type: 'RequestVoteReply',
       seq,

@@ -24,6 +24,8 @@ import {
 const sessionStore = require('./sessionStore').sessionStore;
 import { EurekaInstanceConfig } from 'eureka-js-client';
 import { ApimlConnector } from "./apiml";
+import * as fs from 'fs';
+import * as path from 'path';
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -97,6 +99,47 @@ export interface RaftRPCDriver {
   sendAppendEntries: (args: AppendEntriesArgs) => Promise<AppendEntriesReply>;
 }
 
+export interface Persister {
+  saveData(data: string): void;
+  readData(): string;
+}
+
+export class FilePersister implements Persister {
+  constructor(private filename: string) {
+    raftLog.debug(`raft state file: ${filename}`);
+  }
+
+  saveData(data: string): void {
+    try {
+      fs.writeFileSync(this.filename, data, 'utf-8');
+    } catch (e) {
+      raftLog.error(`unable to save raft persistent state: ${e}`, JSON.stringify(e));
+    }
+  }
+
+  readData(): string | undefined {
+    try {
+      const buffer = fs.readFileSync(this.filename);
+      return buffer.toString();
+    } catch (e) {
+      raftLog.warn(`unable to read raft persistent state: ${e}`, JSON.stringify(e));
+    }
+  }
+
+}
+
+export class DummyPersister implements Persister {
+  constructor() { }
+
+  saveData(data: string): void {
+  }
+
+  readData(): string | undefined {
+    return;
+  }
+
+}
+
 export type State = 'Leader' | 'Follower' | 'Candidate';
 
 const minElectionTimeout = 1000;
@@ -126,6 +169,8 @@ export class Raft {
   private electionTimeoutId: NodeJS.Timer;
   private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .75);
   private heartbeatTimeoutId: NodeJS.Timer;
+  private readonly raftData = path.join(path.dirname(process.env.ZLUX_LOG_PATH!), 'raft.data');
+  private persister: Persister = new FilePersister(this.raftData); // new DummyPersister();
 
   constructor() {
   }
@@ -134,9 +179,10 @@ export class Raft {
     raftLog.info(`starting peer ${me} electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
     this.peers = peers;
     this.me = me;
+    this.readPersistentState(this.persister.readData());
     this.scheduleElectionOnTimeout();
     this.started = true;
-    this.print(`peer ${me} started ${this.started}`);
+    this.print(`peer ${me} started ${this.started} log: ${JSON.stringify(this.log)}`);
   }
 
   getPeers(): RaftPeer[] {
@@ -442,6 +488,12 @@ export class Raft {
     };
   }
 
+  appendEntriesAndWritePersistentState(args: AppendEntriesArgs): AppendEntriesReply {
+    const reply = this.appendEntries(args);
+    this.writePersistentState("after appendEntries");
+    return reply;
+  }
+
   applyCommand(applyMsg: ApplyMsg): void {
     if (!this.isLeader()) {
       this.applyCommandToFollower(applyMsg);
@@ -526,6 +578,12 @@ export class Raft {
     };
   }
 
+  requestVoteAndWritePersistentState(args: RequestVoteArgs): RequestVoteReply {
+    const reply = this.requestVote(args);
+    this.writePersistentState("after requestVote");
+    return reply;
+  }
+
   private checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args: RequestVoteArgs): boolean {
     const myLastLogIndex = this.log.length - 1;
     let myLastLogTerm = -1;
@@ -543,6 +601,7 @@ export class Raft {
       // If command received from client: append entry to local log,
       // respond after entry applied to state machine (§5.3)
       index = this.appendLogEntry(command);
+      this.writePersistentState("after new command added into log");
       this.print("got command %s, would appear at index %d", JSON.stringify(command), index);
       setImmediate(async () => this.startAgreement(index));
     }
@@ -677,6 +736,33 @@ export class Raft {
       } else if (isStorageActionDelete(entry.payload)) {
         clusterManager.deleteStorageByKey(entry.payload.data.pluginId, entry.payload.data.key);
       }
+    }
+  }
+
+  private writePersistentState(site: string): void {
+    this.print("save persistent state %s", site)
+    const data = JSON.stringify({
+      currentTerm: this.currentTerm,
+      votedFor: this.votedFor,
+      log: this.log,
+    });
+    this.persister.saveData(data);
+  }
+
+  private readPersistentState(data: string | undefined): void {
+    if (!data || data.length < 1) {
+      return;
+    }
+    this.print("read persistent state");
+    try {
+      const { votedFor, currentTerm, log } = JSON.parse(data);
+      this.currentTerm = currentTerm;
+      this.votedFor = votedFor;
+      this.log = log;
+      this.print("state: term %d, votedFor %d, log %s",
+        this.currentTerm, this.votedFor, JSON.stringify(this.log));
+    } catch (e) {
+      this.print("unable to decode state: %s", JSON.stringify(e));
     }
   }
 
