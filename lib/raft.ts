@@ -26,6 +26,8 @@ import { EurekaInstanceConfig } from 'eureka-js-client';
 import { ApimlConnector } from "./apiml";
 import * as fs from 'fs';
 import * as path from 'path';
+import { Request, Response } from "express";
+import { NextFunction } from "connect";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -54,6 +56,10 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
 
   async takeIntoService(): Promise<void> {
     return this.apimlClient.takeInstanceIntoService(this.instanceId);
+  }
+
+  get baseAddress(): string {
+    return `${this.secure ? 'https' : 'https'}://${this.host}:${this.port}`;
   }
 }
 
@@ -171,6 +177,7 @@ export class Raft {
   private heartbeatTimeoutId: NodeJS.Timer;
   private readonly raftData = path.join(path.dirname(process.env.ZLUX_LOG_PATH!), 'raft.data');
   private persister: Persister = new FilePersister(this.raftData); // new DummyPersister();
+  private leaderId: number = -1; // last observed leader id
 
   constructor() {
   }
@@ -429,6 +436,7 @@ export class Raft {
         term: this.currentTerm,
       }
     }
+    this.leaderId = args.leaderId;
     this.convertToFollower();
     this.cancelCurrentElectionTimeoutAndReschedule();
     if (args.prevLogIndex >= 0) {
@@ -792,6 +800,22 @@ export class Raft {
 
   async takeOutOfService(): Promise<void> {
     await this.peers[this.me].takeOutOfService();
+  }
+
+  middleware() {
+    return (request: Request, response: Response, next: NextFunction) => {
+      // console.log(`raft ${request.method} ${request.path}`);
+      if (this.started) {
+        if (!this.isLeader()) {
+          if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
+            const leader = this.peers[this.leaderId];
+            response.redirect(`${leader.baseAddress}${request.path}`);
+            return;
+          }
+        }
+      }
+      next();
+    }
   }
 
 
