@@ -34,7 +34,6 @@ export class SyncService {
     this.raft.stateEmitter.on('state', (state: State) => {
       if (state === 'Leader') {
         this.raft.takeIntoService().then(() => {
-          this.sendCurrentStateToClient();
           syncEventEmitter.addListener('session', sessionChangeListener);
           syncEventEmitter.addListener('storage', storageChangeListener);
         });
@@ -52,7 +51,7 @@ export class SyncService {
   }
 
   private onStorageChange(entry: StorageSyncCommand) {
-    syncLog.debug(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
+    syncLog.info(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
     this.raft.startCommand(entry);
   }
 
