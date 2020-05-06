@@ -176,7 +176,7 @@ export class Raft {
   private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .75);
   private heartbeatTimeoutId: NodeJS.Timer;
   private readonly raftData = path.join(path.dirname(process.env.ZLUX_LOG_PATH!), 'raft.data');
-  private persister: Persister = new FilePersister(this.raftData); // new DummyPersister();
+  private persister: Persister = new DummyPersister(); //new FilePersister(this.raftData);
   private leaderId: number = -1; // last observed leader id
 
   constructor() {
