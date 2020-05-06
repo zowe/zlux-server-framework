@@ -246,7 +246,7 @@ export class Raft {
           this.print("got heartbeat, stop election")
           done = true;
           return;
-        } else if (votes <= peerCount / 2) {
+        } else if (votes <= Math.floor(peerCount / 2)) {
           this.print("got vote from %s but not enough votes yet to become Leader", peerAddress);
           return;
         }
@@ -314,7 +314,7 @@ export class Raft {
   }
 
   checkIfCommitted(): void {
-    const minPeers = this.peers.length / 2;
+    const minPeers = Math.floor(this.peers.length / 2);
     const m = new Map<number, number>();
     for (let mi = 0; mi < this.matchIndex.length; mi++) {
       const matchIndex = this.matchIndex[mi];
@@ -647,11 +647,11 @@ export class Raft {
       return;
     }
     this.print("starts agreement on entry %d, nextIndex %s, matchIndex %s", index, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
-    const minPeers = this.peers.length / 2;
+    const minPeers = Math.floor(this.peers.length / 2);
     let donePeers = 0;
     const agreementEmitter = new EventEmitter();
     agreementEmitter.on('done', () => {
-      donePeers++
+      donePeers++;
       if (donePeers == minPeers) {
         this.print("agreement for entry [%d]=%s reached", index, JSON.stringify(this.log[index]))
         this.commitIndex = index;
