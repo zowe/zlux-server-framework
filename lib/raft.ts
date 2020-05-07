@@ -697,13 +697,7 @@ export class Raft {
         this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
         agreementEmitter.emit('done');
       } else {
-        this.print("agreement for entry [%d]=%s for server %d at term %d - failed, try previous entry", index, JSON.stringify(this.log[index]), server, this.currentTerm)
-        if (index > 0) {
-          this.nextIndex[server]--;
-          setImmediate(() => this.startAgreementForServer(server, index - 1, agreementEmitter));
-        } else {
-          this.print("ops! previous index %d is not so good", index - 1);
-        }
+        this.print("agreement for entry %d for server %d - failed", index,  server)
       }
     }
   }
