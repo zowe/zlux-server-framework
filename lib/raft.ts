@@ -192,6 +192,10 @@ export class Raft {
     this.print(`peer ${me} started ${this.started} log: ${JSON.stringify(this.log)}`);
   }
 
+  isStarted(): boolean {
+    return this.started;
+  }
+
   getPeers(): RaftPeer[] {
     return this.peers;
   }
@@ -269,7 +273,7 @@ export class Raft {
     }
     this.print("nextIndex %s", JSON.stringify(this.nextIndex));
     this.print("matchIndex %s", JSON.stringify(this.matchIndex));
-    this.emitState();
+    setImmediate(() => this.emitState());
     this.sendHeartbeat();
   }
 
@@ -697,7 +701,7 @@ export class Raft {
         this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
         agreementEmitter.emit('done');
       } else {
-        this.print("agreement for entry %d for server %d - failed", index,  server)
+        this.print("agreement for entry %d for server %d - failed", index, server)
       }
     }
   }
@@ -798,12 +802,24 @@ export class Raft {
 
   middleware() {
     return (request: Request, response: Response, next: NextFunction) => {
-      // console.log(`raft ${request.method} ${request.path}`);
       if (this.started) {
         if (!this.isLeader() && !request.path.startsWith('/raft')) {
-          if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
+          if (this.state === 'Follower') {
             const leader = this.peers[this.leaderId];
-            response.redirect(`${leader.baseAddress}${request.path}`);
+            if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
+              response.redirect(`${leader.baseAddress}${request.path}`);
+              return;
+            } else {
+              response.status(503).json({
+                state: this.state,
+                message: 'Leader is not elected yet'
+              });
+              return;
+            }
+          } else if (this.state === 'Candidate') {
+            response.status(503).json({
+              state: this.state,
+            });
             return;
           }
         }
