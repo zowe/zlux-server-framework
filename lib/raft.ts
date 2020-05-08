@@ -431,6 +431,13 @@ export class Raft {
     this.ensureRequestTerm(args.term);
     this.print("got %s request from leader %d at term %d, my term %d, prevLogIndex %d, entries %s",
       requestType, args.leaderId, args.term, this.currentTerm, args.prevLogIndex, JSON.stringify(args.entries));
+    if (!this.started) {
+      this.print("not started yet!, reply false");
+      return {
+        term: this.currentTerm,
+        success: false,
+      };
+    }
     this.print("my log is %s", JSON.stringify(this.log))
     // 1. Reply false if term < currentTerm (§5.1)
     if (args.term < this.currentTerm) {

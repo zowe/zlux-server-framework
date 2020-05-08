@@ -176,11 +176,11 @@ export class RaftRPCWebSocketService {
 
   private init(): void {
     this.log(`connected client`);
-    if (!this.raft.isStarted()) {
-      this.clientWS.close();
-      this.log('disconnect client because raft not started yet');
-      return;
-    }
+    // if (!this.raft.isStarted()) {
+    //   this.clientWS.close();
+    //   this.log('disconnect client because raft not started yet');
+    //   return;
+    // }
     this.clientWS.on('close', () => this.onClose());
     this.clientWS.on('message', (data: Buffer) => this.onMessage(data));
   }
