@@ -47,11 +47,9 @@ function cleanupSessionGeneric(sessionState) {
 function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
-  //TODO this seems temporary, will need to unconditionally say usingApiml=usingSso when sso support is complete
-  //this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
 
-  //TODO temporary, once zss is finished we can switch over to true
-  this.apimlSsoEnabled = false;
+  //Not sure if this should ever be false now that SSO exists. Could be based off of env.APIML_ENABLE_SSO
+  this.apimlSsoEnabled = true;
   //Sso here meaning just authenticate to apiml, and handle jwt
   this.usingSso = this.apimlSsoEnabled && this.usingApiml;
 
