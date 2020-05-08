@@ -37,7 +37,7 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
     port: number,
     secure: boolean,
     public readonly instanceId: string,
-    private apimlClient: ApimlConnector,
+    public readonly apimlClient: ApimlConnector,
   ) {
     super(host, port, secure);
   }
@@ -189,7 +189,18 @@ export class Raft {
     this.readPersistentState(this.persister.readData());
     this.scheduleElectionOnTimeout();
     this.started = true;
+    this.addOnReRegisterHandler();
     this.print(`peer ${me} started ${this.started} log: ${JSON.stringify(this.log)}`);
+  }
+  
+  // This is a temporary protection against "eureka heartbeat FAILED, Re-registering app" issue
+  private addOnReRegisterHandler():void {
+    const peer = this.peers[this.me];
+    peer.apimlClient.onReRegister(() => {
+      if (!this.isLeader()) {
+        peer.takeOutOfService().then(() => this.print('force taken out of service because of re-registration in Eureka'));
+      }
+    })
   }
 
   isStarted(): boolean {

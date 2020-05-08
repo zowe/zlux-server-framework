@@ -9,4 +9,5 @@ declare class ApimlConnector {
   takeOutOfService(): Promise<void>;
   takeInstanceOutOfService(instanceId: string): Promise<void>;
   takeInstanceIntoService(instanceId: string): Promise<void>;
+  onReRegister(callback: () => void): void
 }
