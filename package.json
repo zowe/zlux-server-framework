@@ -2,7 +2,12 @@
   "name": "zlux-server-framework",
   "version": "0.0.0-zlux.version.replacement",
   "description": "A Server for zLUX Plugins, Dataservices, and Proxying to other Servers.",
-  "license": "private",
+  "license": "EPL-2.0",
+  "homepage": "zowe.org",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/zowe/zlux-server-framework.git"
+  },
   "author": {
     "name": "Fyodor Kovin",
     "email": "fkovin@rocketsoftware.com"
@@ -56,5 +61,8 @@
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
     "typescript": "2.7.1"
+  },
+  "optionalDependencies": {
+    "keyring_js": "~1.0.0"
   }
 }
