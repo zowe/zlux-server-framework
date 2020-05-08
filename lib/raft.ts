@@ -55,7 +55,7 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   }
 
   async takeIntoService(): Promise<void> {
-    return this.apimlClient.takeInstanceIntoService(this.instanceId);
+    return this.apimlClient.takeIntoService();
   }
 
   get baseAddress(): string {
