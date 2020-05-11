@@ -98,6 +98,13 @@ export interface AppendEntriesArgs {
 export interface AppendEntriesReply {
   term: number;  // currentTerm, for leader to update itself
   success: boolean; // true if follower contained entry matching prevLogIndex and prevLogTerm
+  conflict?: Conflict;
+}
+
+export interface Conflict {
+  ConflictIndex: number; // first index where conflict starts
+  ConflictTerm: number;
+  LogLength: number;
 }
 
 export interface RaftRPCDriver {
@@ -192,9 +199,9 @@ export class Raft {
     this.addOnReRegisterHandler();
     this.print(`peer ${me} started ${this.started} log: ${JSON.stringify(this.log)}`);
   }
-  
+
   // This is a temporary protection against "eureka heartbeat FAILED, Re-registering app" issue
-  private addOnReRegisterHandler():void {
+  private addOnReRegisterHandler(): void {
     const peer = this.peers[this.me];
     peer.apimlClient.onReRegister(() => {
       if (!this.isLeader()) {
@@ -305,14 +312,12 @@ export class Raft {
           return;
         }
         this.print("sends heartbeat to %d at term %d", server, this.currentTerm);
-        const { ok, success } = await this.callAppendEntries(server, this.currentTerm, 'heartbeat');
+        const { ok, success, conflict } = await this.callAppendEntries(server, this.currentTerm, 'heartbeat');
         if (ok && !success) {
-          if (this.isLeader()) {
-            this.nextIndex[server]--;
-            if ((this.nextIndex[server]) < 0) {
-              this.nextIndex[server] = 0;
-            }
-            this.print("got unsuccessful heartbeat response from %d at term %d, decrease nextIndex", server, this.currentTerm);
+          if (this.isLeader() && conflict) {
+            this.print("got unsuccessful heartbeat response from %d, adjust nextIndex because of conflict %s",
+              server, JSON.stringify(conflict));
+            this.adjustNextIndexForServer(server, conflict);
           }
         } else if (ok && success) {
           this.print("got successful heartbeat response from %d at term %d, nextIndex = %d, matchIndex = %d, commitIndex = %d",
@@ -326,6 +331,21 @@ export class Raft {
       return;
     }
     this.heartbeatTimeoutId = setTimeout(() => this.sendHeartbeat(), this.heartbeatInterval)
+  }
+
+  private adjustNextIndexForServer(server: number, conflict: Conflict) {
+    if (conflict.ConflictIndex === -1 && conflict.ConflictTerm === -1) {
+      this.nextIndex[server] = conflict.LogLength;
+      this.print("set nextIndex for server %d = %d because there are missing entries in follower's log", server, this.nextIndex[server]);
+    } else if (conflict.ConflictIndex !== -1) {
+      this.nextIndex[server] = conflict.ConflictIndex;
+      this.print("set nextIndex for server %d = %d because conflictIndex given", server, this.nextIndex[server]);
+    } else {
+      if (this.nextIndex[server] > 0) {
+        this.nextIndex[server]--;
+        this.print("decrease nextIndex for server %d to %d", server, this.nextIndex[server])
+      }
+    }
   }
 
   checkIfCommitted(): void {
@@ -359,7 +379,7 @@ export class Raft {
     });
   }
 
-  async callAppendEntries(server: number, currentTerm: number, kind: AppendEntriesKind): Promise<{ ok: boolean, success: boolean }> {
+  async callAppendEntries(server: number, currentTerm: number, kind: AppendEntriesKind): Promise<{ ok: boolean, success: boolean, conflict?: Conflict }> {
     const entries: RaftLogEntry[] = [];
     let last = this.log.length;
     if (kind == "appendentries") {
@@ -399,7 +419,7 @@ export class Raft {
         }
         this.print("successfully appended entries to server %d nextIndex %s matchIndex %s",
           server, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
-        return { ok: true, success: reply.success };
+        return { ok: true, success: reply.success, conflict: reply.conflict };
       })
       .catch(() => ({ ok: false, success: false }));
   }
@@ -468,6 +488,11 @@ export class Raft {
         return {
           success: false,
           term: this.currentTerm,
+          conflict: {
+            ConflictIndex: -1,
+            ConflictTerm: -1,
+            LogLength: this.log.length,
+          }
         }
       }
       // 3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
@@ -477,10 +502,16 @@ export class Raft {
         this.print("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice[args.prevLogIndex]));
         this.log = this.log.slice(0, args.prevLogIndex);
         this.print("remaining entries %s", JSON.stringify(this.log));
-        this.print("reply false");
+        const conflict: Conflict = {
+          ConflictTerm: prevLogTerm,
+          ConflictIndex: this.findFirstEntryWithTerm(prevLogTerm),
+          LogLength: this.log.length,
+        };
+        this.print("reply false, conflict %s", conflict);
         return {
           success: false,
           term: this.currentTerm,
+          conflict: conflict,
         }
       }
     }
@@ -523,6 +554,19 @@ export class Raft {
       success: true,
       term: args.term,
     };
+  }
+
+  private findFirstEntryWithTerm(term: number): number {
+    let index = -1;
+    for (let i = this.log.length - 1; i >= 0; i--) {
+      const xterm = this.log[i].term;
+      if (xterm === term) {
+        index = i;
+      } else if (xterm < term) {
+        break;
+      }
+    }
+    return index;
   }
 
   appendEntriesAndWritePersistentState(args: AppendEntriesArgs): AppendEntriesReply {
