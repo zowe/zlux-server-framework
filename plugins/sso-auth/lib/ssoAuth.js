@@ -48,10 +48,10 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
 
-  //Not sure if this should ever be false now that SSO exists. Could be based off of env.APIML_ENABLE_SSO
-  this.apimlSsoEnabled = true;
+  const tokenName = process.env['PKCS11_TOKEN_NAME'];
+  const zssCanHandleToken = !tokenName || tokenName=='' ? false : true;
   //Sso here meaning just authenticate to apiml, and handle jwt
-  this.usingSso = this.apimlSsoEnabled && this.usingApiml;
+  this.usingSso = this.usingApiml && zssCanHandleToken;
 
   this.pluginConf = pluginConf;
   this.instanceID = serverConf.instanceID;
