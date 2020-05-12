@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## Recent Changes
 
+- Add ability to state where a plugin path is relative to, instead of just where the server is running.
 - Bugfix: Logout now allows security plugins to clear cookies
 - Removed tokenInjector from sso-auth, since when SSO is being used token injection logic is not needed anymore.
 - Bugfix: When trying to dynamically load a plugin with unmet dependencies, the response from the server would hang
