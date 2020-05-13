@@ -720,6 +720,10 @@ export class Raft {
       donePeers++;
       if (donePeers == minPeers) {
         this.print("agreement for entry [%d]=%s reached", index, JSON.stringify(this.log[index]))
+        if (this.commitIndex >= index) {
+          this.print("already committed %d inside checkIfCommitted", index);
+          return;
+        }
         this.commitIndex = index;
         const applyMsg: ApplyMsg = {
           commandValid: true,
@@ -727,7 +731,7 @@ export class Raft {
           command: this.log[index].command,
         };
         this.applyCommand(applyMsg);
-        this.print("leader applied %s", JSON.stringify(applyMsg));
+        this.print("leader applied  after agreement %s", JSON.stringify(applyMsg));
         this.lastApplied = index
       }
     });
