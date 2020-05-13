@@ -363,7 +363,7 @@ export class Raft {
     }
     m.forEach((count, matchIndex) => {
       if (matchIndex > this.commitIndex && count >= minPeers) {
-        for (let i = this.commitIndex + 1; i <= matchIndex; i++) {
+        for (let i = this.commitIndex + 1; i <= matchIndex && i < this.log.length; i++) {
           this.commitIndex = i;
           this.print("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.log[this.commitIndex]));
           const applyMsg: ApplyMsg = {
