@@ -171,6 +171,8 @@ export class Raft {
   private currentTerm: number = 0;
   private votedFor = -1
   private log: RaftLogEntry[] = [];
+  private startIndex: number = 0
+  private startTerm: number = 0;
 
   // volatile state on all servers
   private commitIndex: number = -1;
@@ -285,8 +287,9 @@ export class Raft {
   convertToLeader(): void {
     this.state = 'Leader';
     // When a leader first comes to power, it initializes all nextIndex values to the index just after the last one in its log (11 in Figure 7)
+    const logLen = this.len();
     for (let i = 0; i < this.peers.length; i++) {
-      this.nextIndex[i] = this.log.length;
+      this.nextIndex[i] = logLen;
       this.matchIndex[i] = -1;
     }
     this.print("nextIndex %s", JSON.stringify(this.nextIndex));
@@ -341,7 +344,7 @@ export class Raft {
       this.nextIndex[server] = conflict.ConflictIndex;
       this.print("set nextIndex for server %d = %d because conflictIndex given", server, this.nextIndex[server]);
     } else {
-      if (this.nextIndex[server] > 0) {
+      if (this.nextIndex[server] > this.startIndex) {
         this.nextIndex[server]--;
         this.print("decrease nextIndex for server %d to %d", server, this.nextIndex[server])
       }
@@ -363,13 +366,13 @@ export class Raft {
     }
     m.forEach((count, matchIndex) => {
       if (matchIndex > this.commitIndex && count >= minPeers) {
-        for (let i = this.commitIndex + 1; i <= matchIndex && i < this.log.length; i++) {
+        for (let i = this.commitIndex + 1; i <= matchIndex && i < this.len(); i++) {
           this.commitIndex = i;
-          this.print("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.log[this.commitIndex]));
+          this.print("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.item(this.commitIndex)));
           const applyMsg: ApplyMsg = {
             commandValid: true,
             commandIndex: this.commitIndex + 1,
-            command: this.log[this.commitIndex].command,
+            command: this.item(this.commitIndex).command,
           }
           this.applyCommand(applyMsg);
           this.lastApplied = this.commitIndex;
@@ -381,23 +384,23 @@ export class Raft {
 
   async callAppendEntries(server: number, currentTerm: number, kind: AppendEntriesKind): Promise<{ ok: boolean, success: boolean, conflict?: Conflict }> {
     const entries: RaftLogEntry[] = [];
-    let last = this.log.length;
+    let last = this.len();
     if (kind == "appendentries") {
       last = this.commitIndex + 1;
     } else {
       last = last - 1;
     }
     let start = this.nextIndex[server];
-    if (start < 0) {
-      start = 0;
+    if (start < this.startIndex) {
+      start = this.startIndex;
     }
-    for (let ni = start; ni <= last && ni < this.log.length; ni++) {
-      entries.push(this.log[ni]);
+    for (let ni = start; ni <= last && ni < this.len(); ni++) {
+      entries.push(this.item(ni));
     }
     let prevLogIndex = this.nextIndex[server] - 1;
     let prevLogTerm = -1;
-    if (prevLogIndex >= 0 && prevLogIndex < this.log.length) {
-      prevLogTerm = this.log[prevLogIndex].term;
+    if (prevLogIndex >= this.startIndex && prevLogIndex < this.len()) {
+      prevLogTerm = this.item(prevLogIndex).term;
     }
     this.print("CallAppendEntries %s for follower %d entries %s, my log %s",
       kind, server, JSON.stringify(entries), JSON.stringify(this.log));
@@ -426,10 +429,10 @@ export class Raft {
 
   async callRequestVote(server: number, term: number): Promise<boolean> {
     const peer = this.peers[server];
-    let lastLogTerm = -1;
-    const lastLogIndex = this.log.length - 1;
-    if (lastLogIndex >= 0) {
-      lastLogTerm = this.log[lastLogIndex].term;
+    let lastLogTerm = this.startTerm;
+    const lastLogIndex = this.lastIndex();
+    if (lastLogIndex >= this.startIndex) {
+      lastLogTerm = this.item(lastLogIndex).term;
     }
     const requestVoteArgs: RequestVoteArgs = {
       candidateId: this.me,
@@ -481,9 +484,9 @@ export class Raft {
     this.leaderId = args.leaderId;
     this.convertToFollower();
     this.cancelCurrentElectionTimeoutAndReschedule();
-    if (args.prevLogIndex >= 0) {
+    if (args.prevLogIndex >= this.startIndex) {
       // 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
-      if (args.prevLogIndex >= this.log.length) {
+      if (args.prevLogIndex >= this.len()) {
         this.print("2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)");
         return {
           success: false,
@@ -491,21 +494,21 @@ export class Raft {
           conflict: {
             ConflictIndex: -1,
             ConflictTerm: -1,
-            LogLength: this.log.length,
+            LogLength: this.len(),
           }
         }
       }
       // 3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
-      const prevLogTerm = this.log[args.prevLogIndex].term;
+      const prevLogTerm = this.item(args.prevLogIndex).term;
       if (prevLogTerm != args.prevLogTerm) {
         this.print("3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)");
         this.print("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice[args.prevLogIndex]));
-        this.log = this.log.slice(0, args.prevLogIndex);
+        this.log = this.log.slice(0, this.relativeIndex(args.prevLogIndex));
         this.print("remaining entries %s", JSON.stringify(this.log));
         const conflict: Conflict = {
           ConflictTerm: prevLogTerm,
           ConflictIndex: this.findFirstEntryWithTerm(prevLogTerm),
-          LogLength: this.log.length,
+          LogLength: this.len(),
         };
         this.print("reply false, conflict %s", conflict);
         return {
@@ -518,20 +521,20 @@ export class Raft {
     this.print("leader commit %d my commit %d", args.leaderCommit, this.commitIndex);
     if (args.entries.length > 0) {
       // 4. Append any new entries not already in the log
-      const lastLogIndex = this.log.length - 1;
+      const lastLogIndex = this.lastIndex();
       if (args.prevLogIndex < lastLogIndex) {
-        this.log = this.log.slice(0, args.prevLogIndex + 1);
-        if (args.prevLogIndex >= 0) {
-          this.print("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.log[lastLogIndex]));
+        this.log = this.log.slice(0, this.relativeIndex(args.prevLogIndex + 1));
+        if (args.prevLogIndex >= this.startIndex) {
+          this.print("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.item(lastLogIndex)));
         } else {
           this.print("truncate log: make long empty");
         }
       }
-      this.print("4. Append any new entries not already in the log at index %d: %s", this.log.length, JSON.stringify(args.entries));
+      this.print("4. Append any new entries not already in the log at index %d: %s", this.len(), JSON.stringify(args.entries));
       this.log = this.log.concat(args.entries);
     }
     // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
-    const lastNewEntryIndex = this.log.length - 1;
+    const lastNewEntryIndex = this.lastIndex();
     if (args.leaderCommit > this.commitIndex) {
       this.print("5. If leaderCommit(%d) > commitIndex(%d), set commitIndex = min(leaderCommit, index of last new entry) = %d",
         args.leaderCommit, this.commitIndex, Math.min(args.leaderCommit, lastNewEntryIndex));
@@ -545,7 +548,7 @@ export class Raft {
       const applyMsg: ApplyMsg = {
         commandValid: true,
         commandIndex: this.lastApplied + 1,
-        command: this.log[this.lastApplied].command,
+        command: this.item(this.lastApplied).command,
       }
       this.applyCommand(applyMsg);
     }
@@ -558,8 +561,8 @@ export class Raft {
 
   private findFirstEntryWithTerm(term: number): number {
     let index = -1;
-    for (let i = this.log.length - 1; i >= 0; i--) {
-      const xterm = this.log[i].term;
+    for (let i = this.lastIndex(); i >= this.startIndex; i--) {
+      const xterm = this.item(i).term;
       if (xterm === term) {
         index = i;
       } else if (xterm < term) {
@@ -666,10 +669,10 @@ export class Raft {
   }
 
   private checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args: RequestVoteArgs): boolean {
-    const myLastLogIndex = this.log.length - 1;
-    let myLastLogTerm = -1;
-    if (myLastLogIndex >= 0) {
-      myLastLogTerm = this.log[myLastLogIndex].term;
+    const myLastLogIndex = this.lastIndex();
+    let myLastLogTerm = this.startTerm;
+    if (myLastLogIndex >= this.startIndex) {
+      myLastLogTerm = this.item(myLastLogIndex).term;
     }
     if (myLastLogTerm == args.lastLogTerm) {
       return args.lastLogIndex >= myLastLogIndex;
@@ -699,7 +702,7 @@ export class Raft {
     }
     this.log.push(entry);
     this.print("leader appended a new entry %s %s", JSON.stringify(entry), JSON.stringify(this.log));
-    return this.log.length - 1;
+    return this.lastIndex();
   }
 
   private async startAgreement(index: number): Promise<void> {
@@ -719,7 +722,7 @@ export class Raft {
     agreementEmitter.on('done', () => {
       donePeers++;
       if (donePeers == minPeers) {
-        this.print("agreement for entry [%d]=%s reached", index, JSON.stringify(this.log[index]))
+        this.print("agreement for entry [%d]=%s reached", index, JSON.stringify(this.item(index)));
         if (this.commitIndex >= index) {
           this.print("already committed %d inside checkIfCommitted", index);
           return;
@@ -728,7 +731,7 @@ export class Raft {
         const applyMsg: ApplyMsg = {
           commandValid: true,
           commandIndex: index + 1,
-          command: this.log[index].command,
+          command: this.item(index).command,
         };
         this.applyCommand(applyMsg);
         this.print("leader applied  after agreement %s", JSON.stringify(applyMsg));
@@ -747,24 +750,24 @@ export class Raft {
     const matchIndex = this.matchIndex[server];
     const nextIndex = this.nextIndex[server];
     this.print("starts agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d",
-      index, JSON.stringify(this.log[index]), server, this.currentTerm, nextIndex, matchIndex)
+      index, JSON.stringify(this.item(index)), server, this.currentTerm, nextIndex, matchIndex)
     const currentTerm = this.currentTerm;
     const isLeader = this.isLeader();
     if (!isLeader) {
       this.print("cancel agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d, because not leader anymore",
-        index, JSON.stringify(this.log[index]), server, this.currentTerm, nextIndex, matchIndex)
+        index, JSON.stringify(this.item(index)), server, this.currentTerm, nextIndex, matchIndex)
       return;
     }
     const { ok, success } = await this.callAppendEntries(server, currentTerm, 'appendentries');
     if (!ok) {
-      if (index >= this.log.length) {
+      if (index >= this.len()) {
         this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, "(removed)", server, this.currentTerm)
       } else {
-        this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
+        this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, JSON.stringify(this.item(index)), server, this.currentTerm)
       }
     } else {
       if (success) {
-        this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.log[index]), server, this.currentTerm)
+        this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.item(index)), server, this.currentTerm)
         agreementEmitter.emit('done');
       } else {
         this.print("agreement for entry %d for server %d - failed", index, server)
@@ -892,6 +895,22 @@ export class Raft {
       }
       next();
     }
+  }
+
+  private item(index: number): RaftLogEntry {
+    return this.log[index - this.startIndex];
+  }
+
+  private len(): number {
+    return this.log.length + this.startIndex;
+  }
+
+  private lastIndex(): number {
+    return this.len() - 1;
+  }
+
+  private relativeIndex(index: number): number {
+    return index - this.startIndex;
   }
 
 
