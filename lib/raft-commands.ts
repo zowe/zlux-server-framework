@@ -9,9 +9,10 @@
 */
 
 import { StorageDict, KeyVal } from './clusterManager';
+import { Snapshot } from './raft';
 
 export interface SyncCommand {
-  type: 'session' | 'sessions' | 'storage',
+  type: 'session' | 'sessions' | 'storage' | 'snapshot',
   payload: any;
 }
 
@@ -77,6 +78,11 @@ export interface Storage {
   }
 }
 
+export interface SnapshotSyncCommand extends SyncCommand {
+  type: 'snapshot',
+  payload: Snapshot;
+}
+
 export interface SessionData {
   sid: string,
   session: any;
@@ -92,6 +98,10 @@ export function isSessionsSyncCommand(entry: SyncCommand): entry is SessionsSync
 
 export function isStorageSyncCommand(entry: SyncCommand): entry is StorageSyncCommand {
   return entry.type === 'storage';
+}
+
+export function isSnapshotSyncCommand(entry: SyncCommand): entry is SnapshotSyncCommand {
+  return entry.type === 'snapshot';
 }
 
 export function isStorageActionInit(action: StorageAction): action is StorageActionInit {

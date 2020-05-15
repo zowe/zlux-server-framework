@@ -19,7 +19,8 @@ import {
   isStorageActionSetAll,
   isStorageActionSet,
   isStorageActionDeleteAll,
-  isStorageActionDelete
+  isStorageActionDelete,
+  SnapshotSyncCommand
 } from "./raft-commands";
 const sessionStore = require('./sessionStore').sessionStore;
 import { EurekaInstanceConfig } from 'eureka-js-client';
@@ -63,6 +64,11 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   }
 }
 
+export interface Snapshot {
+  snapshot: string;
+  lastIncludedIndex: number;
+}
+
 export type Command = SyncCommand;
 export interface ApplyMsg {
   command: Command;
@@ -101,6 +107,17 @@ export interface AppendEntriesReply {
   conflict?: Conflict;
 }
 
+export interface InstallSnapshotArgs {
+  term: number
+  snapshot: string;
+  lastIncludedIndex: number;
+  lastIncludedTerm: number;
+}
+
+export interface InstallSnapshotReply {
+  success: boolean;
+}
+
 export interface Conflict {
   ConflictIndex: number; // first index where conflict starts
   ConflictTerm: number;
@@ -110,11 +127,13 @@ export interface Conflict {
 export interface RaftRPCDriver {
   sendRequestVote: (args: RequestVoteArgs) => Promise<RequestVoteReply>;
   sendAppendEntries: (args: AppendEntriesArgs) => Promise<AppendEntriesReply>;
+  sendInstallSnapshot(args: InstallSnapshotArgs): Promise<InstallSnapshotReply>;
 }
 
 export interface Persister {
   saveData(data: string): void;
   readData(): string;
+  saveStateAndSnapshot(state: string, snapshot: string): void;
 }
 
 export class FilePersister implements Persister {
@@ -139,6 +158,10 @@ export class FilePersister implements Persister {
     }
   }
 
+  saveStateAndSnapshot(state: string, snapshot: string): void {
+
+  }
+
 }
 
 export class DummyPersister implements Persister {
@@ -149,6 +172,10 @@ export class DummyPersister implements Persister {
 
   readData(): string | undefined {
     return;
+  }
+
+  saveStateAndSnapshot(state: string, snapshot: string): void {
+
   }
 
 }
@@ -171,8 +198,8 @@ export class Raft {
   private currentTerm: number = 0;
   private votedFor = -1
   private log: RaftLogEntry[] = [];
-  private startIndex: number = 0
-  private startTerm: number = 0;
+  private startIndex: number = 0;
+  private startTerm: number = -1;
 
   // volatile state on all servers
   private commitIndex: number = -1;
@@ -187,6 +214,7 @@ export class Raft {
   private readonly raftData = path.join(path.dirname(process.env.ZLUX_LOG_PATH!), 'raft.data');
   private persister: Persister = new DummyPersister(); //new FilePersister(this.raftData);
   private leaderId: number = -1; // last observed leader id
+  private discardCount: number = 0;
 
   constructor() {
   }
@@ -457,6 +485,55 @@ export class Raft {
     }
   }
 
+  installSnapshot(args: InstallSnapshotArgs): InstallSnapshotReply {
+    this.print("got InstallSnapshot request term %d, LastIncludedIndex %d, LastIncludedTerm %d",
+      args.term, args.lastIncludedIndex, args.lastIncludedTerm);
+    if (args.term < this.currentTerm) {
+      this.print("Reply false immediately if term(%d) < currentTerm", args.term);
+      return {
+        success: false
+      }
+    }
+    this.cancelCurrentElectionTimeoutAndReschedule();
+    const snapshot: Snapshot = {
+      snapshot: args.snapshot,
+      lastIncludedIndex: args.lastIncludedIndex,
+    };
+    const applyMsg: ApplyMsg = {
+      command: <SnapshotSyncCommand>{
+        type: 'snapshot',
+        payload: snapshot,
+      },
+      commandValid: false,
+      commandIndex: -1,
+    };
+    this.applyCommand(applyMsg);
+    this.discardLog(args.lastIncludedIndex, args.lastIncludedTerm, args.snapshot);
+    this.print("snapshot installed");
+    return {
+      success: true
+    }
+  }
+
+  private async callInstallSnapshot(server: number, term: number, snapshot: any, lastIncludedIndex: number, lastIncludedTerm: number): Promise<{ ok: boolean, success: boolean }> {
+    const args: InstallSnapshotArgs = {
+      term: term,
+      snapshot: snapshot,
+      lastIncludedIndex: lastIncludedIndex,
+      lastIncludedTerm: lastIncludedTerm,
+    };
+    this.print("callInstallSnapshot for server %d with args %s", server, JSON.stringify(args));
+    try {
+      const reply = await this.peers[server].sendInstallSnapshot(args);
+      return ({
+        ok: true,
+        success: reply.success,
+      });
+    } catch (e) {
+      return ({ ok: false, success: false });
+    }
+  }
+
   appendEntries(args: AppendEntriesArgs): AppendEntriesReply {
     let requestType = "heartbeat";
     if (args.entries.length > 0) {
@@ -492,8 +569,8 @@ export class Raft {
           success: false,
           term: this.currentTerm,
           conflict: {
-            ConflictIndex: -1,
-            ConflictTerm: -1,
+            ConflictIndex: this.startIndex - 1,
+            ConflictTerm: this.startTerm,
             LogLength: this.len(),
           }
         }
@@ -502,7 +579,7 @@ export class Raft {
       const prevLogTerm = this.item(args.prevLogIndex).term;
       if (prevLogTerm != args.prevLogTerm) {
         this.print("3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)");
-        this.print("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice[args.prevLogIndex]));
+        this.print("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice(this.relativeIndex(args.prevLogIndex))));
         this.log = this.log.slice(0, this.relativeIndex(args.prevLogIndex));
         this.print("remaining entries %s", JSON.stringify(this.log));
         const conflict: Conflict = {
@@ -523,7 +600,11 @@ export class Raft {
       // 4. Append any new entries not already in the log
       const lastLogIndex = this.lastIndex();
       if (args.prevLogIndex < lastLogIndex) {
-        this.log = this.log.slice(0, this.relativeIndex(args.prevLogIndex + 1));
+        let trimIndex = args.prevLogIndex + 1;
+        if (trimIndex < this.startIndex) {
+          trimIndex = this.startIndex;
+        }
+        this.log = this.log.slice(0, this.relativeIndex(trimIndex));
         if (args.prevLogIndex >= this.startIndex) {
           this.print("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.item(lastLogIndex)));
         } else {
@@ -542,8 +623,8 @@ export class Raft {
     }
 
     for (; this.lastApplied <= this.commitIndex; this.lastApplied++) {
-      if (this.lastApplied < 0) {
-        continue
+      if (this.lastApplied < this.startIndex) {
+        continue;
       }
       const applyMsg: ApplyMsg = {
         commandValid: true,
@@ -830,12 +911,19 @@ export class Raft {
 
   private writePersistentState(site: string): void {
     this.print("save persistent state %s", site)
+    const state = this.getState()
+    this.persister.saveData(state);
+  }
+
+  private getState(): string {
     const data = JSON.stringify({
       currentTerm: this.currentTerm,
       votedFor: this.votedFor,
       log: this.log,
+      startIndex: this.startIndex,
+      startTerm: this.startTerm,
     });
-    this.persister.saveData(data);
+    return data;
   }
 
   private readPersistentState(data: string | undefined): void {
@@ -844,15 +932,68 @@ export class Raft {
     }
     this.print("read persistent state");
     try {
-      const { votedFor, currentTerm, log } = JSON.parse(data);
+      const { votedFor, currentTerm, log, startIndex, startTerm } = JSON.parse(data);
       this.currentTerm = currentTerm;
       this.votedFor = votedFor;
       this.log = log;
+      this.startIndex = startIndex;
+      this.startTerm = startTerm;
       this.print("state: term %d, votedFor %d, log %s",
         this.currentTerm, this.votedFor, JSON.stringify(this.log));
     } catch (e) {
       this.print("unable to decode state: %s", JSON.stringify(e));
     }
+  }
+
+  private discardLogIfLeader(lastIncludedIndex: number, snapshot: string): void {
+    if (!this.isLeader()) {
+      this.print("unable to discard log because not leader");
+      return;
+    }
+    this.print("discardLogIfLeader");
+    const lastIncludedTerm = this.item(lastIncludedIndex).term;
+    this.discardLog(lastIncludedIndex, lastIncludedTerm, snapshot);
+    const term = this.currentTerm;
+    for (let server = 0; server < this.peers.length; server++) {
+      if (server != this.me) {
+        setImmediate(async () => this.installSnapshotForServer(server, term, snapshot, lastIncludedIndex, lastIncludedTerm));
+      }
+    }
+    this.print("discardLogIfLeader done");
+  }
+
+  private async installSnapshotForServer(server: number, term: number, snapshot: string, lastIncludedIndex: number, lastIncludedTerm: number): Promise<void> {
+    const { ok, success } = await this.callInstallSnapshot(server, term, snapshot, lastIncludedIndex, lastIncludedTerm);
+    if (ok && success) {
+      this.print("snapshot successfully installed on server %d", server);
+      return;
+    } else if (ok && !success) {
+      this.print("snapshot rejected by server %d", server);
+      return;
+    }
+    this.print("snapshot not installed on server %d, repeat after a delay", server);
+    setTimeout(async () => this.installSnapshotForServer(server, term, snapshot, lastIncludedIndex, lastIncludedTerm), 10);
+  }
+
+  private discardLog(lastIncludedIndex: number, lastIncludedTerm: number, snapshot: string): void {
+    this.discardCount++;
+    this.print("DiscardNonLocking %d prevStartIndex %d newStartIndex %d",
+      this.discardCount, this.startIndex, lastIncludedIndex);
+    this.print("my log %s", JSON.stringify(this.log));
+    this.print("my log len %d %d", this.log.length, this.len());
+    if (this.hasItemWithSameIndexAndTerm(lastIncludedIndex, lastIncludedTerm)) {
+      this.print("If existing log entry has same index and term as snapshot’s last included entry, retain log entries following it and reply")
+      this.log = this.log.slice(this.relativeIndex(lastIncludedIndex + 1));
+      this.print("after discard my log %s", JSON.stringify(this.log));
+    } else {
+      this.print("7. Discard the entire log");
+      this.log = [];
+    }
+    this.startIndex = lastIncludedIndex + 1;
+    this.startTerm = lastIncludedTerm;
+    this.print("log discarded startIndex = %d", this.startIndex);
+    const state = this.getState();
+    this.persister.saveStateAndSnapshot(state, snapshot);
   }
 
   async takeIntoService(): Promise<void> {
@@ -899,6 +1040,13 @@ export class Raft {
 
   private item(index: number): RaftLogEntry {
     return this.log[index - this.startIndex];
+  }
+
+  private hasItemWithSameIndexAndTerm(index: number, term: number): boolean {
+    if (index < this.startIndex || index >= this.len()) {
+      return false;
+    }
+    return this.item(index).term === term;
   }
 
   private len(): number {

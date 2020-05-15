@@ -1,6 +1,6 @@
 import * as WebSocket from 'ws';
 import * as express from 'express';
-import { RequestVoteArgs, RequestVoteReply, AppendEntriesArgs, AppendEntriesReply, RaftRPCDriver, Raft } from './raft';
+import { RequestVoteArgs, RequestVoteReply, AppendEntriesArgs, AppendEntriesReply, RaftRPCDriver, Raft, InstallSnapshotArgs, InstallSnapshotReply } from './raft';
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -13,7 +13,7 @@ enum WebSocketMessageType {
 
 interface WebSocketMessage {
   seq: number;
-  type: 'RequestVoteArgs' | 'RequestVoteReply' | 'AppendEntriesArgs' | 'AppendEntriesReply';
+  type: 'RequestVoteArgs' | 'RequestVoteReply' | 'AppendEntriesArgs' | 'AppendEntriesReply' | 'InstallSnapshotArgs' | 'InstallSnapshotReply'
   // type: WebSocketMessageType,
   message: any;
 }
@@ -24,6 +24,18 @@ interface WebSocketRequestVoteArgsMessage extends WebSocketMessage {
   message: RequestVoteArgs;
 }
 
+interface WebSocketInstallSnapshotArgsMessage extends WebSocketMessage {
+  type: 'InstallSnapshotArgs';
+  // type: WebSocketMessageType.InstallSnapshotArgs
+  message: InstallSnapshotArgs;
+}
+
+interface WebSocketInstallSnapshotReplyMessage extends WebSocketMessage {
+  type: 'InstallSnapshotReply';
+  // type: WebSocketMessageType.InstallSnapshotArgs
+  message: InstallSnapshotReply;
+}
+
 interface WebSocketRequestVoteReplyMessage extends WebSocketMessage {
   type: 'RequestVoteReply';
   // type: WebSocketMessageType.RequestVoteReply
@@ -32,6 +44,10 @@ interface WebSocketRequestVoteReplyMessage extends WebSocketMessage {
 
 function isWebSocketRequestVoteArgsMessage(message: WebSocketMessage): message is WebSocketRequestVoteArgsMessage {
   return message.type === 'RequestVoteArgs';
+}
+
+function isWebSocketInstallSnapshotArgsMessage(message: WebSocketMessage): message is WebSocketInstallSnapshotArgsMessage {
+  return message.type === 'InstallSnapshotArgs';
 }
 
 interface WebSocketAppendEntriesArgsMessage extends WebSocketMessage {
@@ -86,6 +102,15 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     const message: WebSocketMessage = {
       seq: RaftRPCWebSocketDriver.seq++,
       type: 'AppendEntriesArgs',
+      message: args,
+    };
+    return this.call(message).then(reply => reply.message);
+  }
+  
+  async sendInstallSnapshot(args: InstallSnapshotArgs): Promise<InstallSnapshotReply> {
+    const message: WebSocketMessage = {
+      seq: RaftRPCWebSocketDriver.seq++,
+      type: 'InstallSnapshotArgs',
       message: args,
     };
     return this.call(message).then(reply => reply.message);
@@ -205,6 +230,9 @@ export class RaftRPCWebSocketService {
     } else if (isWebSocketAppendEntriesArgsMessage(message)) {
       raftLog.debug(`got append entries message ${JSON.stringify(message)}`);
       this.processAppendEntriesMessage(message);
+    } else if (isWebSocketInstallSnapshotArgsMessage(message)) {
+      raftLog.debug(`got install snapshot message ${JSON.stringify(message)}`);
+      this.processInstallSnapshotMessage(message);
     }
 
   }
@@ -226,6 +254,18 @@ export class RaftRPCWebSocketService {
     const reply = this.raft.requestVoteAndWritePersistentState(args);
     const replyMessage: WebSocketRequestVoteReplyMessage = {
       type: 'RequestVoteReply',
+      seq,
+      message: reply,
+    };
+    this.clientWS.send(JSON.stringify(replyMessage));
+  }
+  
+  private processInstallSnapshotMessage(message: WebSocketInstallSnapshotArgsMessage): void {
+    const seq = message.seq;
+    const args = message.message;
+    const reply = this.raft.installSnapshot(args);
+    const replyMessage: WebSocketInstallSnapshotReplyMessage = {
+      type: 'InstallSnapshotReply',
       seq,
       message: reply,
     };
