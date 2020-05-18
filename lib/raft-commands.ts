@@ -9,7 +9,7 @@
 */
 
 import { StorageDict, KeyVal } from './clusterManager';
-import { Snapshot } from './raft';
+import { Snapshot, StateSnapshot } from './raft';
 
 export interface SyncCommand {
   type: 'session' | 'sessions' | 'storage' | 'snapshot',
@@ -86,6 +86,10 @@ export interface SnapshotSyncCommand extends SyncCommand {
 export interface SessionData {
   sid: string,
   session: any;
+}
+
+export interface SessionDict {
+  [sid:string]: any;
 }
 
 export function isSessionSyncCommand(entry: SyncCommand): entry is SessionSyncCommand {

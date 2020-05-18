@@ -20,7 +20,9 @@ import {
   isStorageActionSet,
   isStorageActionDeleteAll,
   isStorageActionDelete,
-  SnapshotSyncCommand
+  SnapshotSyncCommand,
+  SessionDict,
+  isSnapshotSyncCommand
 } from "./raft-commands";
 const sessionStore = require('./sessionStore').sessionStore;
 import { EurekaInstanceConfig } from 'eureka-js-client';
@@ -29,6 +31,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Request, Response } from "express";
 import { NextFunction } from "connect";
+import { StorageDict } from "./clusterManager";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
@@ -64,8 +67,13 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   }
 }
 
+export interface StateSnapshot {
+  session: SessionDict;
+  storage: StorageDict;
+}
+
 export interface Snapshot {
-  snapshot: string;
+  snapshot: StateSnapshot;
   lastIncludedIndex: number;
 }
 
@@ -109,7 +117,7 @@ export interface AppendEntriesReply {
 
 export interface InstallSnapshotArgs {
   term: number
-  snapshot: string;
+  snapshot: StateSnapshot;
   lastIncludedIndex: number;
   lastIncludedTerm: number;
 }
@@ -131,27 +139,50 @@ export interface RaftRPCDriver {
 }
 
 export interface Persister {
-  saveData(data: string): void;
-  readData(): string;
+  saveState(state: string): void;
   saveStateAndSnapshot(state: string, snapshot: string): void;
+  readState(): string | undefined;
+  readSnapshot(): string | undefined;
 }
 
 export class FilePersister implements Persister {
-  constructor(private filename: string) {
-    raftLog.debug(`raft state file: ${filename}`);
+  constructor(
+    private stateFilename: string,
+    private snapshotFilename: string,
+  ) {
+    raftLog.debug(`raft state file: ${stateFilename}`);
   }
 
-  saveData(data: string): void {
+  saveState(state: string): void {
     try {
-      fs.writeFileSync(this.filename, data, 'utf-8');
+      fs.writeFileSync(this.stateFilename, state, 'utf-8');
     } catch (e) {
       raftLog.warn(`unable to save raft persistent state: ${e}`, JSON.stringify(e));
     }
   }
 
-  readData(): string | undefined {
+  saveSnapshot(snapshot: string): void {
     try {
-      const buffer = fs.readFileSync(this.filename);
+      fs.writeFileSync(this.snapshotFilename, snapshot, 'utf-8');
+    } catch (e) {
+      raftLog.warn(`unable to save storage snapshot: ${e}`, JSON.stringify(e));
+    }
+  }
+
+  readState(): string | undefined {
+    try {
+      const buffer = fs.readFileSync(this.stateFilename);
+      console.log(`state is ${JSON.stringify(buffer.toString())}`);
+      return buffer.toString();
+    } catch (e) {
+      raftLog.warn(`unable to read raft persistent state: ${e}`, JSON.stringify(e));
+    }
+  }
+
+  readSnapshot(): string | undefined {
+    try {
+      const buffer = fs.readFileSync(this.snapshotFilename);
+      console.log(`snapshot is ${JSON.stringify(buffer.toString())}`);
       return buffer.toString();
     } catch (e) {
       raftLog.warn(`unable to read raft persistent state: ${e}`, JSON.stringify(e));
@@ -159,18 +190,24 @@ export class FilePersister implements Persister {
   }
 
   saveStateAndSnapshot(state: string, snapshot: string): void {
-
+    this.saveState(state);
+    this.saveSnapshot(snapshot);
   }
+
 
 }
 
 export class DummyPersister implements Persister {
   constructor() { }
 
-  saveData(data: string): void {
+  saveState(state: string): void {
   }
 
-  readData(): string | undefined {
+  readSnapshot(): string | undefined {
+    return;
+  }
+
+  readState(): string | undefined {
     return;
   }
 
@@ -189,7 +226,7 @@ export class Raft {
   public readonly stateEmitter = new EventEmitter();
   private peers: RaftPeer[]; // RPC end points of all peers
   private me: number;  // this peer's index into peers[]
-  private state: State = 'Follower'
+  private state: State = 'Follower';
   private readonly electionTimeout = Math.floor(Math.random() * (maxElectionTimeout - minElectionTimeout) + minElectionTimeout);
   private debug = true;
   private started = false;
@@ -211,19 +248,21 @@ export class Raft {
   private electionTimeoutId: NodeJS.Timer;
   private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .75);
   private heartbeatTimeoutId: NodeJS.Timer;
-  private readonly raftData = path.join(path.dirname(process.env.ZLUX_LOG_PATH!), 'raft.data');
-  private persister: Persister = new DummyPersister(); //new FilePersister(this.raftData);
   private leaderId: number = -1; // last observed leader id
   private discardCount: number = 0;
 
-  constructor() {
+  constructor(
+    private persister: Persister,
+    private maxLogSize: number
+  ) {
   }
 
   start(peers: RaftPeer[], me: number): void {
     raftLog.info(`starting peer ${me} electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
     this.peers = peers;
     this.me = me;
-    this.readPersistentState(this.persister.readData());
+    this.readSnapshot(this.persister.readSnapshot());
+    this.readPersistentState(this.persister.readState());
     this.scheduleElectionOnTimeout();
     this.started = true;
     this.addOnReRegisterHandler();
@@ -486,6 +525,11 @@ export class Raft {
   }
 
   installSnapshot(args: InstallSnapshotArgs): InstallSnapshotReply {
+    if (!this.started) {
+      return {
+        success: false,
+      };
+    }
     this.print("got InstallSnapshot request term %d, LastIncludedIndex %d, LastIncludedTerm %d",
       args.term, args.lastIncludedIndex, args.lastIncludedTerm);
     if (args.term < this.currentTerm) {
@@ -654,6 +698,12 @@ export class Raft {
   }
 
   appendEntriesAndWritePersistentState(args: AppendEntriesArgs): AppendEntriesReply {
+    if (!this.started) {
+      return {
+        success: false,
+        term: 0,
+      };
+    }
     const reply = this.appendEntries(args);
     this.writePersistentState("after appendEntries");
     return reply;
@@ -662,6 +712,14 @@ export class Raft {
   applyCommand(applyMsg: ApplyMsg): void {
     if (!this.isLeader()) {
       this.applyCommandToFollower(applyMsg);
+    } else {
+      if (this.log.length > this.maxLogSize) {
+        this.print("raft log size(%d) exceeds max log size(%d)", this.log.length, this.maxLogSize);
+        setImmediate(() => {
+          const snapshot = this.createSnapshot(this.lastApplied);
+          this.discardLogIfLeader(this.lastApplied, snapshot);
+        });
+      }
     }
     this.print("applied %s", JSON.stringify(applyMsg));
   }
@@ -744,6 +802,12 @@ export class Raft {
   }
 
   requestVoteAndWritePersistentState(args: RequestVoteArgs): RequestVoteReply {
+    if (!this.started) {
+      return {
+        voteGranted: false,
+        term: 0,
+      };
+    }
     const reply = this.requestVote(args);
     this.writePersistentState("after requestVote");
     return reply;
@@ -906,13 +970,15 @@ export class Raft {
       } else if (isStorageActionDelete(entry.payload)) {
         clusterManager.deleteStorageByKey(entry.payload.data.pluginId, entry.payload.data.key);
       }
+    } else if (isSnapshotSyncCommand(entry)) {
+      this.restoreStateFromSnapshot(entry.payload.snapshot);
     }
   }
 
   private writePersistentState(site: string): void {
     this.print("save persistent state %s", site)
     const state = this.getState()
-    this.persister.saveData(state);
+    this.persister.saveState(state);
   }
 
   private getState(): string {
@@ -945,7 +1011,20 @@ export class Raft {
     }
   }
 
-  private discardLogIfLeader(lastIncludedIndex: number, snapshot: string): void {
+  private readSnapshot(data: string): void {
+    if (!data || data.length < 1) {
+      return;
+    }
+    this.print("read snapshot");
+    try {
+      const snapshot: StateSnapshot = JSON.parse(data);
+      this.restoreStateFromSnapshot(snapshot);
+    } catch (e) {
+      this.print("unable to decode snapshot: %s", JSON.stringify(e));
+    }
+  }
+
+  private discardLogIfLeader(lastIncludedIndex: number, snapshot: StateSnapshot): void {
     if (!this.isLeader()) {
       this.print("unable to discard log because not leader");
       return;
@@ -962,7 +1041,7 @@ export class Raft {
     this.print("discardLogIfLeader done");
   }
 
-  private async installSnapshotForServer(server: number, term: number, snapshot: string, lastIncludedIndex: number, lastIncludedTerm: number): Promise<void> {
+  private async installSnapshotForServer(server: number, term: number, snapshot: StateSnapshot, lastIncludedIndex: number, lastIncludedTerm: number): Promise<void> {
     const { ok, success } = await this.callInstallSnapshot(server, term, snapshot, lastIncludedIndex, lastIncludedTerm);
     if (ok && success) {
       this.print("snapshot successfully installed on server %d", server);
@@ -975,7 +1054,7 @@ export class Raft {
     setTimeout(async () => this.installSnapshotForServer(server, term, snapshot, lastIncludedIndex, lastIncludedTerm), 10);
   }
 
-  private discardLog(lastIncludedIndex: number, lastIncludedTerm: number, snapshot: string): void {
+  private discardLog(lastIncludedIndex: number, lastIncludedTerm: number, snapshot: StateSnapshot): void {
     this.discardCount++;
     this.print("DiscardNonLocking %d prevStartIndex %d newStartIndex %d",
       this.discardCount, this.startIndex, lastIncludedIndex);
@@ -993,7 +1072,7 @@ export class Raft {
     this.startTerm = lastIncludedTerm;
     this.print("log discarded startIndex = %d", this.startIndex);
     const state = this.getState();
-    this.persister.saveStateAndSnapshot(state, snapshot);
+    this.persister.saveStateAndSnapshot(state, JSON.stringify(snapshot));
   }
 
   async takeIntoService(): Promise<void> {
@@ -1061,6 +1140,61 @@ export class Raft {
     return index - this.startIndex;
   }
 
+  private createSnapshot(lastIndex: number): StateSnapshot {
+    const previousSnapshot = this.persister.readSnapshot();
+    let snapshot: StateSnapshot = { session: {}, storage: {} };
+    if (previousSnapshot) {
+      snapshot = JSON.parse(previousSnapshot);
+    }
+    for (let index = this.startIndex; index <= lastIndex; index++) {
+      const item = this.item(index);
+      this.applyItemToSnapshot(item, snapshot);
+    }
+    return snapshot;
+  }
+
+  private applyItemToSnapshot(item: RaftLogEntry, snapshot: StateSnapshot): void {
+    const entry: SyncCommand = item.command;
+    const { session, storage } = snapshot;
+    if (isSessionSyncCommand(entry)) {
+      const sessionData = entry.payload;
+      session[sessionData.sid] = sessionData.session;
+    } else if (isStorageSyncCommand(entry)) {
+      if (isStorageActionSetAll(entry.payload)) {
+        snapshot.storage[entry.payload.data.pluginId] = entry.payload.data.dict;
+      } else if (isStorageActionSet(entry.payload)) {
+        const { pluginId, key, value } = entry.payload.data;
+        if (typeof storage[pluginId] !== 'object') {
+          storage[pluginId] = {};
+        }
+        storage[pluginId][key] = value;
+      } else if (isStorageActionDeleteAll(entry.payload)) {
+        const { pluginId } = entry.payload.data;
+        storage[pluginId] = {};
+      } else if (isStorageActionDelete(entry.payload)) {
+        const { pluginId, key } = entry.payload.data;
+        if (typeof storage[pluginId] === 'object') {
+          delete storage.pluginId[key];
+        }
+      }
+    }
+  }
+
+  restoreStateFromSnapshot(snapshot: StateSnapshot): void {
+    this.print("restore state from snapshot %s", JSON.stringify(snapshot));
+    const { session, storage } = snapshot;
+    for (const sid in session) {
+      sessionStore.set(sid, session[sid], () => { });
+    }
+    const clusterManager = process.clusterManager;
+    for (const pluginId of Object.keys(storage)) {
+      
+      for (const key of Object.keys(storage[pluginId])) {
+        clusterManager.setStorageByKey(pluginId, key, storage[pluginId][key]);
+      }
+    }
+  }
+
 
   private print(...args: any[]): void {
     if (this.debug) {
@@ -1070,7 +1204,16 @@ export class Raft {
 
 }
 
-export const raft = new Raft();
+let logPath = process.env.ZLUX_LOG_PATH!;
+if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
+  logPath = logPath.substring(1, logPath.length - 1);
+}
+const stateFilename = path.join(path.dirname(logPath), 'raft.data');
+const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
+console.log(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
+const persister = new FilePersister(stateFilename, snapshotFilename);
+const maxLogSize = 10;
+export const raft = new Raft(persister, maxLogSize);
 
 /*
   This program and the accompanying materials are
