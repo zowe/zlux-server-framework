@@ -11,12 +11,17 @@
 */
 
 var crypto = require("crypto");
+var swcrypto = require("diffie-hellman/browser");
+const nodeMajorIndex = process.versions.node.indexOf('.');
+const nodeVersion = Number(process.versions.node.substr(0,nodeMajorIndex));
+
 
 var clientVersion = 'SSH-2.0-UNP_1.1';
 var traceCrypto = false;
 var traceSSHMessage = false;
 var traceBasic = true;
 var MAX_SEQNO = 4294967295;
+var sshLogger;
 
 var hex = function(x){
   if (x || x === 0){
@@ -206,6 +211,10 @@ var SUPPORTED_COMPRESS = [
 function ssh(){
 }
 
+exports.setLogger = function(logger) {
+  sshLogger = logger;
+}
+
 exports.processEncryptedData = function(terminalWebsocketProxy,data) {
   return ssh.processEncryptedData(terminalWebsocketProxy,data);
 };
@@ -221,6 +230,7 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
    }
    var msgCode = jsonData.msgCode;
    var pdu;
+   sshLogger.info('msgCode send='+msgCode);	
    switch (msgCode) {
      case SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_RESPONSE: {
        //numResponses, responses
@@ -370,6 +380,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       sshMessage.type = msgCode;
       sessionData.sshMessageCode = msgCode;      
     }
+    sshLogger.info('msgCode rcv='+msgCode);
     switch (msgCode) {
       case SSH_MESSAGE.SSH_MSG_SERVICE_ACCEPT:{
         sshMessages.push(sshMessage);
@@ -700,22 +711,31 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       }
       
       case SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_GROUP:{
+        sshLogger.info('Start gex group');
         if (sessionData.expectedReplyMsgCode){
           if (sessionData.expectedReplyMsgCode!=msgCode){
             //DISCONNECT_ERROR
+            sshLogger.warn('Disconnect_error');
             return returnError('Unexpected reply message code SSH_MSG_KEX_DH_GEX_GROUP ('+msgCode+'). Expected='+sessionData.expectedReplyMsgCode);
           }
         }
         if (sessionData.sentMsgCode==SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REQUEST){
           sessionData.prime =  sshv2PDU.readSizedData();
+          sshLogger.info('sessionData.prime');
           sessionData.generator = sshv2PDU.readSizedData();     
-          var dh = crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
+          sshLogger.info('sessionData.generator');
+          var dh = nodeVersion >= 12
+              ? swcrypto.createDiffieHellman(sessionData.prime,sessionData.generator)
+              : crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
+	        sshLogger.info('made dh');
           sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY;
           var msgCodeBuffer = Buffer.alloc(1);
           msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_INIT);
+          sshLogger.info('Wrote int');
           dh.generateKeys();
+          sshLogger.info('made keys');
           var publicKeys = dh.getPublicKey();
-          
+          sshLogger.info('made pubkey');
           var idx = 0;
           var len = publicKeys.length;
           while (publicKeys[idx] === 0x00) {
@@ -737,11 +757,13 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           var kexInitPDUData = [msgCodeBuffer,keyLength,publicKeys];
           var kexInitPDU = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_INIT,generateSSHv2PDUBytes(kexInitPDUData));
           writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,kexInitPDU);
+          sshLogger.info('wrote pdu');
           sessionData.dh = dh;
           break;
         } else {
           sessionData.expectedReplyMsgCode=SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY;
         }
+        sshLogger.info('End gex group');
       }
       case SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY: {
         if (sessionData.expectedReplyMsgCode){
