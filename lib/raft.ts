@@ -122,9 +122,9 @@ export interface InstallSnapshotReply {
 }
 
 export interface Conflict {
-  ConflictIndex: number; // first index where conflict starts
-  ConflictTerm: number;
-  LogLength: number;
+  conflictIndex: number; // first index where conflict starts
+  conflictTerm: number;
+  logLength: number;
 }
 
 export interface RaftRPCDriver {
@@ -245,6 +245,7 @@ export class Raft {
   private heartbeatTimeoutId: NodeJS.Timer;
   private leaderId: number = -1; // last observed leader id
   private discardCount: number = 0;
+  private lastSnapshot: Snapshot;
 
   constructor(
     private persister: Persister,
@@ -399,15 +400,16 @@ export class Raft {
   }
 
   private adjustNextIndexForServer(server: number, conflict: Conflict) {
-    if (conflict.ConflictIndex === -1 && conflict.ConflictTerm === -1) {
-      this.nextIndex[server] = conflict.LogLength;
-      this.print("set nextIndex for server %d = %d because there are missing entries in follower's log", server, this.nextIndex[server]);
-      if (conflict.LogLength === 0) {
-        this.print("follower's log is empty, send a snapshot to the follower");
-        // this.callInstallSnapshot(server, )
+    if (conflict.conflictIndex === -1 && conflict.conflictTerm === -1) {
+      if (conflict.logLength === 0 && this.lastSnapshot) {
+        this.print("follower's log is empty(have it re-started?) and there is a snapshot, send the snapshot to the follower");
+        setImmediate(() => this.installSnapshotForServer(server, this.currentTerm, this.lastSnapshot));
+      } else {
+        this.nextIndex[server] = conflict.logLength;
+        this.print("set nextIndex for server %d = %d because there are missing entries in follower's log", server, this.nextIndex[server]);
       }
-    } else if (conflict.ConflictIndex !== -1) {
-      this.nextIndex[server] = conflict.ConflictIndex;
+    } else if (conflict.conflictIndex !== -1) {
+      this.nextIndex[server] = conflict.conflictIndex;
       this.print("set nextIndex for server %d = %d because conflictIndex given", server, this.nextIndex[server]);
     } else {
       if (this.nextIndex[server] > this.startIndex) {
@@ -548,13 +550,14 @@ export class Raft {
     };
     this.applyCommand(applyMsg);
     this.discardLog(args.snapshot);
+    this.lastSnapshot = args.snapshot;
     this.print("snapshot installed");
     return {
       success: true
-    }
+    };
   }
 
-  private async callInstallSnapshot(server: number, term: number, snapshot: Snapshot, lastIncludedIndex: number, lastIncludedTerm: number): Promise<{ ok: boolean, success: boolean }> {
+  private async callInstallSnapshot(server: number, term: number, snapshot: Snapshot): Promise<{ ok: boolean, success: boolean }> {
     const args: InstallSnapshotArgs = {
       term: term,
       snapshot: snapshot,
@@ -606,9 +609,9 @@ export class Raft {
           success: false,
           term: this.currentTerm,
           conflict: {
-            ConflictIndex: this.startIndex - 1,
-            ConflictTerm: this.startTerm,
-            LogLength: this.len(),
+            conflictIndex: this.startIndex - 1,
+            conflictTerm: this.startTerm,
+            logLength: this.len(),
           }
         }
       }
@@ -620,9 +623,9 @@ export class Raft {
         this.log = this.log.slice(0, this.relativeIndex(args.prevLogIndex));
         this.print("remaining entries %s", JSON.stringify(this.log));
         const conflict: Conflict = {
-          ConflictTerm: prevLogTerm,
-          ConflictIndex: this.findFirstEntryWithTerm(prevLogTerm),
-          LogLength: this.len(),
+          conflictTerm: prevLogTerm,
+          conflictIndex: this.findFirstEntryWithTerm(prevLogTerm),
+          logLength: this.len(),
         };
         this.print("reply false, conflict %s", conflict);
         return {
@@ -711,6 +714,7 @@ export class Raft {
         setImmediate(() => {
           const snapshot = this.createSnapshot(this.lastApplied);
           this.discardLogIfLeader(snapshot);
+          this.lastSnapshot = snapshot;
         });
       }
     }
@@ -1023,19 +1027,18 @@ export class Raft {
       return;
     }
     this.print("discardLogIfLeader");
-    const { lastIncludedIndex, lastIncludedTerm } = snapshot;
     this.discardLog(snapshot);
     const term = this.currentTerm;
     for (let server = 0; server < this.peers.length; server++) {
       if (server != this.me) {
-        setImmediate(async () => this.installSnapshotForServer(server, term, snapshot, lastIncludedIndex, lastIncludedTerm));
+        setImmediate(async () => this.installSnapshotForServer(server, term, snapshot));
       }
     }
     this.print("discardLogIfLeader done");
   }
 
-  private async installSnapshotForServer(server: number, term: number, snapshot: Snapshot, lastIncludedIndex: number, lastIncludedTerm: number): Promise<void> {
-    const { ok, success } = await this.callInstallSnapshot(server, term, snapshot, lastIncludedIndex, lastIncludedTerm);
+  private async installSnapshotForServer(server: number, term: number, snapshot: Snapshot): Promise<void> {
+    const { ok, success } = await this.callInstallSnapshot(server, term, snapshot);
     if (ok && success) {
       this.print("snapshot successfully installed on server %d", server);
       return;
@@ -1044,7 +1047,7 @@ export class Raft {
       return;
     }
     this.print("snapshot not installed on server %d, repeat after a delay", server);
-    setTimeout(async () => this.installSnapshotForServer(server, term, snapshot, lastIncludedIndex, lastIncludedTerm), 10);
+    setTimeout(async () => this.installSnapshotForServer(server, term, snapshot), 10);
   }
 
   private discardLog(snapshot: Snapshot): void {
