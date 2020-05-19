@@ -15,7 +15,7 @@ import {
 } from './raft-commands';
 import { Raft, State } from './raft';
 const zluxUtil = require('./util');
-const syncLog = zluxUtil.loggers.utilLogger;
+const raftLog = zluxUtil.loggers.raftLogger;
 
 export class SyncService {
   constructor(
@@ -42,12 +42,12 @@ export class SyncService {
   }
 
   private onSessionChange(entry: SessionSyncCommand) {
-    syncLog.debug(`SyncEndpoint:onSessionChange: send command ${JSON.stringify(entry)}`);
+    raftLog.debug(`SyncEndpoint:onSessionChange: send command ${JSON.stringify(entry)}`);
     this.raft.startCommand(entry);
   }
 
   private onStorageChange(entry: StorageSyncCommand) {
-    syncLog.info(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
+    raftLog.debug(`SyncEndpoint:onStorageChange: send command entry ${JSON.stringify(entry)}`);
     this.raft.startCommand(entry);
   }
 
