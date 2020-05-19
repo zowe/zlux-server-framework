@@ -539,6 +539,7 @@ export class Raft {
         success: false
       }
     }
+    this.currentTerm = args.term;
     this.cancelCurrentElectionTimeoutAndReschedule();
     const applyMsg: ApplyMsg = {
       command: <SnapshotSyncCommand>{
@@ -551,6 +552,12 @@ export class Raft {
     this.applyCommand(applyMsg);
     this.discardLog(args.snapshot);
     this.lastSnapshot = args.snapshot;
+    if (args.snapshot.lastIncludedIndex > this.commitIndex) {
+      this.commitIndex = args.snapshot.lastIncludedIndex;
+    }
+    if (args.snapshot.lastIncludedIndex > this.lastApplied) {
+      this.lastApplied = args.snapshot.lastIncludedIndex;
+    }
     this.print("snapshot installed");
     return {
       success: true
@@ -1138,7 +1145,7 @@ export class Raft {
   }
 
   private createSnapshot(lastIncludedIndex: number): Snapshot {
-    const previousSnapshot = this.persister.readSnapshot();
+    const previousSnapshot = this.lastSnapshot;
     const lastIncludedTerm = this.item(lastIncludedIndex).term;
     let snapshot: Snapshot = {
       session: {},
@@ -1147,7 +1154,7 @@ export class Raft {
       lastIncludedTerm,
     };
     if (previousSnapshot) {
-      snapshot = JSON.parse(previousSnapshot);
+      snapshot = previousSnapshot;
     }
     for (let index = this.startIndex; index <= lastIncludedIndex; index++) {
       const item = this.item(index);
@@ -1206,14 +1213,21 @@ export class Raft {
 
 }
 
-let logPath = process.env.ZLUX_LOG_PATH!;
-if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
-  logPath = logPath.substring(1, logPath.length - 1);
+let persister: Persister;
+if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
+  raftLog.info("raft persistence enabled");
+  let logPath = process.env.ZLUX_LOG_PATH!;
+  if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
+    logPath = logPath.substring(1, logPath.length - 1);
+  }
+  const stateFilename = path.join(path.dirname(logPath), 'raft.data');
+  const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
+  raftLog.debug(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
+  persister = new FilePersister(stateFilename, snapshotFilename);
+} else {
+  raftLog.info("raft persistence disabled");
+  persister = new DummyPersister();
 }
-const stateFilename = path.join(path.dirname(logPath), 'raft.data');
-const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
-console.log(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
-const persister = new FilePersister(stateFilename, snapshotFilename);
 const maxLogSize = 10;
 export const raft = new Raft(persister, maxLogSize);
 
