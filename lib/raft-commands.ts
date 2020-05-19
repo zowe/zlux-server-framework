@@ -9,7 +9,7 @@
 */
 
 import { StorageDict, KeyVal } from './clusterManager';
-import { Snapshot, StateSnapshot } from './raft';
+import { Snapshot } from './raft';
 
 export interface SyncCommand {
   type: 'session' | 'sessions' | 'storage' | 'snapshot',

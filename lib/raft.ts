@@ -67,14 +67,11 @@ export class RaftPeer extends RaftRPCWebSocketDriver {
   }
 }
 
-export interface StateSnapshot {
+export interface Snapshot {
   session: SessionDict;
   storage: StorageDict;
-}
-
-export interface Snapshot {
-  snapshot: StateSnapshot;
   lastIncludedIndex: number;
+  lastIncludedTerm: number;
 }
 
 export type Command = SyncCommand;
@@ -117,9 +114,7 @@ export interface AppendEntriesReply {
 
 export interface InstallSnapshotArgs {
   term: number
-  snapshot: StateSnapshot;
-  lastIncludedIndex: number;
-  lastIncludedTerm: number;
+  snapshot: Snapshot;
 }
 
 export interface InstallSnapshotReply {
@@ -407,6 +402,10 @@ export class Raft {
     if (conflict.ConflictIndex === -1 && conflict.ConflictTerm === -1) {
       this.nextIndex[server] = conflict.LogLength;
       this.print("set nextIndex for server %d = %d because there are missing entries in follower's log", server, this.nextIndex[server]);
+      if (conflict.LogLength === 0) {
+        this.print("follower's log is empty, send a snapshot to the follower");
+        // this.callInstallSnapshot(server, )
+      }
     } else if (conflict.ConflictIndex !== -1) {
       this.nextIndex[server] = conflict.ConflictIndex;
       this.print("set nextIndex for server %d = %d because conflictIndex given", server, this.nextIndex[server]);
@@ -531,7 +530,7 @@ export class Raft {
       };
     }
     this.print("got InstallSnapshot request term %d, LastIncludedIndex %d, LastIncludedTerm %d",
-      args.term, args.lastIncludedIndex, args.lastIncludedTerm);
+      args.term, args.snapshot.lastIncludedIndex, args.snapshot.lastIncludedTerm);
     if (args.term < this.currentTerm) {
       this.print("Reply false immediately if term(%d) < currentTerm", args.term);
       return {
@@ -539,32 +538,26 @@ export class Raft {
       }
     }
     this.cancelCurrentElectionTimeoutAndReschedule();
-    const snapshot: Snapshot = {
-      snapshot: args.snapshot,
-      lastIncludedIndex: args.lastIncludedIndex,
-    };
     const applyMsg: ApplyMsg = {
       command: <SnapshotSyncCommand>{
         type: 'snapshot',
-        payload: snapshot,
+        payload: args.snapshot,
       },
       commandValid: false,
       commandIndex: -1,
     };
     this.applyCommand(applyMsg);
-    this.discardLog(args.lastIncludedIndex, args.lastIncludedTerm, args.snapshot);
+    this.discardLog(args.snapshot);
     this.print("snapshot installed");
     return {
       success: true
     }
   }
 
-  private async callInstallSnapshot(server: number, term: number, snapshot: any, lastIncludedIndex: number, lastIncludedTerm: number): Promise<{ ok: boolean, success: boolean }> {
+  private async callInstallSnapshot(server: number, term: number, snapshot: Snapshot, lastIncludedIndex: number, lastIncludedTerm: number): Promise<{ ok: boolean, success: boolean }> {
     const args: InstallSnapshotArgs = {
       term: term,
       snapshot: snapshot,
-      lastIncludedIndex: lastIncludedIndex,
-      lastIncludedTerm: lastIncludedTerm,
     };
     this.print("callInstallSnapshot for server %d with args %s", server, JSON.stringify(args));
     try {
@@ -717,7 +710,7 @@ export class Raft {
         this.print("raft log size(%d) exceeds max log size(%d)", this.log.length, this.maxLogSize);
         setImmediate(() => {
           const snapshot = this.createSnapshot(this.lastApplied);
-          this.discardLogIfLeader(this.lastApplied, snapshot);
+          this.discardLogIfLeader(snapshot);
         });
       }
     }
@@ -971,7 +964,7 @@ export class Raft {
         clusterManager.deleteStorageByKey(entry.payload.data.pluginId, entry.payload.data.key);
       }
     } else if (isSnapshotSyncCommand(entry)) {
-      this.restoreStateFromSnapshot(entry.payload.snapshot);
+      this.restoreStateFromSnapshot(entry.payload);
     }
   }
 
@@ -1017,21 +1010,21 @@ export class Raft {
     }
     this.print("read snapshot");
     try {
-      const snapshot: StateSnapshot = JSON.parse(data);
+      const snapshot: Snapshot = JSON.parse(data);
       this.restoreStateFromSnapshot(snapshot);
     } catch (e) {
       this.print("unable to decode snapshot: %s", JSON.stringify(e));
     }
   }
 
-  private discardLogIfLeader(lastIncludedIndex: number, snapshot: StateSnapshot): void {
+  private discardLogIfLeader(snapshot: Snapshot): void {
     if (!this.isLeader()) {
       this.print("unable to discard log because not leader");
       return;
     }
     this.print("discardLogIfLeader");
-    const lastIncludedTerm = this.item(lastIncludedIndex).term;
-    this.discardLog(lastIncludedIndex, lastIncludedTerm, snapshot);
+    const { lastIncludedIndex, lastIncludedTerm } = snapshot;
+    this.discardLog(snapshot);
     const term = this.currentTerm;
     for (let server = 0; server < this.peers.length; server++) {
       if (server != this.me) {
@@ -1041,7 +1034,7 @@ export class Raft {
     this.print("discardLogIfLeader done");
   }
 
-  private async installSnapshotForServer(server: number, term: number, snapshot: StateSnapshot, lastIncludedIndex: number, lastIncludedTerm: number): Promise<void> {
+  private async installSnapshotForServer(server: number, term: number, snapshot: Snapshot, lastIncludedIndex: number, lastIncludedTerm: number): Promise<void> {
     const { ok, success } = await this.callInstallSnapshot(server, term, snapshot, lastIncludedIndex, lastIncludedTerm);
     if (ok && success) {
       this.print("snapshot successfully installed on server %d", server);
@@ -1054,8 +1047,9 @@ export class Raft {
     setTimeout(async () => this.installSnapshotForServer(server, term, snapshot, lastIncludedIndex, lastIncludedTerm), 10);
   }
 
-  private discardLog(lastIncludedIndex: number, lastIncludedTerm: number, snapshot: StateSnapshot): void {
+  private discardLog(snapshot: Snapshot): void {
     this.discardCount++;
+    const { lastIncludedIndex, lastIncludedTerm } = snapshot;
     this.print("DiscardNonLocking %d prevStartIndex %d newStartIndex %d",
       this.discardCount, this.startIndex, lastIncludedIndex);
     this.print("my log %s", JSON.stringify(this.log));
@@ -1140,20 +1134,26 @@ export class Raft {
     return index - this.startIndex;
   }
 
-  private createSnapshot(lastIndex: number): StateSnapshot {
+  private createSnapshot(lastIncludedIndex: number): Snapshot {
     const previousSnapshot = this.persister.readSnapshot();
-    let snapshot: StateSnapshot = { session: {}, storage: {} };
+    const lastIncludedTerm = this.item(lastIncludedIndex).term;
+    let snapshot: Snapshot = {
+      session: {},
+      storage: {},
+      lastIncludedIndex,
+      lastIncludedTerm,
+    };
     if (previousSnapshot) {
       snapshot = JSON.parse(previousSnapshot);
     }
-    for (let index = this.startIndex; index <= lastIndex; index++) {
+    for (let index = this.startIndex; index <= lastIncludedIndex; index++) {
       const item = this.item(index);
       this.applyItemToSnapshot(item, snapshot);
     }
     return snapshot;
   }
 
-  private applyItemToSnapshot(item: RaftLogEntry, snapshot: StateSnapshot): void {
+  private applyItemToSnapshot(item: RaftLogEntry, snapshot: Snapshot): void {
     const entry: SyncCommand = item.command;
     const { session, storage } = snapshot;
     if (isSessionSyncCommand(entry)) {
@@ -1180,7 +1180,7 @@ export class Raft {
     }
   }
 
-  restoreStateFromSnapshot(snapshot: StateSnapshot): void {
+  restoreStateFromSnapshot(snapshot: Snapshot): void {
     this.print("restore state from snapshot %s", JSON.stringify(snapshot));
     const { session, storage } = snapshot;
     for (const sid in session) {
@@ -1188,7 +1188,6 @@ export class Raft {
     }
     const clusterManager = process.clusterManager;
     for (const pluginId of Object.keys(storage)) {
-      
       for (const key of Object.keys(storage[pluginId])) {
         clusterManager.setStorageByKey(pluginId, key, storage[pluginId][key]);
       }
