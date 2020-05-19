@@ -8,7 +8,7 @@
   Copyright Contributors to the Zowe Project.
 */
 
-import { StorageDict, KeyVal } from './clusterManager';
+import { KeyVal } from './clusterManager';
 import { Snapshot } from './raft';
 
 export interface SyncCommand {
@@ -21,25 +21,16 @@ export interface SessionSyncCommand extends SyncCommand {
   payload: SessionData;
 }
 
-export interface SessionsSyncCommand extends SyncCommand {
-  type: 'sessions',
-  payload: SessionData[];
-}
-
 export interface StorageSyncCommand extends SyncCommand {
   type: 'storage',
   payload: StorageAction;
 }
 
 export interface StorageAction {
-  type: 'init' | 'set-all' | 'set' | 'delete-all' | 'delete'
+  type: 'set-all' | 'set' | 'delete-all' | 'delete'
   data: any;
 }
 
-export interface StorageActionInit extends StorageAction {
-  type: 'init',
-  data: StorageDict
-}
 export interface StorageActionSetAll extends StorageAction {
   type: 'set-all',
   data: {
@@ -96,20 +87,12 @@ export function isSessionSyncCommand(entry: SyncCommand): entry is SessionSyncCo
   return entry.type === 'session';
 }
 
-export function isSessionsSyncCommand(entry: SyncCommand): entry is SessionsSyncCommand {
-  return entry.type === 'sessions';
-}
-
 export function isStorageSyncCommand(entry: SyncCommand): entry is StorageSyncCommand {
   return entry.type === 'storage';
 }
 
 export function isSnapshotSyncCommand(entry: SyncCommand): entry is SnapshotSyncCommand {
   return entry.type === 'snapshot';
-}
-
-export function isStorageActionInit(action: StorageAction): action is StorageActionInit {
-  return action.type === 'init';
 }
 
 export function isStorageActionSetAll(action: StorageAction): action is StorageActionSetAll {

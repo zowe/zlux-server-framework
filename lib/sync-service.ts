@@ -8,13 +8,9 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const sessionStore = require('./sessionStore').sessionStore;
 import { syncEventEmitter } from './sync';
 import {
-  SessionData,
   SessionSyncCommand,
-  SessionsSyncCommand,
-  StorageActionInit,
   StorageSyncCommand,
 } from './raft-commands';
 import { Raft, State } from './raft';
@@ -55,37 +51,6 @@ export class SyncService {
     this.raft.startCommand(entry);
   }
 
-  private sendCurrentStateToClient(): void {
-    syncLog.debug(`SendCurrentStateToClient`);
-    this.sendSessionStorageSnapshotToClient();
-    this.sendDataserviceStorageSnapshotToClient();
-  }
-
-  private sendSessionStorageSnapshotToClient(): void {
-    syncLog.debug(`sendSessionStorageSnapshotToClient`);
-    sessionStore.all((err: Error | null, sessions: { [sid: string]: any }) => {
-      const sessionData: SessionData[] = [];
-      Object.keys(sessions).forEach(sid => {
-        const session = sessions[sid];
-        sessionData.push({ sid, session });
-      });
-      syncLog.debug(`send all sessions as array ${JSON.stringify(sessionData)}`);
-      const sessionsLogEntry: SessionsSyncCommand = { type: 'sessions', payload: sessionData };
-      this.raft.startCommand(sessionsLogEntry);
-    });
-  }
-
-  private sendDataserviceStorageSnapshotToClient(): void {
-    syncLog.debug(`sendDataserviceStorageSnapshotToClient`);
-    const clusterManager = process.clusterManager;
-    clusterManager.getStorageCluster().then(storage => {
-      syncLog.debug(`[cluster storage: ${JSON.stringify(storage)}]`);
-      const action: StorageActionInit = { type: 'init', data: storage };
-      const storageLogEntry: StorageSyncCommand = { type: 'storage', payload: action };
-      syncLog.debug(`initStorageForNewClient log entry ${JSON.stringify(storageLogEntry)}`);
-      this.raft.startCommand(storageLogEntry);
-    });
-  }
 }
 
 /*

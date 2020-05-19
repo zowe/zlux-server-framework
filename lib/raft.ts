@@ -13,9 +13,7 @@ import { EventEmitter } from "events";
 import {
   SyncCommand,
   isSessionSyncCommand,
-  isSessionsSyncCommand,
   isStorageSyncCommand,
-  isStorageActionInit,
   isStorageActionSetAll,
   isStorageActionSet,
   isStorageActionDeleteAll,
@@ -955,17 +953,9 @@ export class Raft {
     if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
       sessionStore.set(sessionData.sid, sessionData.session, () => { });
-    } else if (isSessionsSyncCommand(entry)) {
-      for (const sessionData of entry.payload) {
-        sessionStore.set(sessionData.sid, sessionData.session, () => { });
-      }
     } else if (isStorageSyncCommand(entry)) {
       const clusterManager = process.clusterManager;
-      if (isStorageActionInit(entry.payload)) {
-        for (const pluginId of Object.keys(entry.payload.data)) {
-          clusterManager.setStorageAll(pluginId, entry.payload[pluginId])
-        }
-      } else if (isStorageActionSetAll(entry.payload)) {
+      if (isStorageActionSetAll(entry.payload)) {
         clusterManager.setStorageAll(entry.payload.data.pluginId, entry.payload.data.dict);
       } else if (isStorageActionSet(entry.payload)) {
         clusterManager.setStorageByKey(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
