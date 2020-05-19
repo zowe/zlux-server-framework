@@ -1198,9 +1198,7 @@ export class Raft {
     }
     const clusterManager = process.clusterManager;
     for (const pluginId of Object.keys(storage)) {
-      for (const key of Object.keys(storage[pluginId])) {
-        clusterManager.setStorageByKey(pluginId, key, storage[pluginId][key]);
-      }
+      clusterManager.setStorageAll(pluginId, storage[pluginId]).then(() => {});
     }
   }
 
