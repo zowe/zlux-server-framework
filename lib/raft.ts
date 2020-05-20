@@ -714,7 +714,7 @@ export class Raft {
     if (!this.isLeader()) {
       this.applyCommandToFollower(applyMsg);
     } else {
-      if (this.log.length > this.maxLogSize) {
+      if (this.maxLogSize > 0 && this.log.length > this.maxLogSize) {
         this.print("raft log size(%d) exceeds max log size(%d)", this.log.length, this.maxLogSize);
         setImmediate(() => {
           const snapshot = this.createSnapshot(this.lastApplied);
@@ -1216,7 +1216,11 @@ if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
   raftLog.info("raft persistence disabled");
   persister = new DummyPersister();
 }
-const maxLogSize = 10;
+let maxLogSize = +process.env.ZLUX_RAFT_MAX_LOG_SIZE;
+if (!Number.isInteger(maxLogSize)) {
+  maxLogSize = 100;
+}
+raftLog.info("raft max log size is %d", maxLogSize);
 export const raft = new Raft(persister, maxLogSize);
 
 /*
