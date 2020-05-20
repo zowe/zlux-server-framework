@@ -10,13 +10,19 @@
   Copyright Contributors to the Zowe Project.
 */
 
-var crypto = require("crypto");
+const crypto = require("crypto");
+const nodeMajorIndex = process.versions.node.indexOf('.');
+const nodeVersion = Number(process.versions.node.substr(0,nodeMajorIndex));
+if (nodeVersion >= 12) {
+  var swcrypto = require("diffie-hellman/browser");
+}
+
 
 var clientVersion = 'SSH-2.0-UNP_1.1';
 var traceCrypto = false;
 var traceSSHMessage = false;
-var traceBasic = true;
 var MAX_SEQNO = 4294967295;
+var sshLogger;
 
 var hex = function(x){
   if (x || x === 0){
@@ -44,7 +50,7 @@ var hexDump = function(a, offset, length){
 }
 
 
-var SSH_MESSAGE = exports.MESSAGE = {
+const SSH_MESSAGE = exports.MESSAGE = {
     SSH_MSG_DISCONNECT                  : 1,  // followed by a String with caose of disconnection
  
     SSH_MSG_SERVICE_REQUEST             : 5,
@@ -90,6 +96,13 @@ var SSH_MESSAGE = exports.MESSAGE = {
     SSH_MSG_CHANNEL_FAILURE             : 100,
     ERROR                               : 1000
 }
+
+const CODE_TO_NAME = {};
+const SSH_MESSAGE_KEYS = Object.keys(SSH_MESSAGE);
+for (let i = 0; i < SSH_MESSAGE_KEYS.length; i++) {
+  CODE_TO_NAME[SSH_MESSAGE[SSH_MESSAGE_KEYS[i]]] = SSH_MESSAGE_KEYS[i];
+}
+
 
 const TERMINAL_TYPE_DEFAULT = 'vt100';
 const VT_COLUMN_DEFAULT = 80;
@@ -206,6 +219,10 @@ var SUPPORTED_COMPRESS = [
 function ssh(){
 }
 
+exports.setLogger = function(logger) {
+  sshLogger = logger;
+}
+
 exports.processEncryptedData = function(terminalWebsocketProxy,data) {
   return ssh.processEncryptedData(terminalWebsocketProxy,data);
 };
@@ -221,6 +238,7 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
    }
    var msgCode = jsonData.msgCode;
    var pdu;
+   sshLogger.debug('send=' + CODE_TO_NAME[msgCode]);
    switch (msgCode) {
      case SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_RESPONSE: {
        //numResponses, responses
@@ -271,7 +289,7 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
           pdu = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_CHANNEL_DATA,generateSSHv2PDUBytes(shellData));
        } else {
          //TODO this occurs occasionally, something must be unimplemented.
-         if (traceBasic) console.log('Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found\n');
+         sshLogger.warn('Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found\n');
        }
        break;
      }
@@ -289,12 +307,13 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
        }
        else {
          //TODO this occurs occasionally, something must be unimplemented.
-         if (traceBasic) console.log('Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found\n');
+         sshLogger.warn('Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found\n');
        }
        break;
      }
      
    }
+  sshLogger.debug('send=%s done', CODE_TO_NAME[msgCode]);
    if (pdu!=null){
      if(sessionData.isKeyExchanging){
        sessionData.rekeyQueue.push(pdu);
@@ -370,6 +389,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       sshMessage.type = msgCode;
       sessionData.sshMessageCode = msgCode;      
     }
+    sshLogger.debug('rcv=' + CODE_TO_NAME[msgCode]);
     switch (msgCode) {
       case SSH_MESSAGE.SSH_MSG_SERVICE_ACCEPT:{
         sshMessages.push(sshMessage);
@@ -378,33 +398,29 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       case SSH_MESSAGE.SSH_MSG_DISCONNECT:{
         sshMessage.reasonCode = sshv2PDU.readInt();
         sshMessage.reasonLine = sshv2PDU.readSizedData();
-        if(traceBasic) console.log("processed SSH_MSG_DISCONNECT: "+ sshMessage.reasonCode +'\n'+ Buffer.from(sshMessage.reasonLine,'ascii').toString());
+        sshLogger.debug("processed SSH_MSG_DISCONNECT: "+ sshMessage.reasonCode +'\n', Buffer.from(sshMessage.reasonLine,'ascii').toString());
         sshMessages.push(sshMessage);
         break;
       }
       case SSH_MESSAGE.SSH_MSG_PK_OK: {
-        if(traceSSHMessage) console.log("SSH_MESSAGE.SSH_MSG_PK_OK ");
         sshMessage.algorithm=sshv2PDU.readSizedData();
         sshMessage.blob=sshv2PDU.readSizedData();
         sshMessages.push(sshMessage);        
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER : {
-        if(traceSSHMessage) console.log("SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER ");
         sshMessage.message=sshv2PDU.readSizedData();
         sshMessage.language=sshv2PDU.readSizedData();        
         sshMessages.push(sshMessage);
         break;
       } 
       case SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE:{
-        if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE ');
         sshMessages.push(sshMessage);
        // processData = Buffer.alloc(sshv2PDU.data.length);
        // sshv2PDU.data.copy(processData,0);
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST:{
-        if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST ');
         sshMessage.name = sshv2PDU.readSizedData();
         sshMessage.inst = sshv2PDU.readSizedData();
         sshMessage.lang = sshv2PDU.readSizedData();
@@ -420,7 +436,6 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_SUCCESS:{
-        if(traceBasic) console.log('SSH_MSG_USERAUTH_SUCCESS  ');
         sshMessages.push(sshMessage);
         terminalWebsocketProxy.sshAuthenticated = true;
         
@@ -523,7 +538,6 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       } 
       case SSH_MESSAGE.SSH_MSG_CHANNEL_FAILURE:{
-        if(traceBasic) console.log('SSH_MSG_CHANNEL_FAILURE ');
         break;
       } 
       case SSH_MESSAGE.SSH_MSG_CHANNEL_DATA : {
@@ -562,7 +576,6 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
             sessionData.highestChannel++;
             sessionData.sshMessageCode = SSH_MESSAGE.SSH_MSG_CHANNEL_SUCCESS;
             
-            if(traceBasic) console.log('SSH_MSG_CHANNEL_SUCCESS built, channel number: ' + sessionData.primaryShellChannel);
             break ;
           }
         }
@@ -585,7 +598,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         
         if (sessionData.expectedReplyMsgCode){
           if (sessionData.expectedReplyMsgCode!=msgCode){
-            if(traceBasic)console.log("SSH rekeying... ");
+            sshLogger.debug("SSH rekeying");
           }
         }
         sshv2PDU.readBytes(sessionData.serverCookie);
@@ -703,19 +716,24 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         if (sessionData.expectedReplyMsgCode){
           if (sessionData.expectedReplyMsgCode!=msgCode){
             //DISCONNECT_ERROR
+            sshLogger.warn('Disconnect_error');
             return returnError('Unexpected reply message code SSH_MSG_KEX_DH_GEX_GROUP ('+msgCode+'). Expected='+sessionData.expectedReplyMsgCode);
           }
         }
         if (sessionData.sentMsgCode==SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REQUEST){
           sessionData.prime =  sshv2PDU.readSizedData();
           sessionData.generator = sshv2PDU.readSizedData();     
-          var dh = crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
+          sshLogger.debug('sessionData.generator');
+          var dh = nodeVersion >= 12
+              ? swcrypto.createDiffieHellman(sessionData.prime,sessionData.generator)
+              : crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
+	        sshLogger.debug('made dh');
           sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY;
           var msgCodeBuffer = Buffer.alloc(1);
           msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_INIT);
           dh.generateKeys();
+          sshLogger.debug('made keys');
           var publicKeys = dh.getPublicKey();
-          
           var idx = 0;
           var len = publicKeys.length;
           while (publicKeys[idx] === 0x00) {
@@ -945,16 +963,13 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           exchangeDataBuffer[cp++] = 0;
         sessionData.k.copy(exchangeDataBuffer, cp, kIndex); 
 
-        if(traceCrypto) console.log("e: length = "+sessionData.e.length);
-        if(traceCrypto) console.log( sessionData.e.toString('hex')+"\n");
-        if(traceCrypto) console.log("f: length = "+sessionData.f.length);
-        if(traceCrypto) console.log( sessionData.f.toString('hex')+"\n");
-        if(traceCrypto) console.log("k: length = "+sessionData.k.length);
-        if(traceCrypto) console.log( sessionData.k.toString('hex')+"\n");
-        if(traceCrypto) console.log("exchangeDataBuffer:");
-        if(traceCrypto) console.log( exchangeDataBuffer.toString('hex')+"\n");
-        if(traceCrypto) console.log("exchangeDataBuffer length :");
-        if(traceCrypto) console.log( exchangeDataBuffer.length+"\n");
+        if(traceCrypto) {
+          console.log(`e: length = ${sessionData.e.length}\n${sessionData.e.toString('hex')}`);
+          console.log(`f: length = ${sessionData.f.length}\n${sessionData.f.toString('hex')}`);
+          console.log(`k: length = ${sessionData.k.length}\n${sessionData.k.toString('hex')}`);
+          console.log("exchangeDataBuffer:\n", exchangeDataBuffer.toString('hex'));
+          console.log(`exchangeDataBuffer length : ${exchangeDataBuffer.length}`);
+        }
         
         sessionData.h = sessionData.hash.update(exchangeDataBuffer).digest(); // the H
         if (sessionData.id == null){
@@ -987,7 +1002,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         if (sessionData.isKeyExchanging){
           sessionData.isKeyExchanging = false;
           sessionData.isKeyExchangingInitSent = false;
-          if(traceBasic)console.log("SSH key exchanged finished... ");
+          sshLogger.debug("SSH key exchanged finished... ");
           var pdu = sessionData.rekeyQueue.shift();
           while (pdu){
             writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,pdu);
@@ -1008,11 +1023,12 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       }
       default :{
-        if(traceBasic)console.log("unknown msgCode, something unimplemented "+ msgCode);
+        sshLogger.warn("unknown msgCode, something unimplemented "+ msgCode);
         break;
       }
      
-    } 
+    }
+    sshLogger.debug('rcv=%s done', CODE_TO_NAME[msgCode]);
     terminalWebsocketProxy.sshSessionData=sessionData;
   }
   if (traceCrypto) console.log('Done with socket read');
@@ -1273,7 +1289,7 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     rawData.copy(receivedMac,0,currentPosition);
     currentPosition+=receivedMac.length;
     if (receivedMac.toString('hex')!=computedMac.toString('hex')){
-      if(traceBasic)console.log("mac verification failed. ");
+      sshLogger.warn("mac verification failed. ");
     }
     if(traceCrypto) console.log("received mac: "+receivedMac.toString('hex'));
     if(traceCrypto) console.log("computed mac: "+computedMac.toString('hex'));
