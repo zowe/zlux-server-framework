@@ -716,8 +716,8 @@ export class Raft {
     } else {
       if (this.maxLogSize > 0 && this.log.length > this.maxLogSize) {
         this.print("raft log size(%d) exceeds max log size(%d)", this.log.length, this.maxLogSize);
-        setImmediate(() => {
-          const snapshot = this.createSnapshot(this.lastApplied);
+        setImmediate(async () => {
+          const snapshot = await this.createSnapshot(this.lastApplied);
           this.discardLogIfLeader(snapshot);
           this.lastSnapshot = snapshot;
         });
@@ -1134,7 +1134,7 @@ export class Raft {
     return index - this.startIndex;
   }
 
-  private createSnapshot(lastIncludedIndex: number): Snapshot {
+  private async createSnapshot(lastIncludedIndex: number): Promise<Snapshot> {
     const previousSnapshot = this.lastSnapshot;
     const lastIncludedTerm = this.item(lastIncludedIndex).term;
     let snapshot: Snapshot = {
@@ -1148,17 +1148,22 @@ export class Raft {
     }
     for (let index = this.startIndex; index <= lastIncludedIndex; index++) {
       const item = this.item(index);
-      this.applyItemToSnapshot(item, snapshot);
+      await this.applyItemToSnapshot(item, snapshot);
     }
     return snapshot;
   }
 
-  private applyItemToSnapshot(item: RaftLogEntry, snapshot: Snapshot): void {
+  private async applyItemToSnapshot(item: RaftLogEntry, snapshot: Snapshot): Promise<void> {
     const entry: SyncCommand = item.command;
     const { session, storage } = snapshot;
     if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
-      session[sessionData.sid] = sessionData.session;
+      const existingSession = await sessionStore.get(sessionData.sid);
+      if (typeof existingSession === 'object') {
+        session[sessionData.sid] = sessionData.session;
+      } else {
+        raftLog.debug(`session ${sessionData.sid} has expired`);
+      }
     } else if (isStorageSyncCommand(entry)) {
       if (isStorageActionSetAll(entry.payload)) {
         snapshot.storage[entry.payload.data.pluginId] = entry.payload.data.dict;
@@ -1188,7 +1193,7 @@ export class Raft {
     }
     const clusterManager = process.clusterManager;
     for (const pluginId of Object.keys(storage)) {
-      clusterManager.setStorageAll(pluginId, storage[pluginId]).then(() => {});
+      clusterManager.setStorageAll(pluginId, storage[pluginId]).then(() => { });
     }
   }
 
