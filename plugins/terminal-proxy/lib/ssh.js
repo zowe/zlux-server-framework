@@ -1288,12 +1288,16 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     var receivedMac = Buffer.alloc(sessionData.readingMACLength);
     rawData.copy(receivedMac,0,currentPosition);
     currentPosition+=receivedMac.length;
-    if (receivedMac.toString('hex')!=computedMac.toString('hex')){
-      sshLogger.warn("mac verification failed. ");
+    if (computedMac == undefined) {
+      sshLogger.warn('mac verification failed')
+    } else {
+      if (receivedMac.toString('hex')!=computedMac.toString('hex')){
+        sshLogger.warn("mac verification failed. ");
+      }
+      if(traceCrypto) console.log("received mac: "+receivedMac.toString('hex'));
+      if(traceCrypto) console.log("computed mac: "+computedMac.toString('hex'));
+        //should disconnect if not matching.
     }
-    if(traceCrypto) console.log("received mac: "+receivedMac.toString('hex'));
-    if(traceCrypto) console.log("computed mac: "+computedMac.toString('hex'));
-      //should disconnect if not matching.
   }
   return  {readLength: currentPosition, sshv2PDU: new SSHv2PDU(0,payload)};
 }
