@@ -25,13 +25,18 @@ import {
 const sessionStore = require('./sessionStore').sessionStore;
 import { EurekaInstanceConfig } from 'eureka-js-client';
 import { ApimlConnector } from "./apiml";
+const ApimlConnectorClass = require('./apiml');
 import * as fs from 'fs';
 import * as path from 'path';
 import { Request, Response } from "express";
 import { NextFunction } from "connect";
 import { StorageDict } from "./clusterManager";
+import { SyncService } from "./sync-service";
+const readTlsOptionsFromConfig = require('./webserver').readTlsOptionsFromConfig;
+const makeWebServerHttpAndHttpsOptions = require('./webserver').makeWebServerHttpAndHttpsOptions;
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
+
 
 export class RaftPeer extends RaftRPCWebSocketDriver {
   constructor(
@@ -1237,3 +1242,50 @@ export const raft = new Raft(persister, maxLogSize);
 
   Copyright Contributors to the Zowe Project.
 */
+
+export async function makeApiml(userConfig: any): Promise<ApimlConnector> {
+  const wsConfig = userConfig.node;
+  const apimlConfig = userConfig.node.mediationLayer;
+  const { httpOptions, httpsOptions} = makeWebServerHttpAndHttpsOptions(wsConfig);
+  let apimlTlsOptions;
+  if (apimlConfig.tlsOptions != null) {
+    apimlTlsOptions = {};
+    readTlsOptionsFromConfig(apimlConfig.tlsOptions, apimlTlsOptions); 
+  } else {
+    apimlTlsOptions = httpsOptions;
+  }
+  const httpPort = wsConfig.http ? wsConfig.http.port : undefined;
+  const httpsPort = wsConfig.https ? wsConfig.https.port : undefined;
+  const apiml = new ApimlConnectorClass({
+    hostName: 'localhost',
+    ipAddr: '127.0.0.1',
+    httpPort:httpPort, 
+    httpsPort: httpsPort, 
+    apimlHost: apimlConfig.server.hostname,
+    apimlPort: apimlConfig.server.port,
+    tlsOptions: apimlTlsOptions,
+    eurekaOverrides: apimlConfig.eureka
+  });
+  await apiml.registerMainServerInstance();
+  return apiml;
+}
+
+export async function makeRaft(apiml: ApimlConnector): Promise<Raft> {
+  await apiml.takeOutOfService();
+  const instanceId = apiml.getInstanceId();
+  let appServerClusterSize = +process.env.ZOWE_APP_SERVER_CLUSTER_SIZE;
+  if (!Number.isInteger(appServerClusterSize) || appServerClusterSize < 3) {
+    appServerClusterSize = 3;
+  }
+  raftLog.info(`my instance is ${instanceId}, app-server cluster size ${appServerClusterSize}`);
+  const zluxInstances = await apiml.waitUntilZluxClusterIsReady(appServerClusterSize);
+  raftLog.debug(`zlux cluster is ready, instances ${JSON.stringify(zluxInstances, null, 2)}`);
+  const me = zluxInstances.findIndex(instance => instance.instanceId === instanceId);
+  raftLog.info(`my peer index is ${me}`);
+  const peers = zluxInstances.map(instance => RaftPeer.make(instance, apiml));
+  if (me !== -1) {
+   raft.start(peers, me);
+   this.syncService = new SyncService(raft);
+  }
+  return raft;
+}

@@ -3,6 +3,7 @@ import { EurekaInstanceConfig } from 'eureka-js-client';
 declare type Status = 'UP' | 'DOWN' | 'STARTING' | 'OUT_OF_SERVICE' | 'UNKNOWN';
 
 declare class ApimlConnector {
+  constructor(config: any);
   registerMainServerInstance(): Promise<void>;
   getInstanceId(): string;
   getZluxInstances(): EurekaInstanceConfig[];
