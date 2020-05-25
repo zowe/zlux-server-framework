@@ -220,6 +220,12 @@ export type State = 'Leader' | 'Follower' | 'Candidate';
 const minElectionTimeout = 1000;
 const maxElectionTimeout = 2000;
 
+export interface RaftStateReply {
+  started: boolean;
+  raftState: State;
+  leaderBaseURL?: string;
+}
+
 export class Raft {
   public readonly stateEmitter = new EventEmitter();
   private peers: RaftPeer[]; // RPC end points of all peers
@@ -566,28 +572,28 @@ export class Raft {
       success: true
     };
   }
-  
+
   invokeInstallSnapshot(args: InstallSnapshotArgs): Promise<InstallSnapshotReply> {
     return this.invokeRPCMethod('invokeInstallSnapshotLocal', args);
   }
-  
+
   invokeInstallSnapshotLocal(args: InstallSnapshotArgs, resultHandler: (reply: InstallSnapshotReply) => void): void {
     const reply = this.installSnapshot(args);
     resultHandler(reply);
   }
-  
-
-  
-
-
-  
-
   
   private invokeRPCMethod<T, P>(method: string, args: T): Promise<P> {
     if (!process.clusterManager || process.clusterManager.isMaster) {
       return this[method](args);
     }
     return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [args], result => result[0]);
+  }
+  
+  private invokeRaftMethod<T, P>(method: string): Promise<P> {
+    if (!process.clusterManager || process.clusterManager.isMaster) {
+      return this[method]();
+    }
+    return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [], result => result[0]);
   }
 
   private async callInstallSnapshot(server: number, term: number, snapshot: Snapshot): Promise<{ ok: boolean, success: boolean }> {
@@ -737,11 +743,11 @@ export class Raft {
     this.writePersistentState("after appendEntries");
     return reply;
   }
-  
+
   invokeAppendEntriesAndWritePersistentState(args: AppendEntriesArgs): Promise<AppendEntriesReply> {
     return this.invokeRPCMethod('invokeAppendEntriesAndWritePersistentStateLocal', args);
   }
-  
+
   invokeAppendEntriesAndWritePersistentStateLocal(args: AppendEntriesArgs, resultHandler: (reply: AppendEntriesReply) => void): void {
     const reply = this.appendEntriesAndWritePersistentState(args);
     resultHandler(reply);
@@ -851,11 +857,11 @@ export class Raft {
     this.writePersistentState("after requestVote");
     return reply;
   }
-  
+
   invokeRequestVoteAndWritePersistentState(args: RequestVoteArgs): Promise<RequestVoteReply> {
     return this.invokeRPCMethod('invokeRequestVoteAndWritePersistentStateLocal', args);
   }
-    
+
   invokeRequestVoteAndWritePersistentStateLocal(args: RequestVoteArgs, resultHandler: (reply: RequestVoteReply) => void): void {
     const reply = this.requestVoteAndWritePersistentState(args);
     resultHandler(reply);
@@ -1130,13 +1136,13 @@ export class Raft {
   }
 
   middleware() {
-    return (request: Request, response: Response, next: NextFunction) => {
-      if (this.started) {
-        if (!this.isLeader() && !request.path.startsWith('/raft')) {
-          if (this.state === 'Follower') {
-            const leader = this.peers[this.leaderId];
-            if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
-              response.redirect(`${leader.baseAddress}${request.path}`);
+    return async (request: Request, response: Response, next: NextFunction) => {
+      const state = await this.invokeGetRaftState();
+      if (state.started) {
+        if (state.raftState !== 'Leader' && !request.path.startsWith('/raft')) {
+          if (state.raftState === 'Follower') {
+            if (typeof state.leaderBaseURL === 'string') {
+              response.redirect(`${state.leaderBaseURL}${request.path}`);
               return;
             } else {
               response.status(503).json({
@@ -1145,7 +1151,7 @@ export class Raft {
               });
               return;
             }
-          } else if (this.state === 'Candidate') {
+          } else if (state.raftState === 'Candidate') {
             response.status(503).json({
               state: this.state,
             });
@@ -1156,6 +1162,34 @@ export class Raft {
       next();
     }
   }
+
+  getRaftStateLocal(resultHandler: (reply: RaftStateReply) => void): void {
+    const reply = this.getRaftState();
+    resultHandler(reply);
+  }
+
+  invokeGetRaftState(): Promise<RaftStateReply> {
+    return this.invokeRaftMethod('getRaftStateLocal');
+  }
+
+  private getRaftState(): RaftStateReply {
+    let leaderBaseURL: string | undefined;
+    if (this.isStarted && this.state === 'Follower') {
+      const leader = this.peers[this.leaderId];
+      if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
+        leaderBaseURL = leader.baseAddress;
+      }
+    }
+    return {
+      started: this.started,
+      raftState: this.state,
+      leaderBaseURL,
+    };
+  }
+
+
+
+
 
   private item(index: number): RaftLogEntry {
     return this.log[index - this.startIndex];
@@ -1287,11 +1321,11 @@ export const raft = new Raft(persister, maxLogSize);
 export async function makeApiml(userConfig: any): Promise<ApimlConnector> {
   const wsConfig = userConfig.node;
   const apimlConfig = userConfig.node.mediationLayer;
-  const { httpOptions, httpsOptions} = makeWebServerHttpAndHttpsOptions(wsConfig);
+  const { httpOptions, httpsOptions } = makeWebServerHttpAndHttpsOptions(wsConfig);
   let apimlTlsOptions;
   if (apimlConfig.tlsOptions != null) {
     apimlTlsOptions = {};
-    readTlsOptionsFromConfig(apimlConfig.tlsOptions, apimlTlsOptions); 
+    readTlsOptionsFromConfig(apimlConfig.tlsOptions, apimlTlsOptions);
   } else {
     apimlTlsOptions = httpsOptions;
   }
@@ -1300,8 +1334,8 @@ export async function makeApiml(userConfig: any): Promise<ApimlConnector> {
   const apiml = new ApimlConnectorClass({
     hostName: 'localhost',
     ipAddr: '127.0.0.1',
-    httpPort:httpPort, 
-    httpsPort: httpsPort, 
+    httpPort: httpPort,
+    httpsPort: httpsPort,
     apimlHost: apimlConfig.server.hostname,
     apimlPort: apimlConfig.server.port,
     tlsOptions: apimlTlsOptions,
@@ -1325,8 +1359,8 @@ export async function makeRaft(apiml: ApimlConnector): Promise<Raft> {
   raftLog.info(`my peer index is ${me}`);
   const peers = zluxInstances.map(instance => RaftPeer.make(instance, apiml));
   if (me !== -1) {
-   raft.start(peers, me);
-   this.syncService = new SyncService(raft);
+    raft.start(peers, me);
+    this.syncService = new SyncService(raft);
   }
   return raft;
 }
