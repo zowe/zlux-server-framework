@@ -236,10 +236,10 @@ export class RaftRPCWebSocketService {
     }
 
   }
-  private processAppendEntriesMessage(message: WebSocketAppendEntriesArgsMessage): void {
+  private async processAppendEntriesMessage(message: WebSocketAppendEntriesArgsMessage): Promise<void> {
     const seq = message.seq;
     const args = message.message;
-    const reply = this.raft.appendEntriesAndWritePersistentState(args);
+    const reply = await this.raft.invokeAppendEntriesAndWritePersistentState(args);
     const replyMessage: WebSocketAppendEntriesReplyMessage = {
       type: 'AppendEntriesReply',
       seq,
@@ -248,10 +248,10 @@ export class RaftRPCWebSocketService {
     this.clientWS.send(JSON.stringify(replyMessage));
   }
 
-  private processRequestVoteMessage(message: WebSocketRequestVoteArgsMessage): void {
+  private async processRequestVoteMessage(message: WebSocketRequestVoteArgsMessage): Promise<void> {
     const seq = message.seq;
     const args = message.message;
-    const reply = this.raft.requestVoteAndWritePersistentState(args);
+    const reply = await this.raft.invokeRequestVoteAndWritePersistentState(args);
     const replyMessage: WebSocketRequestVoteReplyMessage = {
       type: 'RequestVoteReply',
       seq,
@@ -260,10 +260,10 @@ export class RaftRPCWebSocketService {
     this.clientWS.send(JSON.stringify(replyMessage));
   }
   
-  private processInstallSnapshotMessage(message: WebSocketInstallSnapshotArgsMessage): void {
+  private async processInstallSnapshotMessage(message: WebSocketInstallSnapshotArgsMessage): Promise<void> {
     const seq = message.seq;
     const args = message.message;
-    const reply = this.raft.installSnapshot(args);
+    const reply = await this.raft.invokeInstallSnapshot(args);
     const replyMessage: WebSocketInstallSnapshotReplyMessage = {
       type: 'InstallSnapshotReply',
       seq,

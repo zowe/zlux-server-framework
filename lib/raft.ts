@@ -566,6 +566,29 @@ export class Raft {
       success: true
     };
   }
+  
+  invokeInstallSnapshot(args: InstallSnapshotArgs): Promise<InstallSnapshotReply> {
+    return this.invokeRPCMethod('invokeInstallSnapshotLocal', args);
+  }
+  
+  invokeInstallSnapshotLocal(args: InstallSnapshotArgs, resultHandler: (reply: InstallSnapshotReply) => void): void {
+    const reply = this.installSnapshot(args);
+    resultHandler(reply);
+  }
+  
+
+  
+
+
+  
+
+  
+  private invokeRPCMethod<T, P>(method: string, args: T): Promise<P> {
+    if (!process.clusterManager || process.clusterManager.isMaster) {
+      return this[method](args);
+    }
+    return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [args], result => result[0]);
+  }
 
   private async callInstallSnapshot(server: number, term: number, snapshot: Snapshot): Promise<{ ok: boolean, success: boolean }> {
     const args: InstallSnapshotArgs = {
@@ -714,6 +737,15 @@ export class Raft {
     this.writePersistentState("after appendEntries");
     return reply;
   }
+  
+  invokeAppendEntriesAndWritePersistentState(args: AppendEntriesArgs): Promise<AppendEntriesReply> {
+    return this.invokeRPCMethod('invokeAppendEntriesAndWritePersistentStateLocal', args);
+  }
+  
+  invokeAppendEntriesAndWritePersistentStateLocal(args: AppendEntriesArgs, resultHandler: (reply: AppendEntriesReply) => void): void {
+    const reply = this.appendEntriesAndWritePersistentState(args);
+    resultHandler(reply);
+  }
 
   applyCommand(applyMsg: ApplyMsg): void {
     if (!this.isLeader()) {
@@ -818,6 +850,15 @@ export class Raft {
     const reply = this.requestVote(args);
     this.writePersistentState("after requestVote");
     return reply;
+  }
+  
+  invokeRequestVoteAndWritePersistentState(args: RequestVoteArgs): Promise<RequestVoteReply> {
+    return this.invokeRPCMethod('invokeRequestVoteAndWritePersistentStateLocal', args);
+  }
+    
+  invokeRequestVoteAndWritePersistentStateLocal(args: RequestVoteArgs, resultHandler: (reply: RequestVoteReply) => void): void {
+    const reply = this.requestVoteAndWritePersistentState(args);
+    resultHandler(reply);
   }
 
   private checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args: RequestVoteArgs): boolean {

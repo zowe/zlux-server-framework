@@ -24,6 +24,7 @@ declare class ClusterManager extends EventEmitter {
   setStorageByKey: (pluginId: string, key: string, value: string) => Promise<true>;
   deleteStorageByKey: (pluginId: string, key: string) => Promise<true>;
   getStorageCluster: () => Promise<StorageDict>;
+  callClusterMethodRemote: (moduleName: string | null, importedName: string, methodName: string, argsArray: any[], callback: (result: any[]) => void, onerror?: (err: Error) => void, timeout?: number) => Promise<any>;
 }
 
 
