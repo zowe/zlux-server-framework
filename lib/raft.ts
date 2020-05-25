@@ -222,7 +222,7 @@ const maxElectionTimeout = 2000;
 
 export interface RaftStateReply {
   started: boolean;
-  raftState: State;
+  raftState?: State;
   leaderBaseURL?: string;
 }
 
@@ -581,14 +581,14 @@ export class Raft {
     const reply = this.installSnapshot(args);
     resultHandler(reply);
   }
-  
+
   private invokeRPCMethod<T, P>(method: string, args: T): Promise<P> {
     if (!process.clusterManager || process.clusterManager.isMaster) {
       return this[method](args);
     }
     return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [args], result => result[0]);
   }
-  
+
   private invokeRaftMethod<T, P>(method: string): Promise<P> {
     if (!process.clusterManager || process.clusterManager.isMaster) {
       return this[method]();
@@ -1137,27 +1137,31 @@ export class Raft {
 
   middleware() {
     return async (request: Request, response: Response, next: NextFunction) => {
-      const state = await this.invokeGetRaftState();
-      if (state.started) {
-        if (state.raftState !== 'Leader' && !request.path.startsWith('/raft')) {
-          if (state.raftState === 'Follower') {
-            if (typeof state.leaderBaseURL === 'string') {
-              response.redirect(`${state.leaderBaseURL}${request.path}`);
-              return;
-            } else {
+      try {
+        const state = await this.invokeGetRaftState();
+        if (state.started) {
+          if (state.raftState !== 'Leader' && !request.path.startsWith('/raft')) {
+            if (state.raftState === 'Follower') {
+              if (typeof state.leaderBaseURL === 'string') {
+                response.redirect(`${state.leaderBaseURL}${request.path}`);
+                return;
+              } else {
+                response.status(503).json({
+                  state: this.state,
+                  message: 'Leader is not elected yet'
+                });
+                return;
+              }
+            } else if (state.raftState === 'Candidate') {
               response.status(503).json({
                 state: this.state,
-                message: 'Leader is not elected yet'
               });
               return;
             }
-          } else if (state.raftState === 'Candidate') {
-            response.status(503).json({
-              state: this.state,
-            });
-            return;
           }
         }
+      } catch(e) {
+        raftLog.debug(`unable to get raft state ${e.message}`);
       }
       next();
     }
