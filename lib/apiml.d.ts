@@ -16,3 +16,5 @@ declare class ApimlConnector {
   overrideStatusForInstance(instanceId: string, status: Status): Promise<void>;
   onReRegister(callback: () => void): void;
 }
+
+declare function makeApiml(userConfig: any): ApimlConnector;
