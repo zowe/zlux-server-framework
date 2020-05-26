@@ -263,8 +263,8 @@ export class Raft {
   async start(apiml: ApimlConnector): Promise<void> {
     raftLog.info(`starting peer electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
     this.apiml = apiml;
-    this.persister = this.getPersister();
-    this.maxLogSize = this.getMaxLogSize();
+    this.persister = Raft.makePersister();
+    this.maxLogSize = Raft.getMaxLogSize();
     const { peers, me } = await this.waitUntilZluxClusterIsReady();
     this.peers = peers;
     this.me = me;
@@ -297,7 +297,7 @@ export class Raft {
     return { peers, me };
   }
 
-  private getPersister(): Persister {
+  private static makePersister(): Persister {
     let persister: Persister;
     if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
       raftLog.info("raft persistence enabled");
@@ -316,7 +316,7 @@ export class Raft {
     return persister;
   }
 
-  private getMaxLogSize(): number {
+  private static getMaxLogSize(): number {
     let maxLogSize = +process.env.ZLUX_RAFT_MAX_LOG_SIZE;
     if (!Number.isInteger(maxLogSize)) {
       maxLogSize = 100;
