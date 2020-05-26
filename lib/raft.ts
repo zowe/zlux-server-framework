@@ -253,22 +253,76 @@ export class Raft {
   private discardCount: number = 0;
   private lastSnapshot: Snapshot;
 
-  constructor(
-    private persister: Persister,
-    private maxLogSize: number
-  ) {
-  }
+  private persister: Persister;
+  private maxLogSize: number = -1;
+  private syncService: SyncService;
+  private apiml: ApimlConnector;
 
-  start(peers: RaftPeer[], me: number): void {
-    raftLog.info(`starting peer ${me} electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
+  constructor() { }
+
+  async start(apiml: ApimlConnector): Promise<void> {
+    raftLog.info(`starting peer electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
+    this.apiml = apiml;
+    this.persister = this.getPersister();
+    this.maxLogSize = this.getMaxLogSize();
+    const { peers, me } = await this.waitUntilZluxClusterIsReady();
     this.peers = peers;
     this.me = me;
+    if (me === -1) {
+      raftLog.warn(`unable to find my instance among registered zlux instances`);
+      return;
+    }
+    this.syncService = new SyncService(this);
     this.readSnapshot(this.persister.readSnapshot());
     this.readPersistentState(this.persister.readState());
     this.scheduleElectionOnTimeout();
-    this.started = true;
     this.addOnReRegisterHandler();
-    this.print(`peer ${me} started ${this.started} log: ${JSON.stringify(this.log)}`);
+    this.started = true;
+    raftLog.info(`peer ${me} started with %s log`, this.log.length > 0 ? 'not empty' : 'empty');
+  }
+
+  private async waitUntilZluxClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
+    await this.apiml.takeOutOfService();
+    const instanceId = this.apiml.getInstanceId();
+    let appServerClusterSize = +process.env.ZOWE_APP_SERVER_CLUSTER_SIZE;
+    if (!Number.isInteger(appServerClusterSize) || appServerClusterSize < 3) {
+      appServerClusterSize = 3;
+    }
+    raftLog.info(`my instance is ${instanceId}, app-server cluster size ${appServerClusterSize}`);
+    const zluxInstances = await this.apiml.waitUntilZluxClusterIsReady(appServerClusterSize);
+    raftLog.debug(`zlux cluster is ready, instances ${JSON.stringify(zluxInstances, null, 2)}`);
+    const me = zluxInstances.findIndex(instance => instance.instanceId === instanceId);
+    raftLog.debug(`my peer index is ${me}`);
+    const peers = zluxInstances.map(instance => RaftPeer.make(instance, this.apiml));
+    return { peers, me };
+  }
+
+  private getPersister(): Persister {
+    let persister: Persister;
+    if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
+      raftLog.info("raft persistence enabled");
+      let logPath = process.env.ZLUX_LOG_PATH!;
+      if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
+        logPath = logPath.substring(1, logPath.length - 1);
+      }
+      const stateFilename = path.join(path.dirname(logPath), 'raft.data');
+      const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
+      raftLog.debug(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
+      persister = new FilePersister(stateFilename, snapshotFilename);
+    } else {
+      raftLog.info("raft persistence disabled");
+      persister = new DummyPersister();
+    }
+    return persister;
+  }
+
+  private getMaxLogSize(): number {
+    let maxLogSize = +process.env.ZLUX_RAFT_MAX_LOG_SIZE;
+    if (!Number.isInteger(maxLogSize)) {
+      maxLogSize = 100;
+    }
+    raftLog.info("raft max log size is %d", maxLogSize);
+    return maxLogSize;
   }
 
   // This is a temporary protection against "eureka heartbeat FAILED, Re-registering app" issue
@@ -1157,7 +1211,7 @@ export class Raft {
             }
           }
         }
-      } catch(e) {
+      } catch (e) {
         raftLog.debug(`unable to get raft state ${e.message}`);
       }
       next();
@@ -1287,47 +1341,7 @@ export class Raft {
 
 }
 
-export async function makeRaft(apiml: ApimlConnector): Promise<Raft> {
-  await apiml.takeOutOfService();
-  const instanceId = apiml.getInstanceId();
-  let appServerClusterSize = +process.env.ZOWE_APP_SERVER_CLUSTER_SIZE;
-  if (!Number.isInteger(appServerClusterSize) || appServerClusterSize < 3) {
-    appServerClusterSize = 3;
-  }
-  raftLog.info(`my instance is ${instanceId}, app-server cluster size ${appServerClusterSize}`);
-  const zluxInstances = await apiml.waitUntilZluxClusterIsReady(appServerClusterSize);
-  raftLog.debug(`zlux cluster is ready, instances ${JSON.stringify(zluxInstances, null, 2)}`);
-  const me = zluxInstances.findIndex(instance => instance.instanceId === instanceId);
-  raftLog.info(`my peer index is ${me}`);
-  const peers = zluxInstances.map(instance => RaftPeer.make(instance, apiml));
-  if (me !== -1) {
-    raft.start(peers, me);
-    this.syncService = new SyncService(raft);
-  }
-  return raft;
-}
-
-let persister: Persister;
-if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
-  raftLog.info("raft persistence enabled");
-  let logPath = process.env.ZLUX_LOG_PATH!;
-  if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
-    logPath = logPath.substring(1, logPath.length - 1);
-  }
-  const stateFilename = path.join(path.dirname(logPath), 'raft.data');
-  const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
-  raftLog.debug(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
-  persister = new FilePersister(stateFilename, snapshotFilename);
-} else {
-  raftLog.info("raft persistence disabled");
-  persister = new DummyPersister();
-}
-let maxLogSize = +process.env.ZLUX_RAFT_MAX_LOG_SIZE;
-if (!Number.isInteger(maxLogSize)) {
-  maxLogSize = 100;
-}
-raftLog.info("raft max log size is %d", maxLogSize);
-export const raft = new Raft(persister, maxLogSize);
+export const raft = new Raft();
 
 /*
   This program and the accompanying materials are
