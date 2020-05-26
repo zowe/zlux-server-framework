@@ -432,8 +432,10 @@ function createMissingFolderAsync(resourcePath, scopeDirectory, callback){
 
 
 function encodeDirectoryName(inputName){
-  var resourceLength = inputName.length;
-  var percentEncodedResource = percentEncode(inputName,percentEncodedResource,resourceLength);
+  //var resourceLength = inputName.length;
+  // TODO: Refactor percentEnconde method to include parameters for resource + resource length
+  //var percentEncodedResource = percentEncode(inputName,percentEncodedResource,resourceLength);
+  var percentEncodedResource = percentEncode(inputName);
 
   return percentEncodedResource;
 }
@@ -1115,7 +1117,7 @@ function respondWithConfigFile(response, filename, resource, directories, scope,
   default:
     {
       var msg = "ZWED0067E - Aggregation policy type="+policy+" unhandled";
-      respondWithJsonError(response,msg,HTTP_STATUS_BAD_REQUEST,"Bad Request",location);
+      respondWithJsonError(response,msg,HTTP_STATUS_BAD_REQUEST,location);
       logger.warn("ZWED0101W", policy); //logger.warn(msg);
     }
   }
