@@ -3,8 +3,12 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
-## Recent Changes
+## 1.12.0
 
+- Bugfix: Server handles if implementationDefaults or mediationLayer objects are missing
+- Bugfix: SSH connecting from terminal-proxy was very slow on node v12+
+- Bugfix: Lease info for mediation layer was a value that caused periodic heartbeat failure
+- Add ability to state where a plugin path is relative to, instead of just where the server is running.
 - Bugfix: Logout now allows security plugins to clear cookies
 - Removed tokenInjector from sso-auth, since when SSO is being used token injection logic is not needed anymore.
 - Bugfix: When trying to dynamically load a plugin with unmet dependencies, the response from the server would hang
