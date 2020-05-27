@@ -346,5 +346,12 @@
   "ZWED0112E":"The server found no plugin implementing the specified default authentication type of %s.",
   "ZWED0113E":"The server found no authentication types. Verify that the server configuration file defines server authentication.",
   "ZWED0114E":"The server found no plugin implementing the specified default authentication type of %s.",
-  "ZWED0115E":"RESERVED: Unable to retrieve storage object from cluster. This is probably due to a timeout.\nYou may change the default of '%s' ms by setting 'node.cluster.storageTimeout' within the config. %s"
+  "ZWED0115E":"RESERVED: Unable to retrieve storage object from cluster. This is probably due to a timeout.\nYou may change the default of '%s' ms by setting 'node.cluster.storageTimeout' within the config. %s",
+  "ZWED0145E":"Cannot load SAF keyring content outside of z/OS",
+  "ZWED0146E":"SAF keyring data had no attribute \"%s\". Attributes=",
+  "ZWED0147E":"SAF keyring data was not found for \"%s\"",
+  "ZWED0148E":"Exception thrown when reading SAF keyring, e=",
+  "ZWED0149E":"SAF keyring reference missing userId \"%s\", keyringName \"%s\", or label \"%s\"",
+  "ZWED0150E":"Cannot load SAF keyring due to missing keyring_js library",
+  "ZWED0151E":"RESERVED: Env var %s not found"
 }
