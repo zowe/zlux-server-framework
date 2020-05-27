@@ -133,6 +133,8 @@ SsoAuthenticator.prototype = {
             }).catch((e) => {
               resolve(this._insertHandlerStatus({success: false, reason: e.message}));
             });
+          } else { //only zss?
+            resolve(this._insertHandlerStatus({success: (zssResult.success), cookies: zssResult.cookies}));
           }
         }).catch((e) => {
           resolve(this._insertHandlerStatus({success: false, reason: e.message}));
