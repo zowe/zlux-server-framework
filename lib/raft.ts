@@ -1230,8 +1230,8 @@ export class Raft {
   private getRaftState(): RaftStateReply {
     let leaderBaseURL: string | undefined;
     if (this.isStarted && this.state === 'Follower') {
-      const leader = this.peers[this.leaderId];
       if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
+        const leader = this.peers[this.leaderId];
         leaderBaseURL = leader.baseAddress;
       }
     }
@@ -1328,7 +1328,7 @@ export class Raft {
     }
     const clusterManager = process.clusterManager;
     for (const pluginId of Object.keys(storage)) {
-      clusterManager.setStorageAll(pluginId, storage[pluginId]).then(() => { });
+      clusterManager.setStorageAll(pluginId, storage[pluginId]);
     }
   }
 
