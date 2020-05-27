@@ -1153,7 +1153,7 @@ export class Raft {
   private discardLog(snapshot: Snapshot): void {
     this.discardCount++;
     const { lastIncludedIndex, lastIncludedTerm } = snapshot;
-    this.print("DiscardNonLocking %d prevStartIndex %d newStartIndex %d",
+    this.print("DiscardNonLocking %d prevStartIndex %d lastIncludedIndex %d",
       this.discardCount, this.startIndex, lastIncludedIndex);
     this.print("my log %s", JSON.stringify(this.log));
     this.print("my log len %d %d", this.log.length, this.len());
@@ -1281,6 +1281,7 @@ export class Raft {
     if (previousSnapshot) {
       snapshot = previousSnapshot;
     }
+    this.print(`create snapshot from ${this.startIndex} to ${lastIncludedIndex}`);
     for (let index = this.startIndex; index <= lastIncludedIndex; index++) {
       const item = this.item(index);
       await this.applyItemToSnapshot(item, snapshot);
@@ -1293,8 +1294,9 @@ export class Raft {
     const { session, storage } = snapshot;
     if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
-      const existingSession = await sessionStore.get(sessionData.sid);
-      if (typeof existingSession === 'object') {
+      let existingSession = null;
+      sessionStore.get(sessionData.sid, (_err, session) => existingSession = session);
+      if (existingSession) {
         session[sessionData.sid] = sessionData.session;
       } else {
         raftLog.debug(`session ${sessionData.sid} has expired`);
