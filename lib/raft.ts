@@ -218,6 +218,7 @@ const minElectionTimeout = 1000;
 const maxElectionTimeout = 2000;
 
 export interface RaftStateReply {
+  isEnabled: boolean;
   started: boolean;
   raftState?: State;
   leaderBaseURL?: string;
@@ -225,6 +226,7 @@ export interface RaftStateReply {
 
 export class Raft {
   public readonly stateEmitter = new EventEmitter();
+  public readonly isEnabled: boolean;
   private peers: RaftPeer[]; // RPC end points of all peers
   private me: number;  // this peer's index into peers[]
   private state: State = 'Follower';
@@ -258,7 +260,11 @@ export class Raft {
   private syncService: SyncService;
   private apiml: ApimlConnector;
 
-  constructor() { }
+
+  constructor() {
+    const clusterEnabledEnvVar = process.env.ZOWE_APP_SERVER_CLUSTER_ENABLED;
+    this.isEnabled = clusterEnabledEnvVar === 'TRUE' || clusterEnabledEnvVar === 'YES';
+  }
 
   async start(apiml: ApimlConnector): Promise<void> {
     raftLog.info(`starting peer electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
@@ -1190,7 +1196,14 @@ export class Raft {
     return async (request: Request, response: Response, next: NextFunction) => {
       try {
         const state = await this.invokeGetRaftState();
-        if (state.started) {
+        if (state.isEnabled) {
+          if (!state.started) {
+            response.status(503).json({
+              state,
+              message: 'Cluster is not started yet'
+            });
+            return;
+          }
           if (state.raftState !== 'Leader' && !request.path.startsWith('/raft')) {
             if (state.raftState === 'Follower') {
               if (typeof state.leaderBaseURL === 'string') {
@@ -1198,21 +1211,21 @@ export class Raft {
                 return;
               } else {
                 response.status(503).json({
-                  state: this.state,
+                  state,
                   message: 'Leader is not elected yet'
                 });
                 return;
               }
             } else if (state.raftState === 'Candidate') {
-              response.status(503).json({
-                state: this.state,
-              });
+              response.status(503).json({ state });
               return;
             }
           }
         }
       } catch (e) {
-        raftLog.debug(`unable to get raft state ${e.message}`);
+        raftLog.warn(`unable to get raft state ${e.message}`);
+        next(e);
+        return;
       }
       next();
     }
@@ -1236,6 +1249,7 @@ export class Raft {
       }
     }
     return {
+      isEnabled: this.isEnabled,
       started: this.started,
       raftState: this.state,
       leaderBaseURL,
