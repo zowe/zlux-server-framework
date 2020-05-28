@@ -1061,17 +1061,17 @@ export class Raft {
     const entry: SyncCommand = applyMsg.command;
     if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
-      sessionStore.set(sessionData.sid, sessionData.session, () => { });
+      sessionStore.addSession(sessionData.sid, sessionData.session);
     } else if (isStorageSyncCommand(entry)) {
       const clusterManager = process.clusterManager;
       if (isStorageActionSetAll(entry.payload)) {
-        clusterManager.setStorageAll(entry.payload.data.pluginId, entry.payload.data.dict);
+        clusterManager.setStorageAllLocal(entry.payload.data.pluginId, entry.payload.data.dict);
       } else if (isStorageActionSet(entry.payload)) {
-        clusterManager.setStorageByKey(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
+        clusterManager.setStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
       } else if (isStorageActionDeleteAll(entry.payload)) {
-        clusterManager.setStorageAll(entry.payload.data.pluginId, {});
+        clusterManager.setStorageAllLocal(entry.payload.data.pluginId, {});
       } else if (isStorageActionDelete(entry.payload)) {
-        clusterManager.deleteStorageByKey(entry.payload.data.pluginId, entry.payload.data.key);
+        clusterManager.deleteStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key);
       }
     } else if (isSnapshotSyncCommand(entry)) {
       this.restoreStateFromSnapshot(entry.payload);
@@ -1309,7 +1309,7 @@ export class Raft {
     if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
       let existingSession = null;
-      sessionStore.get(sessionData.sid, (_err, session) => existingSession = session);
+      sessionStore.get(sessionData.sid, (_err, session: any) => existingSession = session);
       if (existingSession) {
         session[sessionData.sid] = sessionData.session;
       } else {
@@ -1344,7 +1344,7 @@ export class Raft {
     }
     const clusterManager = process.clusterManager;
     for (const pluginId of Object.keys(storage)) {
-      clusterManager.setStorageAll(pluginId, storage[pluginId]);
+      clusterManager.setStorageAllLocal(pluginId, storage[pluginId]);
     }
   }
 
