@@ -143,7 +143,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
       const pendingRequest: PendingRequest = { message, resolve, reject };
       this.pendingRequests.set(seq, pendingRequest);
     });
-    raftLog.debug(`send websocket message ${JSON.stringify(message)} to ${this.address}`);
+    raftLog.trace(`send websocket message ${JSON.stringify(message)} to ${this.address}`);
     this.ws.send(JSON.stringify(message));
     return promise;
   }
@@ -154,7 +154,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   }
 
   private onMessage(data: Buffer): void {
-    raftLog.debug(`message ${data}`);
+    raftLog.trace(`message ${data}`);
     let message: WebSocketMessage;
     try {
       message = JSON.parse(data.toString());
@@ -170,11 +170,11 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     }
     this.pendingRequests.delete(seq);
     pendingRequest.resolve(message);
-    raftLog.debug(`successfully resolve pending request with seq ${seq}`);
+    raftLog.trace(`successfully resolve pending request with seq ${seq}`);
   }
 
   private onClose(code: number, reason: string): void {
-    raftLog.debug(`connection to ${this.address} closed ${code} ${reason}`);
+    raftLog.trace(`connection to ${this.address} closed ${code} ${reason}`);
     this.isConnected = false;
     this.ws = undefined;
     this.pendingRequests.forEach((request => {
@@ -184,7 +184,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   }
 
   private onError(ws: WebSocket, err: Error): void {
-    raftLog.debug(`connection error ${JSON.stringify(err)}`);
+    raftLog.trace(`connection error ${JSON.stringify(err)}`);
   }
 
 }
@@ -195,12 +195,12 @@ export class RaftRPCWebSocketService {
     private req: express.Request,
     private raft: Raft,
   ) {
-    this.log('constructor');
+    this.tracePrintf('constructor');
     this.init();
   }
 
   private init(): void {
-    this.log(`connected client`);
+    this.tracePrintf(`connected client`);
     // if (!this.raft.isStarted()) {
     //   this.clientWS.close();
     //   this.log('disconnect client because raft not started yet');
@@ -211,27 +211,27 @@ export class RaftRPCWebSocketService {
   }
 
   private onClose(): void {
-    this.log('connection closed');
+    this.tracePrintf('connection closed');
   }
 
   private onMessage(data: Buffer): void {
-    this.log(`received message ${data}`);
+    this.tracePrintf(`received message ${data}`);
     let message: WebSocketMessage;
     try {
       message = JSON.parse(data.toString());
     } catch (e) {
-      this.log(`ignore invalid message`);
+      this.tracePrintf(`ignore invalid message`);
       return;
     }
-    this.log(`got message ${JSON.stringify(message)}`);
+    this.tracePrintf(`got message ${JSON.stringify(message)}`);
     if (isWebSocketRequestVoteArgsMessage(message)) {
-      raftLog.debug(`got request vote message ${JSON.stringify(message)}`);
+      raftLog.trace(`got request vote message ${JSON.stringify(message)}`);
       this.processRequestVoteMessage(message);
     } else if (isWebSocketAppendEntriesArgsMessage(message)) {
-      raftLog.debug(`got append entries message ${JSON.stringify(message)}`);
+      raftLog.trace(`got append entries message ${JSON.stringify(message)}`);
       this.processAppendEntriesMessage(message);
     } else if (isWebSocketInstallSnapshotArgsMessage(message)) {
-      raftLog.debug(`got install snapshot message ${JSON.stringify(message)}`);
+      raftLog.trace(`got install snapshot message ${JSON.stringify(message)}`);
       this.processInstallSnapshotMessage(message);
     }
 
@@ -272,7 +272,7 @@ export class RaftRPCWebSocketService {
     this.clientWS.send(JSON.stringify(replyMessage));
   }
   
-  private log(msg: string): void {
-    raftLog.debug(`RaftRPCWebSocketService: ${msg}`);
+  private tracePrintf(msg: string): void {
+    raftLog.trace(`RaftRPCWebSocketService: ${msg}`);
   }
 }
