@@ -533,7 +533,7 @@ export class Raft {
       entries.push(this.item(ni));
     }
     let prevLogIndex = this.nextIndex[server] - 1;
-    let prevLogTerm = -1;
+    let prevLogTerm = this.startTerm;
     if (prevLogIndex >= this.startIndex && prevLogIndex < this.len()) {
       prevLogTerm = this.item(prevLogIndex).term;
     }
@@ -698,7 +698,7 @@ export class Raft {
     this.leaderId = args.leaderId;
     this.convertToFollower();
     this.cancelCurrentElectionTimeoutAndReschedule();
-    if (args.prevLogIndex >= this.startIndex) {
+    if (args.prevLogIndex >= this.startIndex - 1) {
       // 2. Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
       if (args.prevLogIndex >= this.len()) {
         this.tracePrintf("2. Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)");
@@ -712,24 +712,34 @@ export class Raft {
           }
         }
       }
+      let prevLogTerm: number;
       // 3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
-      const prevLogTerm = this.item(args.prevLogIndex).term;
-      if (prevLogTerm != args.prevLogTerm) {
+      if (args.prevLogIndex === this.startIndex - 1) {
+        prevLogTerm = this.startTerm;
+      } else {
+        prevLogTerm = this.item(args.prevLogIndex).term;
+      }
+      this.tracePrintf('prevLogTerm %d args.prevLogTerm', prevLogTerm, args.prevLogTerm);
+      if (prevLogTerm !== args.prevLogTerm) {
         this.tracePrintf("3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)");
-        this.tracePrintf("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice(this.relativeIndex(args.prevLogIndex))));
-        this.log = this.log.slice(0, this.relativeIndex(args.prevLogIndex));
+        let trimIndex = args.prevLogIndex;
+        if (args.prevLogIndex < this.startIndex) {
+          trimIndex = this.startIndex;
+        }
+        this.tracePrintf("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice(this.relativeIndex(trimIndex))));
+        this.log = this.log.slice(0, this.relativeIndex(trimIndex));
         this.tracePrintf("remaining entries %s", JSON.stringify(this.log));
         const conflict: Conflict = {
           conflictTerm: prevLogTerm,
           conflictIndex: this.findFirstEntryWithTerm(prevLogTerm),
           logLength: this.len(),
         };
-        this.tracePrintf("reply false, conflict %s", conflict);
+        this.tracePrintf("reply false, conflict %s", JSON.stringify(conflict));
         return {
           success: false,
           term: this.currentTerm,
           conflict: conflict,
-        }
+        };
       }
     }
     this.tracePrintf("leader commit %d my commit %d", args.leaderCommit, this.commitIndex);
@@ -818,7 +828,7 @@ export class Raft {
       if (this.maxLogSize > 0 && this.log.length > this.maxLogSize) {
         this.tracePrintf("raft log size(%d) exceeds max log size(%d)", this.log.length, this.maxLogSize);
         setImmediate(async () => {
-          const snapshot = await this.createSnapshot(this.lastApplied);
+          const snapshot = await this.createSnapshot(this.lastApplied - 1);
           this.discardLogIfLeader(snapshot);
           this.lastSnapshot = snapshot;
         });
@@ -1293,7 +1303,8 @@ export class Raft {
       lastIncludedTerm,
     };
     if (previousSnapshot) {
-      snapshot = previousSnapshot;
+      snapshot.session = {...previousSnapshot.session};
+      snapshot.storage = {...previousSnapshot.storage};
     }
     this.tracePrintf(`create snapshot from ${this.startIndex} to ${lastIncludedIndex}`);
     for (let index = this.startIndex; index <= lastIncludedIndex; index++) {
