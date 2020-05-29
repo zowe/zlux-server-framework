@@ -30,8 +30,11 @@ import * as path from 'path';
 import { Request, Response } from "express";
 import { NextFunction } from "connect";
 import { StorageDict } from "./clusterManager";
+import { SyncService } from "./sync-service";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
+
+(global as any).COM_RS_COMMON_LOGGER.setLogLevelForComponentName("_zsf.raft", 4);
 
 export class RaftPeer extends RaftRPCWebSocketDriver {
   constructor(
@@ -215,13 +218,21 @@ export type State = 'Leader' | 'Follower' | 'Candidate';
 const minElectionTimeout = 1000;
 const maxElectionTimeout = 2000;
 
+export interface RaftStateReply {
+  isEnabled: boolean;
+  started: boolean;
+  raftState?: State;
+  leaderBaseURL?: string;
+}
+
 export class Raft {
   public readonly stateEmitter = new EventEmitter();
+  public readonly isEnabled: boolean;
   private peers: RaftPeer[]; // RPC end points of all peers
   private me: number;  // this peer's index into peers[]
   private state: State = 'Follower';
   private readonly electionTimeout = Math.floor(Math.random() * (maxElectionTimeout - minElectionTimeout) + minElectionTimeout);
-  private debug = true;
+  private trace = true;
   private started = false;
 
   // persistent state
@@ -245,22 +256,80 @@ export class Raft {
   private discardCount: number = 0;
   private lastSnapshot: Snapshot;
 
-  constructor(
-    private persister: Persister,
-    private maxLogSize: number
-  ) {
+  private persister: Persister;
+  private maxLogSize: number = -1;
+  private syncService: SyncService;
+  private apiml: ApimlConnector;
+
+
+  constructor() {
+    const clusterEnabledEnvVar = process.env.ZOWE_APP_SERVER_CLUSTER_ENABLED;
+    this.isEnabled = clusterEnabledEnvVar === 'TRUE' || clusterEnabledEnvVar === 'YES';
   }
 
-  start(peers: RaftPeer[], me: number): void {
-    raftLog.info(`starting peer ${me} electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
+  async start(apiml: ApimlConnector): Promise<void> {
+    raftLog.info(`starting peer electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
+    this.apiml = apiml;
+    this.persister = Raft.makePersister();
+    this.maxLogSize = Raft.getMaxLogSize();
+    const { peers, me } = await this.waitUntilZluxClusterIsReady();
     this.peers = peers;
     this.me = me;
+    if (me === -1) {
+      raftLog.warn(`unable to find my instance among registered zlux instances`);
+      return;
+    }
+    this.syncService = new SyncService(this);
     this.readSnapshot(this.persister.readSnapshot());
     this.readPersistentState(this.persister.readState());
     this.scheduleElectionOnTimeout();
-    this.started = true;
     this.addOnReRegisterHandler();
-    this.print(`peer ${me} started ${this.started} log: ${JSON.stringify(this.log)}`);
+    this.started = true;
+    raftLog.info(`peer ${me} started with %s log`, this.log.length > 0 ? 'not empty' : 'empty');
+  }
+
+  private async waitUntilZluxClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
+    await this.apiml.takeOutOfService();
+    const instanceId = this.apiml.getInstanceId();
+    let appServerClusterSize = +process.env.ZOWE_APP_SERVER_CLUSTER_SIZE;
+    if (!Number.isInteger(appServerClusterSize) || appServerClusterSize < 3) {
+      appServerClusterSize = 3;
+    }
+    raftLog.info(`my instance is ${instanceId}, app-server cluster size ${appServerClusterSize}`);
+    const zluxInstances = await this.apiml.waitUntilZluxClusterIsReady(appServerClusterSize);
+    raftLog.debug(`zlux cluster is ready, instances ${JSON.stringify(zluxInstances, null, 2)}`);
+    const me = zluxInstances.findIndex(instance => instance.instanceId === instanceId);
+    raftLog.debug(`my peer index is ${me}`);
+    const peers = zluxInstances.map(instance => RaftPeer.make(instance, this.apiml));
+    return { peers, me };
+  }
+
+  private static makePersister(): Persister {
+    let persister: Persister;
+    if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
+      raftLog.info("raft persistence enabled");
+      let logPath = process.env.ZLUX_LOG_PATH!;
+      if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
+        logPath = logPath.substring(1, logPath.length - 1);
+      }
+      const stateFilename = path.join(path.dirname(logPath), 'raft.data');
+      const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
+      raftLog.debug(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
+      persister = new FilePersister(stateFilename, snapshotFilename);
+    } else {
+      raftLog.info("raft persistence disabled");
+      persister = new DummyPersister();
+    }
+    return persister;
+  }
+
+  private static getMaxLogSize(): number {
+    let maxLogSize = +process.env.ZLUX_RAFT_MAX_LOG_SIZE;
+    if (!Number.isInteger(maxLogSize)) {
+      maxLogSize = 100;
+    }
+    raftLog.info("raft max log size is %d", maxLogSize);
+    return maxLogSize;
   }
 
   // This is a temporary protection against "eureka heartbeat FAILED, Re-registering app" issue
@@ -268,7 +337,7 @@ export class Raft {
     const peer = this.peers[this.me];
     peer.apimlClient.onReRegister(() => {
       if (!this.isLeader()) {
-        peer.takeOutOfService().then(() => this.print('force taken out of service because of re-registration in Eureka'));
+        peer.takeOutOfService().then(() => this.tracePrintf('force taken out of service because of re-registration in Eureka'));
       }
     })
   }
@@ -310,7 +379,7 @@ export class Raft {
     let done = false;
     const term = this.currentTerm;
     const peerCount = this.peers.length;
-    this.print("attempting election at term %d", this.currentTerm)
+    this.tracePrintf("attempting election at term %d", this.currentTerm)
 
     for (let server = 0; server < peerCount; server++) {
       if (server === this.me) {
@@ -320,23 +389,23 @@ export class Raft {
         const peerAddress = this.peers[server].address;
         const voteGranted = await this.callRequestVote(server, term);
         if (!voteGranted) {
-          this.print("vote by peer %s not granted", peerAddress);
+          this.tracePrintf("vote by peer %s not granted", peerAddress);
           return;
         }
         votes++;
         if (done) {
-          this.print("got vote from peer %s but election already finished", peerAddress);
+          this.tracePrintf("got vote from peer %s but election already finished", peerAddress);
           return;
         } else if (this.state == 'Follower') {
-          this.print("got heartbeat, stop election")
+          this.tracePrintf("got heartbeat, stop election")
           done = true;
           return;
         } else if (votes <= Math.floor(peerCount / 2)) {
-          this.print("got vote from %s but not enough votes yet to become Leader", peerAddress);
+          this.tracePrintf("got vote from %s but not enough votes yet to become Leader", peerAddress);
           return;
         }
         if (this.state === 'Candidate') {
-          this.print("got final vote from %s and became Leader of term %d", peerAddress, term);
+          raftLog.info("got final vote from %s and became Leader of term %d", peerAddress, term);
           done = true;
           this.convertToLeader();
         }
@@ -353,8 +422,8 @@ export class Raft {
       this.nextIndex[i] = logLen;
       this.matchIndex[i] = -1;
     }
-    this.print("nextIndex %s", JSON.stringify(this.nextIndex));
-    this.print("matchIndex %s", JSON.stringify(this.matchIndex));
+    this.tracePrintf("nextIndex %s", JSON.stringify(this.nextIndex));
+    this.tracePrintf("matchIndex %s", JSON.stringify(this.matchIndex));
     setImmediate(() => this.emitState());
     this.sendHeartbeat();
   }
@@ -372,26 +441,26 @@ export class Raft {
       }
       setImmediate(async () => {
         if (!this.isLeader()) {
-          this.print("cancel heartbeat to %d at term %d because not leader anymore", server, this.currentTerm);
+          this.tracePrintf("cancel heartbeat to %d at term %d because not leader anymore", server, this.currentTerm);
           return;
         }
-        this.print("sends heartbeat to %d at term %d", server, this.currentTerm);
+        this.tracePrintf("sends heartbeat to %d at term %d", server, this.currentTerm);
         const { ok, success, conflict } = await this.callAppendEntries(server, this.currentTerm, 'heartbeat');
         if (ok && !success) {
           if (this.isLeader() && conflict) {
-            this.print("got unsuccessful heartbeat response from %d, adjust nextIndex because of conflict %s",
+            this.tracePrintf("got unsuccessful heartbeat response from %d, adjust nextIndex because of conflict %s",
               server, JSON.stringify(conflict));
             this.adjustNextIndexForServer(server, conflict);
           }
         } else if (ok && success) {
-          this.print("got successful heartbeat response from %d at term %d, nextIndex = %d, matchIndex = %d, commitIndex = %d",
+          this.tracePrintf("got successful heartbeat response from %d at term %d, nextIndex = %d, matchIndex = %d, commitIndex = %d",
             server, this.currentTerm, this.nextIndex[server], this.matchIndex[server], this.commitIndex)
           this.checkIfCommitted();
         }
       });
     }
     if (!this.isLeader()) {
-      this.print("stop heartbeat because not leader anymore");
+      this.tracePrintf("stop heartbeat because not leader anymore");
       return;
     }
     this.heartbeatTimeoutId = setTimeout(() => this.sendHeartbeat(), this.heartbeatInterval)
@@ -400,19 +469,19 @@ export class Raft {
   private adjustNextIndexForServer(server: number, conflict: Conflict) {
     if (conflict.conflictIndex === -1 && conflict.conflictTerm === -1) {
       if (conflict.logLength === 0 && this.lastSnapshot) {
-        this.print("follower's log is empty(have it re-started?) and there is a snapshot, send the snapshot to the follower");
+        this.tracePrintf("follower's log is empty(have it re-started?) and there is a snapshot, send the snapshot to the follower");
         setImmediate(() => this.installSnapshotForServer(server, this.currentTerm, this.lastSnapshot));
       } else {
         this.nextIndex[server] = conflict.logLength;
-        this.print("set nextIndex for server %d = %d because there are missing entries in follower's log", server, this.nextIndex[server]);
+        this.tracePrintf("set nextIndex for server %d = %d because there are missing entries in follower's log", server, this.nextIndex[server]);
       }
     } else if (conflict.conflictIndex !== -1) {
       this.nextIndex[server] = conflict.conflictIndex;
-      this.print("set nextIndex for server %d = %d because conflictIndex given", server, this.nextIndex[server]);
+      this.tracePrintf("set nextIndex for server %d = %d because conflictIndex given", server, this.nextIndex[server]);
     } else {
       if (this.nextIndex[server] > this.startIndex) {
         this.nextIndex[server]--;
-        this.print("decrease nextIndex for server %d to %d", server, this.nextIndex[server])
+        this.tracePrintf("decrease nextIndex for server %d to %d", server, this.nextIndex[server])
       }
     }
   }
@@ -434,7 +503,7 @@ export class Raft {
       if (matchIndex > this.commitIndex && count >= minPeers) {
         for (let i = this.commitIndex + 1; i <= matchIndex && i < this.len(); i++) {
           this.commitIndex = i;
-          this.print("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.item(this.commitIndex)));
+          this.tracePrintf("leader about to apply %d %s", this.commitIndex, JSON.stringify(this.item(this.commitIndex)));
           const applyMsg: ApplyMsg = {
             commandValid: true,
             commandIndex: this.commitIndex + 1,
@@ -443,7 +512,7 @@ export class Raft {
           this.applyCommand(applyMsg);
           this.lastApplied = this.commitIndex;
         }
-        this.print("checkIfCommitted: adjust commitIndex to %d", matchIndex);
+        this.tracePrintf("checkIfCommitted: adjust commitIndex to %d", matchIndex);
       }
     });
   }
@@ -464,12 +533,12 @@ export class Raft {
       entries.push(this.item(ni));
     }
     let prevLogIndex = this.nextIndex[server] - 1;
-    let prevLogTerm = -1;
+    let prevLogTerm = this.startTerm;
     if (prevLogIndex >= this.startIndex && prevLogIndex < this.len()) {
       prevLogTerm = this.item(prevLogIndex).term;
     }
-    this.print("CallAppendEntries %s for follower %d entries %s, my log %s",
-      kind, server, JSON.stringify(entries), JSON.stringify(this.log));
+    this.tracePrintf("CallAppendEntries %s for follower %d entries %s",
+      kind, server, JSON.stringify(entries));
     const args: AppendEntriesArgs = {
       leaderId: this.me,
       term: this.currentTerm,
@@ -486,7 +555,7 @@ export class Raft {
           this.nextIndex[server] = last + 1;
           this.matchIndex[server] = last;
         }
-        this.print("successfully appended entries to server %d nextIndex %s matchIndex %s",
+        this.tracePrintf("successfully appended entries to server %d nextIndex %s matchIndex %s",
           server, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
         return { ok: true, success: reply.success, conflict: reply.conflict };
       })
@@ -506,7 +575,7 @@ export class Raft {
       lastLogIndex: lastLogIndex,
       lastLogTerm: lastLogTerm,
     }
-    this.print("CallRequestVote: my log %s", JSON.stringify(this.log));
+    this.tracePrintf("CallRequestVote: log length", this.len());
     return peer.sendRequestVote(requestVoteArgs)
       .then(reply => {
         this.ensureResponseTerm(reply.term);
@@ -517,7 +586,7 @@ export class Raft {
 
   private ensureResponseTerm(responseTerm: number) {
     if (responseTerm > this.currentTerm) {
-      this.print(`If RPC response contains term(%d) > currentTerm(%d): set currentTerm = T, convert to follower (§5.1)`, responseTerm, this.currentTerm);
+      this.tracePrintf(`If RPC response contains term(%d) > currentTerm(%d): set currentTerm = T, convert to follower (§5.1)`, responseTerm, this.currentTerm);
       this.currentTerm = responseTerm;
       this.convertToFollower();
     }
@@ -529,10 +598,10 @@ export class Raft {
         success: false,
       };
     }
-    this.print("got InstallSnapshot request term %d, LastIncludedIndex %d, LastIncludedTerm %d",
+    this.tracePrintf("got InstallSnapshot request term %d, LastIncludedIndex %d, LastIncludedTerm %d",
       args.term, args.snapshot.lastIncludedIndex, args.snapshot.lastIncludedTerm);
     if (args.term < this.currentTerm) {
-      this.print("Reply false immediately if term(%d) < currentTerm", args.term);
+      this.tracePrintf("Reply false immediately if term(%d) < currentTerm", args.term);
       return {
         success: false
       }
@@ -556,10 +625,33 @@ export class Raft {
     if (args.snapshot.lastIncludedIndex > this.lastApplied) {
       this.lastApplied = args.snapshot.lastIncludedIndex;
     }
-    this.print("snapshot installed");
+    this.tracePrintf("snapshot installed");
     return {
       success: true
     };
+  }
+
+  invokeInstallSnapshot(args: InstallSnapshotArgs): Promise<InstallSnapshotReply> {
+    return this.invokeRPCMethod('invokeInstallSnapshotLocal', args);
+  }
+
+  invokeInstallSnapshotLocal(args: InstallSnapshotArgs, resultHandler: (reply: InstallSnapshotReply) => void): void {
+    const reply = this.installSnapshot(args);
+    resultHandler(reply);
+  }
+
+  private invokeRPCMethod<T, P>(method: string, args: T): Promise<P> {
+    if (!process.clusterManager || process.clusterManager.isMaster) {
+      return this[method](args);
+    }
+    return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [args], result => result[0]);
+  }
+
+  private invokeRaftMethod<T, P>(method: string): Promise<P> {
+    if (!process.clusterManager || process.clusterManager.isMaster) {
+      return this[method]();
+    }
+    return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [], result => result[0]);
   }
 
   private async callInstallSnapshot(server: number, term: number, snapshot: Snapshot): Promise<{ ok: boolean, success: boolean }> {
@@ -567,7 +659,7 @@ export class Raft {
       term: term,
       snapshot: snapshot,
     };
-    this.print("callInstallSnapshot for server %d with args %s", server, JSON.stringify(args));
+    this.tracePrintf("callInstallSnapshot for server %d with args %s", server, JSON.stringify(args));
     try {
       const reply = await this.peers[server].sendInstallSnapshot(args);
       return ({
@@ -585,19 +677,19 @@ export class Raft {
       requestType = "appendentries";
     }
     this.ensureRequestTerm(args.term);
-    this.print("got %s request from leader %d at term %d, my term %d, prevLogIndex %d, entries %s",
+    this.tracePrintf("got %s request from leader %d at term %d, my term %d, prevLogIndex %d, entries %s",
       requestType, args.leaderId, args.term, this.currentTerm, args.prevLogIndex, JSON.stringify(args.entries));
     if (!this.started) {
-      this.print("not started yet!, reply false");
+      this.tracePrintf("not started yet!, reply false");
       return {
         term: this.currentTerm,
         success: false,
       };
     }
-    this.print("my log is %s", JSON.stringify(this.log))
+    this.tracePrintf("my log is %s", JSON.stringify(this.log));
     // 1. Reply false if term < currentTerm (§5.1)
     if (args.term < this.currentTerm) {
-      this.print("1. Reply false if term < currentTerm (§5.1)")
+      this.tracePrintf("1. Reply false if term < currentTerm (§5.1)")
       return {
         success: false,
         term: this.currentTerm,
@@ -606,10 +698,10 @@ export class Raft {
     this.leaderId = args.leaderId;
     this.convertToFollower();
     this.cancelCurrentElectionTimeoutAndReschedule();
-    if (args.prevLogIndex >= this.startIndex) {
-      // 2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
+    if (args.prevLogIndex >= this.startIndex - 1) {
+      // 2. Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)
       if (args.prevLogIndex >= this.len()) {
-        this.print("2. Reply false if log doesn’t contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)");
+        this.tracePrintf("2. Reply false if log doesn't contain an entry at prevLogIndex whose term matches prevLogTerm (§5.3)");
         return {
           success: false,
           term: this.currentTerm,
@@ -620,27 +712,37 @@ export class Raft {
           }
         }
       }
+      let prevLogTerm: number;
       // 3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)
-      const prevLogTerm = this.item(args.prevLogIndex).term;
-      if (prevLogTerm != args.prevLogTerm) {
-        this.print("3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)");
-        this.print("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice(this.relativeIndex(args.prevLogIndex))));
-        this.log = this.log.slice(0, this.relativeIndex(args.prevLogIndex));
-        this.print("remaining entries %s", JSON.stringify(this.log));
+      if (args.prevLogIndex === this.startIndex - 1) {
+        prevLogTerm = this.startTerm;
+      } else {
+        prevLogTerm = this.item(args.prevLogIndex).term;
+      }
+      this.tracePrintf('prevLogTerm %d args.prevLogTerm', prevLogTerm, args.prevLogTerm);
+      if (prevLogTerm !== args.prevLogTerm) {
+        this.tracePrintf("3. If an existing entry conflicts with a new one (same index but different terms), delete the existing entry and all that follow it (§5.3)");
+        let trimIndex = args.prevLogIndex;
+        if (args.prevLogIndex < this.startIndex) {
+          trimIndex = this.startIndex;
+        }
+        this.tracePrintf("commit index %d, remove entries %s", this.commitIndex, JSON.stringify(this.log.slice(this.relativeIndex(trimIndex))));
+        this.log = this.log.slice(0, this.relativeIndex(trimIndex));
+        this.tracePrintf("remaining entries %s", JSON.stringify(this.log));
         const conflict: Conflict = {
           conflictTerm: prevLogTerm,
           conflictIndex: this.findFirstEntryWithTerm(prevLogTerm),
           logLength: this.len(),
         };
-        this.print("reply false, conflict %s", conflict);
+        this.tracePrintf("reply false, conflict %s", JSON.stringify(conflict));
         return {
           success: false,
           term: this.currentTerm,
           conflict: conflict,
-        }
+        };
       }
     }
-    this.print("leader commit %d my commit %d", args.leaderCommit, this.commitIndex);
+    this.tracePrintf("leader commit %d my commit %d", args.leaderCommit, this.commitIndex);
     if (args.entries.length > 0) {
       // 4. Append any new entries not already in the log
       const lastLogIndex = this.lastIndex();
@@ -651,18 +753,18 @@ export class Raft {
         }
         this.log = this.log.slice(0, this.relativeIndex(trimIndex));
         if (args.prevLogIndex >= this.startIndex) {
-          this.print("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.item(lastLogIndex)));
+          this.tracePrintf("truncate log, last log entry is [%d]=%s", lastLogIndex, JSON.stringify(this.item(lastLogIndex)));
         } else {
-          this.print("truncate log: make long empty");
+          this.tracePrintf("truncate log: make long empty");
         }
       }
-      this.print("4. Append any new entries not already in the log at index %d: %s", this.len(), JSON.stringify(args.entries));
+      this.tracePrintf("4. Append any new entries not already in the log at index %d: %s", this.len(), JSON.stringify(args.entries));
       this.log = this.log.concat(args.entries);
     }
     // 5. If leaderCommit > commitIndex, set commitIndex = min(leaderCommit, index of last new entry)
     const lastNewEntryIndex = this.lastIndex();
     if (args.leaderCommit > this.commitIndex) {
-      this.print("5. If leaderCommit(%d) > commitIndex(%d), set commitIndex = min(leaderCommit, index of last new entry) = %d",
+      this.tracePrintf("5. If leaderCommit(%d) > commitIndex(%d), set commitIndex = min(leaderCommit, index of last new entry) = %d",
         args.leaderCommit, this.commitIndex, Math.min(args.leaderCommit, lastNewEntryIndex));
       this.commitIndex = Math.min(args.leaderCommit, lastNewEntryIndex);
     }
@@ -678,7 +780,7 @@ export class Raft {
       }
       this.applyCommand(applyMsg);
     }
-    this.print("%s reply with success = true", requestType)
+    this.tracePrintf("%s reply with success = true", requestType)
     return {
       success: true,
       term: args.term,
@@ -710,25 +812,34 @@ export class Raft {
     return reply;
   }
 
+  invokeAppendEntriesAndWritePersistentState(args: AppendEntriesArgs): Promise<AppendEntriesReply> {
+    return this.invokeRPCMethod('invokeAppendEntriesAndWritePersistentStateLocal', args);
+  }
+
+  invokeAppendEntriesAndWritePersistentStateLocal(args: AppendEntriesArgs, resultHandler: (reply: AppendEntriesReply) => void): void {
+    const reply = this.appendEntriesAndWritePersistentState(args);
+    resultHandler(reply);
+  }
+
   applyCommand(applyMsg: ApplyMsg): void {
     if (!this.isLeader()) {
       this.applyCommandToFollower(applyMsg);
     } else {
       if (this.maxLogSize > 0 && this.log.length > this.maxLogSize) {
-        this.print("raft log size(%d) exceeds max log size(%d)", this.log.length, this.maxLogSize);
+        this.tracePrintf("raft log size(%d) exceeds max log size(%d)", this.log.length, this.maxLogSize);
         setImmediate(async () => {
-          const snapshot = await this.createSnapshot(this.lastApplied);
+          const snapshot = await this.createSnapshot(this.lastApplied - 1);
           this.discardLogIfLeader(snapshot);
           this.lastSnapshot = snapshot;
         });
       }
     }
-    this.print("applied %s", JSON.stringify(applyMsg));
+    this.tracePrintf("applied %s", JSON.stringify(applyMsg));
   }
 
   private ensureRequestTerm(requestTerm: number) {
     if (requestTerm > this.currentTerm) {
-      this.print("If RPC request contains term(%d) > currentTerm(%d): set currentTerm = T, convert to follower (§5.1)", requestTerm, this.currentTerm);
+      this.tracePrintf("If RPC request contains term(%d) > currentTerm(%d): set currentTerm = T, convert to follower (§5.1)", requestTerm, this.currentTerm);
       this.currentTerm = requestTerm;
       this.convertToFollower();
     }
@@ -736,7 +847,7 @@ export class Raft {
 
   convertToFollower(): void {
     if (this.state != 'Follower') {
-      this.print('convert to Follower');
+      this.tracePrintf('convert to Follower');
       this.state = 'Follower';
       this.cancelCurrentElectionTimeoutAndReschedule();
       this.cancelHeartbeat();
@@ -757,37 +868,37 @@ export class Raft {
   }
 
   requestVote(args: RequestVoteArgs): RequestVoteReply {
-    this.print("got vote request from %d at term %d, lastLogIndex %d, my term is %d, my commit index %d",
+    this.tracePrintf("got vote request from %d at term %d with lastLogIndex %d and term %d, my commit index %d",
       args.candidateId, args.term, args.lastLogIndex, this.currentTerm, this.commitIndex);
     if (!this.started) {
-      this.print("not started yet!, reply false");
+      this.tracePrintf("not started yet!, reply false");
       return {
         term: this.currentTerm,
         voteGranted: false,
       };
     }
-    this.print("my log %s", JSON.stringify(this.log));
+    this.tracePrintf("my log length", this.len());
     if (args.term < this.currentTerm) {
-      this.print("got vote request from %d at term %d", args.candidateId, args.term);
+      this.tracePrintf("got vote request from %d at term %d", args.candidateId, args.term);
       return {
         term: this.currentTerm,
         voteGranted: false,
       };
     }
     if (args.term > this.currentTerm) {
-      this.print("new term observed, I haven't voted at term %d", args.term);
+      this.tracePrintf("new term observed, I haven't voted at term %d", args.term);
       this.votedFor = -1;
     }
-    this.print("vote args %s", JSON.stringify(args));
+    this.tracePrintf("vote args %s", JSON.stringify(args));
     if (this.votedFor != -1 && this.votedFor != this.me) {
-      this.print("don't grant vote because already voted at term %d", this.currentTerm);
+      this.tracePrintf("don't grant vote because already voted at term %d", this.currentTerm);
       return {
         voteGranted: false,
         term: this.currentTerm
       };
     }
     if (this.checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args)) {
-      this.print("grant vote to %d because its log is up to date at least as mine log", args.candidateId);
+      this.tracePrintf("grant vote to %d because its log is up to date at least as mine log", args.candidateId);
       this.votedFor = args.candidateId;
       this.currentTerm = args.term;
       return {
@@ -795,7 +906,7 @@ export class Raft {
         voteGranted: true
       };
     }
-    this.print("don't grant vote to %d because candidate's log is stale", args.candidateId)
+    this.tracePrintf("don't grant vote to %d because candidate's log is stale", args.candidateId)
     this.ensureRequestTerm(args.term)
     return {
       term: this.currentTerm,
@@ -813,6 +924,15 @@ export class Raft {
     const reply = this.requestVote(args);
     this.writePersistentState("after requestVote");
     return reply;
+  }
+
+  invokeRequestVoteAndWritePersistentState(args: RequestVoteArgs): Promise<RequestVoteReply> {
+    return this.invokeRPCMethod('invokeRequestVoteAndWritePersistentStateLocal', args);
+  }
+
+  invokeRequestVoteAndWritePersistentStateLocal(args: RequestVoteArgs, resultHandler: (reply: RequestVoteReply) => void): void {
+    const reply = this.requestVoteAndWritePersistentState(args);
+    resultHandler(reply);
   }
 
   private checkIfCandidateLogIsUptoDateAtLeastAsMyLog(args: RequestVoteArgs): boolean {
@@ -836,7 +956,7 @@ export class Raft {
       // respond after entry applied to state machine (§5.3)
       index = this.appendLogEntry(command);
       this.writePersistentState("after new command added into log");
-      this.print("got command %s, would appear at index %d", JSON.stringify(command), index);
+      this.tracePrintf("got command %s, would appear at index %d", JSON.stringify(command), index);
       setImmediate(async () => this.startAgreement(index));
     }
     return { index, term, isLeader };
@@ -848,30 +968,30 @@ export class Raft {
       command: command,
     }
     this.log.push(entry);
-    this.print("leader appended a new entry %s %s", JSON.stringify(entry), JSON.stringify(this.log));
+    this.tracePrintf("leader appended a new entry %s", JSON.stringify(entry));
     return this.lastIndex();
   }
 
   private async startAgreement(index: number): Promise<void> {
     const alreadyCommitted = await this.waitForPreviousAgreement(index - 1);
     if (alreadyCommitted) {
-      this.print("entry %d already committed", index);
+      this.tracePrintf("entry %d already committed", index);
       return;
     }
     if (!this.isLeader()) {
-      this.print("not leader anymore cancel agreement on entry %d", index);
+      this.tracePrintf("not leader anymore cancel agreement on entry %d", index);
       return;
     }
-    this.print("starts agreement on entry %d, nextIndex %s, matchIndex %s", index, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
+    this.tracePrintf("starts agreement on entry %d, nextIndex %s, matchIndex %s", index, JSON.stringify(this.nextIndex), JSON.stringify(this.matchIndex));
     const minPeers = Math.floor(this.peers.length / 2);
     let donePeers = 0;
     const agreementEmitter = new EventEmitter();
     agreementEmitter.on('done', () => {
       donePeers++;
       if (donePeers == minPeers) {
-        this.print("agreement for entry [%d]=%s reached", index, JSON.stringify(this.item(index)));
+        this.tracePrintf("agreement for entry [%d]=%s reached", index, JSON.stringify(this.item(index)));
         if (this.commitIndex >= index) {
-          this.print("already committed %d inside checkIfCommitted", index);
+          this.tracePrintf("already committed %d inside checkIfCommitted", index);
           return;
         }
         this.commitIndex = index;
@@ -881,7 +1001,7 @@ export class Raft {
           command: this.item(index).command,
         };
         this.applyCommand(applyMsg);
-        this.print("leader applied  after agreement %s", JSON.stringify(applyMsg));
+        this.tracePrintf("leader applied  after agreement %s", JSON.stringify(applyMsg));
         this.lastApplied = index
       }
     });
@@ -896,35 +1016,35 @@ export class Raft {
   private async startAgreementForServer(server: number, index: number, agreementEmitter: EventEmitter): Promise<void> {
     const matchIndex = this.matchIndex[server];
     const nextIndex = this.nextIndex[server];
-    this.print("starts agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d",
+    this.tracePrintf("starts agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d",
       index, JSON.stringify(this.item(index)), server, this.currentTerm, nextIndex, matchIndex)
     const currentTerm = this.currentTerm;
     const isLeader = this.isLeader();
     if (!isLeader) {
-      this.print("cancel agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d, because not leader anymore",
+      this.tracePrintf("cancel agreement for entry [%d]=%s for server %d at term %d, nextIndex = %d, matchIndex = %d, because not leader anymore",
         index, JSON.stringify(this.item(index)), server, this.currentTerm, nextIndex, matchIndex)
       return;
     }
     const { ok, success } = await this.callAppendEntries(server, currentTerm, 'appendentries');
     if (!ok) {
       if (index >= this.len()) {
-        this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, "(removed)", server, this.currentTerm)
+        this.tracePrintf("agreement for entry [%d]=%s for server %d at term %d - not ok", index, "(removed)", server, this.currentTerm)
       } else {
-        this.print("agreement for entry [%d]=%s for server %d at term %d - not ok", index, JSON.stringify(this.item(index)), server, this.currentTerm)
+        this.tracePrintf("agreement for entry [%d]=%s for server %d at term %d - not ok", index, JSON.stringify(this.item(index)), server, this.currentTerm)
       }
     } else {
       if (success) {
-        this.print("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.item(index)), server, this.currentTerm)
+        this.tracePrintf("agreement for entry [%d]=%s for server %d at term %d - ok", index, JSON.stringify(this.item(index)), server, this.currentTerm)
         agreementEmitter.emit('done');
       } else {
-        this.print("agreement for entry %d for server %d - failed", index, server)
+        this.tracePrintf("agreement for entry %d for server %d - failed", index, server)
       }
     }
   }
 
   private async waitForPreviousAgreement(index: number): Promise<boolean> {
     if (index < 0) {
-      this.print("don't need to wait for agreement because no entries yet committed")
+      this.tracePrintf("don't need to wait for agreement because no entries yet committed")
       return false;
     }
     return new Promise<boolean>((resolve, reject) => this.checkPreviousAgreement(index, resolve));
@@ -939,30 +1059,30 @@ export class Raft {
     if (index < lastCommitted) {
       resolve(true);
     } else if (index == lastCommitted) {
-      this.print("entry %d is committed, ready to start agreement on next entry", index)
+      this.tracePrintf("entry %d is committed, ready to start agreement on next entry", index)
       resolve(false);
     } else {
-      this.print("wait because previous entry %d is not committed yet, commitIndex %d", index, lastCommitted);
+      this.tracePrintf("wait because previous entry %d is not committed yet, commitIndex %d", index, lastCommitted);
       setTimeout(() => this.checkPreviousAgreement(index, resolve), 10);
     }
   }
 
   private applyCommandToFollower(applyMsg: ApplyMsg): void {
-    this.print(`applyToFollower ${JSON.stringify(applyMsg)}`);
+    this.tracePrintf(`applyToFollower ${JSON.stringify(applyMsg)}`);
     const entry: SyncCommand = applyMsg.command;
     if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
-      sessionStore.set(sessionData.sid, sessionData.session, () => { });
+      sessionStore.addSession(sessionData.sid, sessionData.session);
     } else if (isStorageSyncCommand(entry)) {
       const clusterManager = process.clusterManager;
       if (isStorageActionSetAll(entry.payload)) {
-        clusterManager.setStorageAll(entry.payload.data.pluginId, entry.payload.data.dict);
+        clusterManager.setStorageAllLocal(entry.payload.data.pluginId, entry.payload.data.dict);
       } else if (isStorageActionSet(entry.payload)) {
-        clusterManager.setStorageByKey(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
+        clusterManager.setStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
       } else if (isStorageActionDeleteAll(entry.payload)) {
-        clusterManager.setStorageAll(entry.payload.data.pluginId, {});
+        clusterManager.setStorageAllLocal(entry.payload.data.pluginId, {});
       } else if (isStorageActionDelete(entry.payload)) {
-        clusterManager.deleteStorageByKey(entry.payload.data.pluginId, entry.payload.data.key);
+        clusterManager.deleteStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key);
       }
     } else if (isSnapshotSyncCommand(entry)) {
       this.restoreStateFromSnapshot(entry.payload);
@@ -970,7 +1090,7 @@ export class Raft {
   }
 
   private writePersistentState(site: string): void {
-    this.print("save persistent state %s", site)
+    this.tracePrintf("save persistent state %s", site)
     const state = this.getState()
     this.persister.saveState(state);
   }
@@ -990,7 +1110,7 @@ export class Raft {
     if (!data || data.length < 1) {
       return;
     }
-    this.print("read persistent state");
+    this.tracePrintf("read persistent state");
     try {
       const { votedFor, currentTerm, log, startIndex, startTerm } = JSON.parse(data);
       this.currentTerm = currentTerm;
@@ -998,10 +1118,10 @@ export class Raft {
       this.log = log;
       this.startIndex = startIndex;
       this.startTerm = startTerm;
-      this.print("state: term %d, votedFor %d, log %s",
+      this.tracePrintf("state: term %d, votedFor %d, log %s",
         this.currentTerm, this.votedFor, JSON.stringify(this.log));
     } catch (e) {
-      this.print("unable to decode state: %s", JSON.stringify(e));
+      this.tracePrintf("unable to decode state: %s", JSON.stringify(e));
     }
   }
 
@@ -1009,21 +1129,21 @@ export class Raft {
     if (!data || data.length < 1) {
       return;
     }
-    this.print("read snapshot");
+    this.tracePrintf("read snapshot");
     try {
       const snapshot: Snapshot = JSON.parse(data);
       this.restoreStateFromSnapshot(snapshot);
     } catch (e) {
-      this.print("unable to decode snapshot: %s", JSON.stringify(e));
+      this.tracePrintf("unable to decode snapshot: %s", JSON.stringify(e));
     }
   }
 
   private discardLogIfLeader(snapshot: Snapshot): void {
     if (!this.isLeader()) {
-      this.print("unable to discard log because not leader");
+      this.tracePrintf("unable to discard log because not leader");
       return;
     }
-    this.print("discardLogIfLeader");
+    this.tracePrintf("discardLogIfLeader");
     this.discardLog(snapshot);
     const term = this.currentTerm;
     for (let server = 0; server < this.peers.length; server++) {
@@ -1031,40 +1151,39 @@ export class Raft {
         setImmediate(async () => this.installSnapshotForServer(server, term, snapshot));
       }
     }
-    this.print("discardLogIfLeader done");
+    this.tracePrintf("discardLogIfLeader done");
   }
 
   private async installSnapshotForServer(server: number, term: number, snapshot: Snapshot): Promise<void> {
     const { ok, success } = await this.callInstallSnapshot(server, term, snapshot);
     if (ok && success) {
-      this.print("snapshot successfully installed on server %d", server);
+      this.tracePrintf("snapshot successfully installed on server %d", server);
       return;
     } else if (ok && !success) {
-      this.print("snapshot rejected by server %d", server);
+      this.tracePrintf("snapshot rejected by server %d", server);
       return;
     }
-    this.print("snapshot not installed on server %d, repeat after a delay", server);
+    this.tracePrintf("snapshot not installed on server %d, repeat after a delay", server);
     setTimeout(async () => this.installSnapshotForServer(server, term, snapshot), 10);
   }
 
   private discardLog(snapshot: Snapshot): void {
     this.discardCount++;
     const { lastIncludedIndex, lastIncludedTerm } = snapshot;
-    this.print("DiscardNonLocking %d prevStartIndex %d newStartIndex %d",
+    this.tracePrintf("DiscardNonLocking %d prevStartIndex %d lastIncludedIndex %d",
       this.discardCount, this.startIndex, lastIncludedIndex);
-    this.print("my log %s", JSON.stringify(this.log));
-    this.print("my log len %d %d", this.log.length, this.len());
+    this.tracePrintf("my log len %d, total %d", this.log.length, this.len());
     if (this.hasItemWithSameIndexAndTerm(lastIncludedIndex, lastIncludedTerm)) {
-      this.print("If existing log entry has same index and term as snapshot’s last included entry, retain log entries following it and reply")
+      this.tracePrintf("If existing log entry has same index and term as snapshot’s last included entry, retain log entries following it and reply")
       this.log = this.log.slice(this.relativeIndex(lastIncludedIndex + 1));
-      this.print("after discard my log %s", JSON.stringify(this.log));
+      this.tracePrintf("after discard my log %s", JSON.stringify(this.log));
     } else {
-      this.print("7. Discard the entire log");
+      this.tracePrintf("7. Discard the entire log");
       this.log = [];
     }
     this.startIndex = lastIncludedIndex + 1;
     this.startTerm = lastIncludedTerm;
-    this.print("log discarded startIndex = %d", this.startIndex);
+    this.tracePrintf("log discarded startIndex = %d", this.startIndex);
     const state = this.getState();
     this.persister.saveStateAndSnapshot(state, JSON.stringify(snapshot));
   }
@@ -1084,32 +1203,76 @@ export class Raft {
   }
 
   middleware() {
-    return (request: Request, response: Response, next: NextFunction) => {
-      if (this.started) {
-        if (!this.isLeader() && !request.path.startsWith('/raft')) {
-          if (this.state === 'Follower') {
-            const leader = this.peers[this.leaderId];
-            if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
-              response.redirect(`${leader.baseAddress}${request.path}`);
-              return;
-            } else {
+    return async (request: Request, response: Response, next: NextFunction) => {
+      if (this.isEnabled) {
+        try {
+          const state = await this.invokeGetRaftState();
+          if (state.raftState !== 'Leader' && !request.path.startsWith('/raft')) {
+            if (!state.started) {
+              raftLog.debug(`respond with 503 cluater not started yet, ${request.path}`);
               response.status(503).json({
-                state: this.state,
-                message: 'Leader is not elected yet'
+                state,
+                message: 'Cluster is not started yet'
               });
               return;
             }
-          } else if (this.state === 'Candidate') {
-            response.status(503).json({
-              state: this.state,
-            });
-            return;
+            if (state.raftState === 'Follower') {
+              if (typeof state.leaderBaseURL === 'string') {
+                const url = `${state.leaderBaseURL}${request.path}`;
+                raftLog.info(`redirect client to Leader at ${url}`);
+                response.redirect(301, url);
+                return;
+              } else {
+                response.status(503).json({
+                  state,
+                  message: 'Leader is not elected yet'
+                });
+                return;
+              }
+            } else if (state.raftState === 'Candidate') {
+              raftLog.debug(`candidate respond with 503, ${request.path}`);
+              response.status(503).json({ state });
+              return;
+            }
           }
+        } catch (e) {
+          raftLog.warn(`unable to get raft state ${e.message}`);
+          next(e);
+          return;
         }
       }
       next();
     }
   }
+
+  getRaftStateLocal(resultHandler: (reply: RaftStateReply) => void): void {
+    const reply = this.getRaftState();
+    resultHandler(reply);
+  }
+
+  invokeGetRaftState(): Promise<RaftStateReply> {
+    return this.invokeRaftMethod('getRaftStateLocal');
+  }
+
+  private getRaftState(): RaftStateReply {
+    let leaderBaseURL: string | undefined;
+    if (this.isStarted && this.state === 'Follower') {
+      if (this.leaderId >= 0 && this.leaderId < this.peers.length) {
+        const leader = this.peers[this.leaderId];
+        leaderBaseURL = leader.baseAddress;
+      }
+    }
+    return {
+      isEnabled: this.isEnabled,
+      started: this.started,
+      raftState: this.state,
+      leaderBaseURL,
+    };
+  }
+
+
+
+
 
   private item(index: number): RaftLogEntry {
     return this.log[index - this.startIndex];
@@ -1144,8 +1307,10 @@ export class Raft {
       lastIncludedTerm,
     };
     if (previousSnapshot) {
-      snapshot = previousSnapshot;
+      snapshot.session = { ...previousSnapshot.session };
+      snapshot.storage = { ...previousSnapshot.storage };
     }
+    this.tracePrintf(`create snapshot from ${this.startIndex} to ${lastIncludedIndex}`);
     for (let index = this.startIndex; index <= lastIncludedIndex; index++) {
       const item = this.item(index);
       await this.applyItemToSnapshot(item, snapshot);
@@ -1158,8 +1323,9 @@ export class Raft {
     const { session, storage } = snapshot;
     if (isSessionSyncCommand(entry)) {
       const sessionData = entry.payload;
-      const existingSession = await sessionStore.get(sessionData.sid);
-      if (typeof existingSession === 'object') {
+      let existingSession = null;
+      sessionStore.get(sessionData.sid, (_err, session: any) => existingSession = session);
+      if (existingSession) {
         session[sessionData.sid] = sessionData.session;
       } else {
         raftLog.debug(`session ${sessionData.sid} has expired`);
@@ -1186,47 +1352,26 @@ export class Raft {
   }
 
   restoreStateFromSnapshot(snapshot: Snapshot): void {
-    this.print("restore state from snapshot %s", JSON.stringify(snapshot));
+    this.tracePrintf("restore state from snapshot %s", JSON.stringify(snapshot));
     const { session, storage } = snapshot;
     for (const sid in session) {
       sessionStore.set(sid, session[sid], () => { });
     }
     const clusterManager = process.clusterManager;
     for (const pluginId of Object.keys(storage)) {
-      clusterManager.setStorageAll(pluginId, storage[pluginId]).then(() => { });
+      clusterManager.setStorageAllLocal(pluginId, storage[pluginId]);
     }
   }
 
-
-  private print(...args: any[]): void {
-    if (this.debug) {
-      raftLog.info(...args);
+  private tracePrintf(...args: any[]): void {
+    if (this.trace) {
+      raftLog.debug(...args);
     }
   }
 
 }
 
-let persister: Persister;
-if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
-  raftLog.info("raft persistence enabled");
-  let logPath = process.env.ZLUX_LOG_PATH!;
-  if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
-    logPath = logPath.substring(1, logPath.length - 1);
-  }
-  const stateFilename = path.join(path.dirname(logPath), 'raft.data');
-  const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
-  raftLog.debug(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
-  persister = new FilePersister(stateFilename, snapshotFilename);
-} else {
-  raftLog.info("raft persistence disabled");
-  persister = new DummyPersister();
-}
-let maxLogSize = +process.env.ZLUX_RAFT_MAX_LOG_SIZE;
-if (!Number.isInteger(maxLogSize)) {
-  maxLogSize = 100;
-}
-raftLog.info("raft max log size is %d", maxLogSize);
-export const raft = new Raft(persister, maxLogSize);
+export const raft = new Raft();
 
 /*
   This program and the accompanying materials are

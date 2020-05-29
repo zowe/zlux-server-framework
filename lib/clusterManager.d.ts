@@ -20,10 +20,14 @@ interface StorageDict {
 
 declare class ClusterManager extends EventEmitter {
   isMaster: boolean;
-  setStorageAll: (pluginId: string, dict: KeyVal) => Promise<true>;
-  setStorageByKey: (pluginId: string, key: string, value: string) => Promise<true>;
-  deleteStorageByKey: (pluginId: string, key: string) => Promise<true>;
-  getStorageCluster: () => Promise<StorageDict>;
+  setStorageAllLocal(pluginId: string, dict: KeyVal): void;
+  setStorageAll(pluginId: string, dict: KeyVal): Promise<true>;
+  setStorageByKeyLocal(pluginId: string, key: string, value: string): void;
+  setStorageByKey(pluginId: string, key: string, value: string): Promise<true>;
+  deleteStorageByKey(pluginId: string, key: string): void;
+  deleteStorageByKeyLocal(pluginId: string, key: string): Promise<true>;
+  getStorageCluster(): Promise<StorageDict>;
+  callClusterMethodRemote(moduleName: string | null, importedName: string, methodName: string, argsArray: any[], callback: (result: any[]) => void, onerror?: (err: Error) => void, timeout?: number): Promise<any>;
 }
 
 
