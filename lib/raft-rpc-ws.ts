@@ -79,6 +79,8 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   readonly address: string;
 
   private pendingRequests = new Map<number, PendingRequest>();
+  connectPromise: Promise<void>;
+  isConnecting: boolean = false;
 
 
   constructor(
@@ -95,7 +97,15 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
       type: 'RequestVoteArgs',
       message: args,
     };
-    return this.call(message).then(reply => reply.message);
+    try {
+    const reply = await this.call(message).then(reply => reply.message);
+    return reply;
+    } catch(e) {
+      return {
+        term: -1,
+        voteGranted: false,
+      };
+    }
   }
 
   async sendAppendEntries(args: AppendEntriesArgs): Promise<AppendEntriesReply> {
@@ -104,7 +114,15 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
       type: 'AppendEntriesArgs',
       message: args,
     };
-    return this.call(message).then(reply => reply.message);
+    try {
+      const reply = await this.call(message).then(reply => reply.message);
+      return reply
+    } catch (e) {
+      return {
+        term: -1,
+        success: false,
+      };
+    }
   }
   
   async sendInstallSnapshot(args: InstallSnapshotArgs): Promise<InstallSnapshotReply> {
@@ -113,7 +131,14 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
       type: 'InstallSnapshotArgs',
       message: args,
     };
-    return this.call(message).then(reply => reply.message);
+    try {
+      const reply = await this.call(message).then(reply => reply.message);
+      return reply
+    } catch (e) {
+      return {
+        success: false,
+      };
+    }
   }
 
   private makeWebsocketAddress(): string {
@@ -123,8 +148,10 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   private async connect(): Promise<void> {
     if (this.isConnected) {
       return Promise.resolve();
+    } else if (this.isConnecting && this.connectPromise) {
+      return this.connectPromise;
     }
-    return new Promise<void>((resolve, reject) => {
+    this.connectPromise = new Promise<void>((resolve, reject) => {
       this.ws = new WebSocket(this.address, { rejectUnauthorized: false });
       this.ws.on('open', () => {
         this.onOpen();
@@ -134,6 +161,8 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
       this.ws.on('message', (data: Buffer) => this.onMessage(data));
       this.ws.on('close', (code: number, reason: string) => this.onClose(code, reason));
     });
+    this.isConnecting = true;
+    return this.connectPromise;
   }
 
   private async call(message: WebSocketMessage): Promise<WebSocketMessage> {
@@ -150,6 +179,8 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
 
   private onOpen(): void {
     this.isConnected = true;
+    this.isConnecting = false;
+    this.connectPromise = undefined;
     raftLog.info(`connection to ${this.address} established`);
   }
 
@@ -176,6 +207,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   private onClose(code: number, reason: string): void {
     raftLog.trace(`connection to ${this.address} closed ${code} ${reason}`);
     this.isConnected = false;
+    this.isConnecting = false;
     this.ws = undefined;
     this.pendingRequests.forEach((request => {
       request.reject(new Error('connection closed'));
