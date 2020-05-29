@@ -98,13 +98,10 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
       message: args,
     };
     try {
-    const reply = await this.call(message).then(reply => reply.message);
-    return reply;
-    } catch(e) {
-      return {
-        term: -1,
-        voteGranted: false,
-      };
+      const reply = await this.call(message).then(reply => reply.message);
+      return reply;
+    } catch (e) {
+      throw e;
     }
   }
 
@@ -116,15 +113,12 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     };
     try {
       const reply = await this.call(message).then(reply => reply.message);
-      return reply
+      return reply;
     } catch (e) {
-      return {
-        term: -1,
-        success: false,
-      };
+      throw e;
     }
   }
-  
+
   async sendInstallSnapshot(args: InstallSnapshotArgs): Promise<InstallSnapshotReply> {
     const message: WebSocketMessage = {
       seq: RaftRPCWebSocketDriver.seq++,
@@ -133,11 +127,9 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     };
     try {
       const reply = await this.call(message).then(reply => reply.message);
-      return reply
+      return reply;
     } catch (e) {
-      return {
-        success: false,
-      };
+     throw e;
     }
   }
 
@@ -166,15 +158,20 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
   }
 
   private async call(message: WebSocketMessage): Promise<WebSocketMessage> {
-    await this.connect();
-    const promise = new Promise<WebSocketMessage>((resolve, reject) => {
-      const seq = message.seq;
-      const pendingRequest: PendingRequest = { message, resolve, reject };
-      this.pendingRequests.set(seq, pendingRequest);
-    });
-    raftLog.trace(`send websocket message ${JSON.stringify(message)} to ${this.address}`);
-    this.ws.send(JSON.stringify(message));
-    return promise;
+    try {
+      await this.connect();
+      const promise = new Promise<WebSocketMessage>((resolve, reject) => {
+        const seq = message.seq;
+        const pendingRequest: PendingRequest = { message, resolve, reject };
+        this.pendingRequests.set(seq, pendingRequest);
+      });
+      raftLog.trace(`send websocket message ${JSON.stringify(message)} to ${this.address}`);
+      this.ws.send(JSON.stringify(message));
+      const replyMessage = await promise;
+      return replyMessage;
+    } catch (e) {
+      throw e;
+    }
   }
 
   private onOpen(): void {
@@ -291,7 +288,7 @@ export class RaftRPCWebSocketService {
     };
     this.clientWS.send(JSON.stringify(replyMessage));
   }
-  
+
   private async processInstallSnapshotMessage(message: WebSocketInstallSnapshotArgsMessage): Promise<void> {
     const seq = message.seq;
     const args = message.message;
@@ -303,7 +300,7 @@ export class RaftRPCWebSocketService {
     };
     this.clientWS.send(JSON.stringify(replyMessage));
   }
-  
+
   private tracePrintf(msg: string): void {
     raftLog.trace(`RaftRPCWebSocketService: ${msg}`);
   }
