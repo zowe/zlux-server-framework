@@ -1204,20 +1204,23 @@ export class Raft {
 
   middleware() {
     return async (request: Request, response: Response, next: NextFunction) => {
-      try {
-        const state = await this.invokeGetRaftState();
-        if (state.isEnabled) {
-          if (!state.started) {
-            response.status(503).json({
-              state,
-              message: 'Cluster is not started yet'
-            });
-            return;
-          }
+      if (this.isEnabled) {
+        try {
+          const state = await this.invokeGetRaftState();
           if (state.raftState !== 'Leader' && !request.path.startsWith('/raft')) {
+            if (!state.started) {
+              raftLog.debug(`respond with 503 cluater not started yet, ${request.path}`);
+              response.status(503).json({
+                state,
+                message: 'Cluster is not started yet'
+              });
+              return;
+            }
             if (state.raftState === 'Follower') {
               if (typeof state.leaderBaseURL === 'string') {
-                response.redirect(`${state.leaderBaseURL}${request.path}`);
+                const url = `${state.leaderBaseURL}${request.path}`;
+                raftLog.info(`redirect client to Leader at ${url}`);
+                response.redirect(301, url);
                 return;
               } else {
                 response.status(503).json({
@@ -1227,15 +1230,16 @@ export class Raft {
                 return;
               }
             } else if (state.raftState === 'Candidate') {
+              raftLog.debug(`candidate respond with 503, ${request.path}`);
               response.status(503).json({ state });
               return;
             }
           }
+        } catch (e) {
+          raftLog.warn(`unable to get raft state ${e.message}`);
+          next(e);
+          return;
         }
-      } catch (e) {
-        raftLog.warn(`unable to get raft state ${e.message}`);
-        next(e);
-        return;
       }
       next();
     }
@@ -1303,8 +1307,8 @@ export class Raft {
       lastIncludedTerm,
     };
     if (previousSnapshot) {
-      snapshot.session = {...previousSnapshot.session};
-      snapshot.storage = {...previousSnapshot.storage};
+      snapshot.session = { ...previousSnapshot.session };
+      snapshot.storage = { ...previousSnapshot.storage };
     }
     this.tracePrintf(`create snapshot from ${this.startIndex} to ${lastIncludedIndex}`);
     for (let index = this.startIndex; index <= lastIncludedIndex; index++) {
