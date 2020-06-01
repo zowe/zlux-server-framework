@@ -19,35 +19,35 @@ export const syncEventEmitter = new EventEmitter();
 export function updateSession(sid: string, session: any): void {
   const data = { sid, session };
   const sessionLogEntry: SessionSyncCommand = { type: 'session', payload: data };
-  raftLog.debug(`updateSession log entry ${JSON.stringify(sessionLogEntry)}`);
+  raftLog.trace(`updateSession log entry ${JSON.stringify(sessionLogEntry)}`);
   syncEventEmitter.emit('session', sessionLogEntry);
 }
 
 export function setAllStorageForPlugin(pluginId: string, dict: KeyVal): void {
   const action: StorageActionSetAll = { type: 'set-all', data: { pluginId, dict } };
   const storageLogEntry: StorageSyncCommand = { type: 'storage', payload: action };
-  raftLog.debug(`setAllStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
+  raftLog.trace(`setAllStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   syncEventEmitter.emit('storage', storageLogEntry);
 }
 
 export function setStorageForPlugin(pluginId: string, key: string, value: string): void {
   const action: StorageActionSet = { type: 'set', data: { pluginId, key, value } };
   const storageLogEntry: StorageSyncCommand = { type: 'storage', payload: action };
-  raftLog.debug(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
+  raftLog.trace(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   syncEventEmitter.emit('storage', storageLogEntry);
 }
 
 export function deleteAllStorageForPlugin(pluginId: string): void {
   const action: StorageActionDeleteAll = { type: 'delete-all', data: { pluginId } };
   const storageLogEntry: StorageSyncCommand = { type: 'storage', payload: action };
-  raftLog.debug(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
+  raftLog.trace(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   syncEventEmitter.emit('storage', storageLogEntry);
 }
 
 export function deleteStorageForPlugin(pluginId: string, key: string): void {
   const action: StorageActionDelete = { type: 'delete', data: { pluginId, key } };
   const storageLogEntry: StorageSyncCommand = { type: 'storage', payload: action };
-  raftLog.debug(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
+  raftLog.trace(`setStorageForPlugin log entry ${JSON.stringify(storageLogEntry)}`);
   syncEventEmitter.emit('storage', storageLogEntry);
 }
 
