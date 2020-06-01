@@ -268,7 +268,7 @@ export class Raft {
   }
 
   async start(apiml: ApimlConnector): Promise<void> {
-    raftLog.info(`starting peer electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
+    raftLog.info(`Starting peer electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
     this.apiml = apiml;
     this.persister = Raft.makePersister();
     this.maxLogSize = Raft.getMaxLogSize();
@@ -405,7 +405,7 @@ export class Raft {
           return;
         }
         if (this.state === 'Candidate') {
-          raftLog.info("got final vote from %s and became Leader of term %d", peerAddress, term);
+          raftLog.info("ZWED0294I - Got final vote from %s and became leader of term %d", peerAddress, term);
           done = true;
           this.convertToLeader();
         }
@@ -742,7 +742,7 @@ export class Raft {
         };
       }
     }
-    this.tracePrintf("leader commit %d my commit %d", args.leaderCommit, this.commitIndex);
+    this.tracePrintf("leader's commit %d, my commit %d", args.leaderCommit, this.commitIndex);
     if (args.entries.length > 0) {
       // 4. Append any new entries not already in the log
       const lastLogIndex = this.lastIndex();
@@ -1364,9 +1364,7 @@ export class Raft {
   }
 
   private tracePrintf(...args: any[]): void {
-    if (this.trace) {
       raftLog.debug(...args);
-    }
   }
 
 }
