@@ -178,7 +178,7 @@ export class RaftRPCWebSocketDriver implements RaftRPCDriver {
     this.isConnected = true;
     this.isConnecting = false;
     this.connectPromise = undefined;
-    raftLog.info(`connection to ${this.address} established`);
+    raftLog.trace(`connection to ${this.address} established`);
   }
 
   private onMessage(data: Buffer): void {
@@ -224,17 +224,11 @@ export class RaftRPCWebSocketService {
     private req: express.Request,
     private raft: Raft,
   ) {
-    this.tracePrintf('constructor');
     this.init();
   }
 
   private init(): void {
     this.tracePrintf(`connected client`);
-    // if (!this.raft.isStarted()) {
-    //   this.clientWS.close();
-    //   this.log('disconnect client because raft not started yet');
-    //   return;
-    // }
     this.clientWS.on('close', () => this.onClose());
     this.clientWS.on('message', (data: Buffer) => this.onMessage(data));
   }

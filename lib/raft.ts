@@ -34,7 +34,7 @@ import { SyncService } from "./sync-service";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
-(global as any).COM_RS_COMMON_LOGGER.setLogLevelForComponentName("_zsf.raft", 4);
+// (global as any).COM_RS_COMMON_LOGGER.setLogLevelForComponentName("_zsf.raft", 4);
 
 export class RaftPeer extends RaftRPCWebSocketDriver {
   constructor(
@@ -285,7 +285,7 @@ export class Raft {
     this.scheduleElectionOnTimeout();
     this.addOnReRegisterHandler();
     this.started = true;
-    raftLog.info(`peer ${me} started with %s log`, this.log.length > 0 ? 'not empty' : 'empty');
+    raftLog.trace(`peer ${me} started with %s log`, this.log.length > 0 ? 'not empty' : 'empty');
   }
 
   private async waitUntilZluxClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
