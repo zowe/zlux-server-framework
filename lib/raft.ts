@@ -295,11 +295,10 @@ export class Raft {
     if (!Number.isInteger(appServerClusterSize) || appServerClusterSize < 3) {
       appServerClusterSize = 3;
     }
-    raftLog.info(`my instance is ${instanceId}, app-server cluster size ${appServerClusterSize}`);
     const zluxInstances = await this.apiml.waitUntilZluxClusterIsReady(appServerClusterSize);
-    raftLog.debug(`zlux cluster is ready, instances ${JSON.stringify(zluxInstances, null, 2)}`);
+    const instanceIds = zluxInstances.map((instance, i) => `[${i}] = ${instance.instanceId}${instance.instanceId === instanceId ? "(me)" : ""}`).join(', ');
+    raftLog.info(`zlux app-server cluster is ready, size ${appServerClusterSize}, instances ${instanceIds}`);
     const me = zluxInstances.findIndex(instance => instance.instanceId === instanceId);
-    raftLog.debug(`my peer index is ${me}`);
     const peers = zluxInstances.map(instance => RaftPeer.make(instance, this.apiml));
     return { peers, me };
   }
@@ -307,7 +306,7 @@ export class Raft {
   private static makePersister(): Persister {
     let persister: Persister;
     if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
-      raftLog.info("raft persistence enabled");
+      raftLog.debug("raft persistence enabled");
       let logPath = process.env.ZLUX_LOG_PATH!;
       if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
         logPath = logPath.substring(1, logPath.length - 1);
@@ -317,7 +316,7 @@ export class Raft {
       raftLog.debug(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
       persister = new FilePersister(stateFilename, snapshotFilename);
     } else {
-      raftLog.info("raft persistence disabled");
+      raftLog.debug("raft persistence disabled");
       persister = new DummyPersister();
     }
     return persister;
