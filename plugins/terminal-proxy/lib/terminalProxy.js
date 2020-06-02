@@ -16,7 +16,7 @@ var net = require('net');
 const tls = require('tls');
 const crypto = require('crypto');
 const fs = require('fs');
-const ssh = require('./ssh'); // TODO Sean to create a setter for the logger
+const ssh = require('./ssh');
 const SSH_MESSAGE = ssh.MESSAGE;
 
 const base64BitValues = [ 
@@ -786,6 +786,7 @@ exports.tn5250WebsocketRouter = function(context) {
 };
 exports.vtWebsocketRouter = function(context) {
   let handlers = scanAndImportHandlers(context.logger);
+  ssh.setLogger(context.logger);
   return new Promise(function(resolve, reject) {
     let securityConfig = context.plugin.server.config.user.node.https;
     if (securityConfig && !TerminalWebsocketProxy.securityObjects) {
