@@ -47,13 +47,11 @@ function cleanupSessionGeneric(sessionState) {
 function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
-  //TODO this seems temporary, will need to unconditionally say usingApiml=usingSso when sso support is complete
-  //this.apimlSsoEnabled = process.env['APIML_ENABLE_SSO'] == 'true';
 
-  //TODO temporary, once zss is finished we can switch over to true
-  this.apimlSsoEnabled = false;
+  const tokenName = process.env['PKCS11_TOKEN_NAME'];
+  const zssCanHandleToken = !tokenName || tokenName=='' ? false : true;
   //Sso here meaning just authenticate to apiml, and handle jwt
-  this.usingSso = this.apimlSsoEnabled && this.usingApiml;
+  this.usingSso = this.usingApiml && zssCanHandleToken;
 
   this.pluginConf = pluginConf;
   this.instanceID = serverConf.instanceID;
@@ -135,6 +133,8 @@ SsoAuthenticator.prototype = {
             }).catch((e) => {
               resolve(this._insertHandlerStatus({success: false, reason: e.message}));
             });
+          } else { //only zss?
+            resolve(this._insertHandlerStatus({success: (zssResult.success), cookies: zssResult.cookies}));
           }
         }).catch((e) => {
           resolve(this._insertHandlerStatus({success: false, reason: e.message}));
