@@ -34,8 +34,6 @@ import { SyncService } from "./sync-service";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
-// (global as any).COM_RS_COMMON_LOGGER.setLogLevelForComponentName("_zsf.raft", 4);
-
 export class RaftPeer extends RaftRPCWebSocketDriver {
   constructor(
     host: string,
@@ -263,8 +261,8 @@ export class Raft {
 
 
   constructor() {
-    const clusterEnabledEnvVar = process.env.ZOWE_APP_SERVER_CLUSTER_ENABLED;
-    this.isEnabled = clusterEnabledEnvVar === 'TRUE' || clusterEnabledEnvVar === 'YES';
+    const raftClusterEnabledEnvVar = process.env.ZLUX_RAFT_CLUSTER_ENABLED;
+    this.isEnabled = raftClusterEnabledEnvVar === 'TRUE' || raftClusterEnabledEnvVar === 'YES';
   }
 
   async start(apiml: ApimlConnector): Promise<void> {
@@ -291,13 +289,13 @@ export class Raft {
   private async waitUntilZluxClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
     await this.apiml.takeOutOfService();
     const instanceId = this.apiml.getInstanceId();
-    let appServerClusterSize = +process.env.ZOWE_APP_SERVER_CLUSTER_SIZE;
-    if (!Number.isInteger(appServerClusterSize) || appServerClusterSize < 3) {
-      appServerClusterSize = 3;
+    let raftClusterSize = +process.env.ZLUX_RAFT_CLUSTER_SIZE;
+    if (!Number.isInteger(raftClusterSize) || raftClusterSize < 3) {
+      raftClusterSize = 3;
     }
-    const zluxInstances = await this.apiml.waitUntilZluxClusterIsReady(appServerClusterSize);
+    const zluxInstances = await this.apiml.waitUntilRaftClusterIsReady(raftClusterSize);
     const instanceIds = zluxInstances.map((instance, i) => `[${i}] = ${instance.instanceId}${instance.instanceId === instanceId ? "(me)" : ""}`).join(', ');
-    raftLog.info(`zlux app-server cluster is ready, size ${appServerClusterSize}, instances ${instanceIds}`);
+    raftLog.info(`zlux app-server cluster is ready, size ${raftClusterSize}, instances ${instanceIds}`);
     const me = zluxInstances.findIndex(instance => instance.instanceId === instanceId);
     const peers = zluxInstances.map(instance => RaftPeer.make(instance, this.apiml));
     return { peers, me };
@@ -307,13 +305,13 @@ export class Raft {
     let persister: Persister;
     if (process.env.ZLUX_RAFT_PERSISTENCE_ENABLED === "TRUE") {
       raftLog.debug("raft persistence enabled");
-      let logPath = process.env.ZLUX_LOG_PATH!;
-      if (logPath.startsWith(`"`) && logPath.endsWith(`"`)) {
-        logPath = logPath.substring(1, logPath.length - 1);
+      let instanceDir = process.env.INSTANCE_DIR!;
+      if (instanceDir.startsWith(`"`) && instanceDir.endsWith(`"`)) {
+        instanceDir = instanceDir.substring(1, instanceDir.length - 1);
       }
-      const stateFilename = path.join(path.dirname(logPath), 'raft.data');
-      const snapshotFilename = path.join(path.dirname(logPath), 'snapshot.data');
-      raftLog.debug(`log ${logPath} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
+      const stateFilename = path.join(path.dirname(instanceDir), 'workspace', 'app-server', 'raft.data');
+      const snapshotFilename = path.join(path.dirname(instanceDir), 'workspace', 'app-server', 'snapshot.data');
+      raftLog.debug(`INSTANCE_DIR ${instanceDir} stateFilename ${stateFilename} snapshotFilename ${snapshotFilename}`);
       persister = new FilePersister(stateFilename, snapshotFilename);
     } else {
       raftLog.debug("raft persistence disabled");
