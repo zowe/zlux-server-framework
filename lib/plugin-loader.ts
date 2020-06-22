@@ -9,7 +9,7 @@
   Copyright Contributors to the Zowe Project.
 */
 
-import * as util from './util';
+import util from './util';
 import * as Promise from 'bluebird';
 import * as fs from 'graceful-fs';
 import * as http from 'http';
@@ -47,18 +47,54 @@ enum defaultOptions {
   relativePathResolver = zluxUtil.normalizePath
 }
 
-export class Service {
-  private version: any;
-  private versionRequirements: any;
+enum dataServiceType {
+  'service',
+  'import',
+  'nodeService',
+  'router',
+  'external'
+}
+
+enum pluginTypes {
+  'library',
+  'application',
+  'windowManager',
+  'bootstrap',
+  'desktop',
+  'nodeAuthentication',
+  'proxyConnector'
+}
+
+type ServiceDefinition = { name: string, type: dataServiceType, version: string, versionRequirements: Object}
+type ConfigDefinition = { getContents: any}
+type PluginDefinition = { pluginType: typeof pluginTypes, nodeModule: any, host: string, port: string, identifier: string, location: string}
+type ServiceContext = { productCode: string, config: ConfigDefinition, version: string}
+
+interface IService {
+  version: string;
+  versionRequirements: object;
+  localName?: string;
+  name: string;
+  type: dataServiceType;
+  sourceName: string;
+  sourcePlugin: any;
+  loadImplementation: Function;
+}
+
+
+export class Service implements IService {
+  public version: any;
+  public versionRequirements: any;
   public localName: any;
   public name: string;
+  public type: dataServiceType;
+  public sourceName: string;
+  public sourcePlugin: any;
+  public loadImplementation: Function;
 
-  constructor(public configuration: any, public plugin: any, public def: any) {
-    this.configuration = this.configuration;
-    Object.assign(this, this.def)
-  }
+  constructor(public def: ServiceDefinition, public configuration: ConfigDefinition, public plugin: PluginDefinition) {}
 
-  public validate() {
+  public validate(): void {
     if (!semver.valid(this.version)) {
       throw new Error(`ZWED0007E - ${this.name}: invalid version "${this.version}"`)
     }
@@ -74,13 +110,13 @@ export class Service {
 }
 
 export class Import extends Service {
-  private versionRange: any;
+  private versionRange: string;
 
-  constructor(def, configuration, plugin) {
+  constructor(def: ServiceDefinition, configuration: ConfigDefinition, plugin: PluginDefinition) {
     super(def, configuration, plugin);
   }
 
-  public validate() {
+  public validate(): void {
     if (!semver.validRange(this.versionRange)) {
       throw new Error(`ZWED0009E - ${this.localName}: invalid version range "${this.versionRange}"`)
     }
@@ -88,12 +124,12 @@ export class Import extends Service {
 }
 
 export class NodeService extends Service {
-  private source: any;
-  private nodeModule: any;
-  private filename: any;
-  private fileName: any;
+  private source: string;
+  private nodeModule: string;
+  private filename: string;
+  private fileName: string;
 
-  constructor(def, configuration, plugin) {
+  constructor(def: ServiceDefinition, configuration: ConfigDefinition, plugin: PluginDefinition) {
     super(def, configuration, plugin);
   }
 
@@ -103,9 +139,9 @@ export class NodeService extends Service {
       this.nodeModule = nodeModule;
     } else {
       // Quick fix before MVD-947 is merged
-      var fileLocation = ""
-      var serverModuleLocation = ""
-      var clientModuleLocation = ""
+      let fileLocation = ""
+      let serverModuleLocation = ""
+      let clientModuleLocation = ""
       if (this.filename) {
         fileLocation = path.join(location, 'lib', this.filename);
       } else if (this.fileName) {
@@ -116,10 +152,10 @@ export class NodeService extends Service {
       }
       serverModuleLocation = path.join(location, 'nodeServer', 'node_modules' );
       clientModuleLocation = path.join(location, 'lib', 'node_modules');
-      var nodePathStore = process.env.NODE_PATH;
-      var nodePathAdd = process.env.NODE_PATH;
-      var operatingSystem = process.platform;
-      var osDelim = operatingSystem === "win32" ? ";" : ":"; 
+      let nodePathStore = process.env.NODE_PATH;
+      let nodePathAdd = process.env.NODE_PATH;
+      let operatingSystem = process.platform;
+      let osDelim = operatingSystem === "win32" ? ";" : ":"; 
       bootstrapLogger.info("ZWED0116I", serverModuleLocation, clientModuleLocation); //bootstrapLogger.log(bootstrapLogger.INFO,
         //`The LOCATIONS are ${serverModuleLocation} and ${clientModuleLocation}`);
       nodePathAdd = `${process.env.NODE_PATH}${serverModuleLocation}${osDelim}${clientModuleLocation}${osDelim}.`
@@ -128,7 +164,7 @@ export class NodeService extends Service {
       bootstrapLogger.info("ZWED0117I", fileLocation); //bootstrapLogger.log(bootstrapLogger.INFO, `The fileLocation is ${fileLocation}`);
       bootstrapLogger.info("ZWED0118I", process.env.NODE_PATH); //bootstrapLogger.log(bootstrapLogger.INFO,
         //`The NODE_PATH is ${process.env.NODE_PATH}`);
-      const nodeModule = require(fileLocation);
+        const nodeModule = (require as any)(fileLocation);
       this.nodeModule = nodeModule;
       process.env.NODE_PATH = nodePathStore;
       require("module").Module._initPaths(); 
@@ -143,8 +179,8 @@ export class ExternalService extends Service {
   private host: any;
   private port: any;
 
-  constructor(configuration: any, plugin: any, def: any) {
-    super(configuration, plugin, def)
+  constructor(def: ServiceDefinition, configuration: ConfigDefinition, plugin: PluginDefinition) {
+    super(def, configuration, plugin)
     if (!this.host) {
       this.host = this.plugin.host;
     }
@@ -163,46 +199,58 @@ export class ExternalService extends Service {
   }
 }
 
-export class makeDataService extends Service {
-  private context: any;
-
-  constructor(configuration: any, plugin: any, def: any) {
-    super(configuration, plugin, def)
-    configuration = configService.getServiceConfiguration(this.plugin.identifier, this.plugin.location,
-      this.def.name, this.context.config, this.context.productCode);
-    let dataservice: any;
-    if (this.def.type == "external") {
-      dataservice = new ExternalService(this.def, configuration, this.plugin);
-    } else if (this.def.type == "import") {
-      dataservice = new Import(this.def, configuration, this.plugin);
-    } else if ((this.def.type == 'nodeService') || (this.def.type === 'router')) {
-      dataservice = new NodeService(this.def, configuration, this.plugin);
-    } else {
-      dataservice = new Service(this.def, configuration, this.plugin);
-    }
-    dataservice.validate();
-    return dataservice;
+function makeDataService(def: ServiceDefinition, plugin: PluginDefinition, context: ServiceContext): Service {
+  const configuration = configService.getServiceConfiguration(plugin.identifier, plugin.location,
+    def.name, context.config, context.productCode);
+  let dataservice: Service;
+  if (this.def.type == "external") {
+    dataservice = new ExternalService(this.def, configuration, this.plugin);
+  } else if (this.def.type == "import") {
+    dataservice = new Import(this.def, configuration, this.plugin);
+  } else if ((this.def.type == 'nodeService') || (this.def.type === 'router')) {
+    dataservice = new NodeService(this.def, configuration, this.plugin);
+  } else {
+    dataservice = new Service(this.def, configuration, this.plugin);
   }
+  dataservice.validate();
+  return dataservice;
 }
 
-export class Plugin {
-  private apiVersion: null;
-  private pluginVersion: null;
-  private webContent: null;
-  private copyright:null;
-  private dataServices: Array<string>;
-  private dataServicesGrouped: Object;
-  private importsGrouped: Object;
-  private configuration: null;
-  private translationMaps: any;
-  public identifier: null;  
-  public pluginType: null;
-  public location: string;
-  public definition: any;
+interface IPlugin {
+  apiVersion: string;
+  pluginVersion: string;
+  webContent: any;
+  copyright: any;
+  dataServices: Array<ServiceDefinition>;
+  dataServicesGrouped: Object;
+  importsGrouped: Object;
+  translationMaps: any;
+  identifier: string;  
+  pluginType: pluginTypes;
+  location: string;
+  definition: PluginDefinition;
+  configuration: ConfigDefinition;
+  dynamicallyCreated: boolean;
+}
 
-  constructor(configuration: any, def: any) {
-    Object.assign(this, def);
-    this.definition = Object.assign({},def);
+export class Plugin implements IPlugin {
+  public apiVersion: string;
+  public pluginVersion: string;
+  public webContent: any;
+  public copyright: any;
+  public dataServices: Array<ServiceDefinition>;
+  public dataServicesGrouped: Object;
+  public importsGrouped: Object;
+  public translationMaps: any;
+  public identifier: string;  
+  public pluginType: pluginTypes;
+  public location: string;
+  public definition: PluginDefinition;
+  public configuration: ConfigDefinition;
+  public dynamicallyCreated: boolean;
+
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    this.definition = def
     delete this.definition.location;
     delete this.definition.nodeModule;
     this.configuration = configuration;
@@ -211,32 +259,32 @@ export class Plugin {
     }
     this.translationMaps = {};
   }
-  
-  public toString() {
+
+  public toString(): string {
     return `[Plugin ${this.identifier}]`
   }
 
-  public isValid(context: any) {
+  public isValid(context: ServiceContext) {
     //TODO detailed diagnostics
     return this.identifier && (typeof this.identifier === "string")
       && this.pluginVersion && (typeof this.pluginVersion === "string")
       && this.apiVersion && (typeof this.apiVersion === "string")
       //this might cause some pain, but I guess it's better to
       //leave it here and make everyone tidy up their plugin defs:
-      && this.pluginType && (typeof this.pluginType === "string");
+      && this.pluginType && (typeof this.pluginType === pluginTypes);
   }
-  
-  public init(context: any) {
+
+  public init(context: ServiceContext) {
     //Nothing here anymore: startup checks for validity will be superceeded by 
     //https://github.com/zowe/zlux-server-framework/pull/18 and initialization 
     //concept has not manifested for many plugin types, so a warning is not needed.
   }
   
-  public exportDef() {
+  public exportDef(): PluginDefinition {
     return this.definition;
   }
 
-  public exportTranslatedDef(acceptLanguage: string) {
+  public exportTranslatedDef(acceptLanguage: string): PluginDefinition {
     const def = this.exportDef();
     if (typeof this.webContent === 'object') {
       return translationUtils.translate(def, this.translationMaps, acceptLanguage);
@@ -262,9 +310,8 @@ export class Plugin {
     }
   }
   
-  public initDataServices(context: any, langManagers: any) {
-
-    function addService(service: any, name: any, container: any) : any {
+  public initDataServices(context: ServiceContext, langManagers: any) {
+    function addService(service: ServiceDefinition, name: string, container: any) : any {
       let group : any = container[name];
       if (!group) {
         group = container[name] = {
@@ -287,17 +334,17 @@ export class Plugin {
     this.importsGrouped = {};
     const filteredDataServices = [];
     for (const dataServiceDef of this.dataServices) {
-      const dataservice = new makeDataService(dataServiceDef, this, context);
-      if (dataservice.type == "service") {          
+      const dataservice = makeDataService(dataServiceDef, this, context);
+      if (dataservice.type == dataServiceType.service) {          
         addService(dataservice, dataservice.name, this.dataServicesGrouped);
         bootstrapLogger.info(`ZWED0037I`, this.identifier, dataservice.name); //bootstrapLogger.info(`${this.identifier}: ` + `found proxied service '${dataservice.name}'`);
         filteredDataServices.push(dataservice);
-      } else   if (dataservice.type === 'import') {
+      } else if (dataservice.type === dataServiceType.import) {
         bootstrapLogger.info(`ZWED0038I`, this.identifier, dataservice.sourceName, dataservice.sourcePlugin, dataservice.localName); //bootstrapLogger.info(`${this.identifier}:` + ` importing service '${dataservice.sourceName}'` + ` from ${dataservice.sourcePlugin}` + ` as '${dataservice.localName}'`);
         addService(dataservice, dataservice.localName, this.importsGrouped);
         filteredDataServices.push(dataservice);
-      } else if ((dataservice.type == 'nodeService')
-          || (dataservice.type === 'router')) {
+      } else if ((dataservice.type == dataServiceType.nodeService)
+          || (dataservice.type === dataServiceType.router)) {
         //TODO what is this? Why do we need it?
 //        if ((dataservice.serviceLookupMethod == 'internal')
 //            || !dataservice.dependenciesIncluded) {
@@ -306,7 +353,7 @@ export class Plugin {
 //          continue;
 //        }
         dataservice.loadImplementation(this.dynamicallyCreated, this.location);
-        if (dataservice.type === 'router') {
+        if (dataservice.type === dataServiceType.router) {
           bootstrapLogger.info(`ZWED0039I`, this.identifier, dataservice.name); //bootstrapLogger.info(`${this.identifier}: ` + `found router '${dataservice.name}'`);
           addService(dataservice, dataservice.name, this.dataServicesGrouped);
         } else {
@@ -314,7 +361,7 @@ export class Plugin {
           addService(dataservice, dataservice.name, this.dataServicesGrouped);
         }
         filteredDataServices.push(dataservice);
-      } else if (dataservice.type == 'external') {
+      } else if (dataservice.type == dataServiceType.external) {
         addService(dataservice, dataservice.name, this.dataServicesGrouped);
         bootstrapLogger.info(`ZWED0041I`, this.identifier, dataservice.name); //bootstrapLogger.info(`${this.identifier}: ` + `found external service '${dataservice.name}'`);
         filteredDataServices.push(dataservice);
@@ -332,7 +379,7 @@ export class Plugin {
     this._validateLocalVersionRequirements()
   }
 
-  public _validateLocalVersionRequirements() {
+  private _validateLocalVersionRequirements() {
     for (let service of this.dataServices) {
       if (!service.versionRequirements) {
         continue;
@@ -375,16 +422,14 @@ export class Plugin {
 
 export class LibraryPlugIn extends Plugin {
 
-  constructor(configuration: any, def: any) { 
-    super(configuration, def);
-    Object.assign(this, def);
-    this.definition = Object.assign({},def);
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    super(def, configuration);
   }
 
-  public init(context: any) {
-    assert(this.pluginType === "library");
+  public init(context: ServiceContext) {
+    assert(this.pluginType === pluginTypes.library);
     if (!fs.existsSync(this.location)) {
-      bootstrapLogger.warn("ZWED0150W", def.identifier, this.location); //bootstrapLogger.log(bootstrapLogger.WARNING,
+      bootstrapLogger.warn("ZWED0150W", this.definition.identifier, this.location); //bootstrapLogger.log(bootstrapLogger.WARNING,
         //`${def.identifier}: library path ${this.location} does not exist`);
       return;
     }
@@ -394,36 +439,37 @@ export class LibraryPlugIn extends Plugin {
 }
 
 export class ApplicationPlugIn extends Plugin {
-  constructor(configuration: any, def: any) {
-    super(configuration, def);
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    super(def, configuration);
   }
 }
 
 export class WindowManagerPlugIn extends Plugin {
-  constructor(configuration: any, def: any) {
-    super(configuration, def);
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    super(def, configuration);
   }
 }
 
 export class BootstrapPlugIn extends Plugin {
-  constructor(configuration: any, def: any) {
-    super(configuration, def);
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    super(def, configuration);
   }
 }
 
 export class DesktopPlugIn extends Plugin {
-  constructor(configuration: any, def: any) {
-    super(configuration, def);
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    super(def, configuration);
   }
 }
 
 export class NodeAuthenticationPlugIn extends Plugin {
   private authenticationModule: string;
-  private authenticationCategory: null;
-  private filename: null;
+  private authenticationCategory: any;
+  private authenticationCategories: any;
+  private filename: string;
 
-  constructor(configuration: any, def: any) {
-    super(configuration, def);
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    super(def, configuration);
   }
 
   public isValid(context: any) {
@@ -467,8 +513,8 @@ export class ProxyConnectorPlugIn extends Plugin {
   private host: any;
   private port: any;
 
-  constructor(configuration: any, def: any) {
-    super(configuration, def);
+  constructor(def: PluginDefinition, configuration: ConfigDefinition) {
+    super(def, configuration);
     const remoteConfig = configuration.getContents(["remote.json"]);
     if (remoteConfig) {
       if (!this.host) {
@@ -497,20 +543,18 @@ export class ProxyConnectorPlugIn extends Plugin {
   }
 }
 
-const plugInConstructorsByType = {
-  "library": LibraryPlugIn,
-  "application": ApplicationPlugIn,
-  "windowManager": WindowManagerPlugIn,
-  "bootstrap": BootstrapPlugIn,
-  "desktop": DesktopPlugIn,
-  "nodeAuthentication": NodeAuthenticationPlugIn,
-  "proxyConnector": ProxyConnectorPlugIn
-};
+enum plugInConstructorsByType {
+  library = LibraryPlugIn,
+  application = ApplicationPlugIn,
+  windowManager = WindowManagerPlugIn,
+  bootstrap = BootstrapPlugIn,
+  desktop = DesktopPlugIn,
+  nodeAuthentication = NodeAuthenticationPlugIn,
+  proxyConnector = ProxyConnectorPlugIn
+}
 
-export class makePlugin {
-
-  constructor(def: any, pluginConfiguration: any, pluginContext: any, dynamicallyCreated: any, langManagers: any) {
-    const pluginConstr = plugInConstructorsByType[def.pluginType];
+function makePlugin(def: PluginDefinition, pluginConfiguration: any, pluginContext: any, dynamicallyCreated: any, langManagers: any) {
+  const pluginConstr = plugInConstructorsByType[def.pluginType];
     if (!pluginConstr) {
       throw new Error(`ZWED0020E - ${def.identifier}: pluginType ${def.pluginType} is unknown`); 
     }
@@ -521,7 +565,7 @@ export class makePlugin {
     const self = new pluginConstr(def, pluginConfiguration);
     self.dynamicallyCreated = dynamicallyCreated;
     if (!self.isValid(pluginContext)) {
-      if (def.pluginType == 'nodeAuthentication' && !pluginContext.authManager.authPluginRequested(self.identifier,
+      if (def.pluginType.nodeAuthentication && !pluginContext.authManager.authPluginRequested(self.identifier,
         self.authenticationCategory)) {
           bootstrapLogger.info(`ZWED0043I`, self.identifier); //bootstrapLogger.info(`Plugin ${self.identifier} is not requested skipping without error`);
         return null;
@@ -538,14 +582,14 @@ export class makePlugin {
     self.init(pluginContext);
     self.loadTranslations();
     return self;
-  }
 }
 
 export class PluginLoader {
   private plugins: any;
   private pluginMap: any;
   public intervalScanner: any;
-  public makePlugin: any;
+  public makePlugin: typeof makePlugin;
+  public emit: any;
 
   constructor(private options: any) {
     EventEmitter.call(this);
@@ -596,7 +640,7 @@ export class PluginLoader {
     return pluginDef;
   }
 
-  private _readPluginDefAsync(pluginDescriptorFilename: any) {
+  private _readPluginDefAsync(pluginDescriptorFilename: any): Promise<object> {
     return new Promise((resolve, reject)=> {
       const pluginPtrPath = this.options.relativePathResolver(pluginDescriptorFilename,
                                                               this.options.pluginsDir);
@@ -680,7 +724,7 @@ export class PluginLoader {
               if (counter == pluginLocationJSONs.length) {
                 resolve(defs);
               }
-            }).catch(function(e) {
+            }).catch(function(e: any) {
               counter++;
               bootstrapLogger.log(bootstrapLogger.INFO,
                                   `Failed to load ${pluginDescriptorFilename}\n`);
@@ -691,7 +735,7 @@ export class PluginLoader {
             });
           }
         } else {
-          bootstrapLogger.warn('Could not read plugins dir, e=',e);
+          bootstrapLogger.warn('Could not read plugins dir, e=', err);
         }
       });
     });
@@ -749,7 +793,7 @@ export class PluginLoader {
     for (const pluginDef of sortedAndRejectedPlugins.plugins) { 
       try {
         if (this.pluginMap[pluginDef.identifier]) {
-          bootstrapLogger.warn(`ZWED0034W`, plugin.identifier); //bootstrapLogger.warn(`Skipping install of plugin due to existing plugin with same id=${plugin.identifier}`);
+          bootstrapLogger.warn(`ZWED0034W`, pluginDef.identifier); //bootstrapLogger.warn(`Skipping install of plugin due to existing plugin with same id=${plugin.identifier}`);
 
            continue;
         }
@@ -759,8 +803,7 @@ export class PluginLoader {
           bootstrapLogger.debug("ZWED0165I", pluginDef.identifier, JSON.stringify(pluginConfiguration)); //bootstrapLogger.debug(`For plugin with id=${pluginDef.identifier}, internal config` 
                                 //+ ` found=\n${JSON.stringify(pluginConfiguration)}`);
 
-        const plugin = new makePlugin(pluginDef, pluginConfiguration, pluginContext,
-          false, this.options.langManagers);
+        const plugin = makePlugin(pluginDef, pluginConfiguration, pluginContext, false, this.options.langManagers);
         if (plugin) {
           bootstrapLogger.info("ZWED0124I", plugin.identifier, plugin.location); //bootstrapLogger.log(bootstrapLogger.INFO,
             //`Plugin ${plugin.identifier} at path=${plugin.location} loaded.\n`);
@@ -823,8 +866,7 @@ export class PluginLoader {
     const pluginConfiguration = configService.getPluginConfiguration(
       pluginDef.identifier, pluginDef.location,
       this.options.serverConfig, this.options.productCode);
-    const plugin = new makePlugin(pluginDef, pluginConfiguration, null, pluginContext,
-      true);
+    const plugin = makePlugin(pluginDef, pluginConfiguration, null, pluginContext, true);
 //    if (!this.unresolvedImports.allImportsResolved(pluginContext.plugins)) {
 //      throw new Error('unresolved dependencies');
 //      this.unresolvedImports.reset();
@@ -838,8 +880,6 @@ export class PluginLoader {
   }
 };
 
-module.exports = PluginLoader;
-PluginLoader.makePlugin = makePlugin;
 
 /*
   This program and the accompanying materials are
