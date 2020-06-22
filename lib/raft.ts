@@ -270,7 +270,7 @@ export class Raft {
     this.apiml = apiml;
     this.persister = Raft.makePersister();
     this.maxLogSize = Raft.getMaxLogSize();
-    const { peers, me } = await this.waitUntilZluxClusterIsReady();
+    const { peers, me } = await this.waitUntilRaftClusterIsReady();
     this.peers = peers;
     this.me = me;
     if (me === -1) {
@@ -286,7 +286,7 @@ export class Raft {
     raftLog.trace(`peer ${me} started with %s log`, this.log.length > 0 ? 'not empty' : 'empty');
   }
 
-  private async waitUntilZluxClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
+  private async waitUntilRaftClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
     await this.apiml.takeOutOfService();
     const instanceId = this.apiml.getInstanceId();
     let raftClusterSize = +process.env.ZLUX_RAFT_CLUSTER_SIZE;
