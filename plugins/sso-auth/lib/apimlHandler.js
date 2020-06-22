@@ -65,7 +65,7 @@ class ApimlHandler {
     } else {
       this.httpsAgent = new https.Agent({
         rejectUnauthorized: true,
-        ca: readUtf8FilesToArray(serverConf.node.https.certificateAuthorities)
+        ca: context.tlsOptions.ca
       });
     }
   }
