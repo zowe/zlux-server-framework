@@ -288,6 +288,8 @@
   "ZWED0168W":"RESERVED: Unable to retrieve storage value from cluster %s",
   "ZWED0169W":"RESERVED: Error deleting the storage with id: %s %s",
   "ZWED0170W":"Plugin (%s) loading failed. Message: \"%s\"",
+  "ZWED0171W":"Rejected undefined referrer for url=%s, ip=%s",
+  "ZWED0172W":"Rejected bad referrer=%s for url=%s, ip=%s",
   
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",

@@ -144,7 +144,7 @@ class ZssHandler {
   _authenticateOrRefresh(request, sessionState, isRefresh) {
     return new Promise((resolve, reject) => {
       if (isRefresh && !sessionState.zssCookies) {
-        reject(new Error('No cookie given for refresh or check, skipping zss request'));
+        resolve({success: false, error: {message: 'No cookie given for refresh or check'}});
         return;
       }
       let options = isRefresh ? {
