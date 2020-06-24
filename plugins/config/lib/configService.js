@@ -2315,13 +2315,15 @@ InternalConfiguration.prototype.getContents = function(attributeArray) {
   aggregation policy none at the moment
   relativeLocation excluses the scope path
 */
-function getJSONFromLocation(relativeLocation,directories,startScope,endScope) {
+function getJSONFromLocation(relativeLocation,directories,startScope,endScope,pluginId) {
   var scope = startScope;
   var configuration = {};
   while (scope) {
     const path = getScopeRootPath(scope,directories);
     if (path) {
-      var rootPath = pathModule.join(path,relativeLocation);
+      var rootPath = (scope == CONFIG_SCOPE_PLUGIN) && pluginId
+          ? pathModule.join(path,relativeLocation.substring(pluginId.length))
+          : pathModule.join(path,relativeLocation);
       var updatedConfiguration = addJSONFilesToJSON(rootPath,configuration);
       if (updatedConfiguration) {
         logger.debug("ZWED0256I", JSON.stringify(updatedConfiguration)); //logger.debug("Configuration is now = "+JSON.stringify(updatedConfiguration));
@@ -2343,7 +2345,7 @@ function getServiceConfiguration(pluginIdentifier, pluginLocation, serviceName,s
   var policy = AGGREGATION_POLICY_NONE;
   var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = pluginIdentifier+'/_internal/services/'+serviceName;
-  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
+  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE,pluginIdentifier);
   return new InternalConfiguration(configuration);
 }
 exports.getServiceConfiguration = getServiceConfiguration;
@@ -2354,7 +2356,7 @@ function getPluginConfiguration(identifier, pluginLocation, serverSettings,produ
   var policy = AGGREGATION_POLICY_NONE;
   var directories = makeConfigurationDirectoriesStructInner(serverSettings,productCode, undefined, pluginLocation);
   var relativeLocation = identifier+'/_internal/plugin';
-  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE);
+  var configuration = getJSONFromLocation(relativeLocation,directories,CONFIG_SCOPE_PLUGIN,CONFIG_SCOPE_INSTANCE,identifier);
   return new InternalConfiguration(configuration);
 };
 exports.getPluginConfiguration = getPluginConfiguration;
