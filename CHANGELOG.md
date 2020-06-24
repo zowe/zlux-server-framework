@@ -3,6 +3,11 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.14.0
+
+- Bugfix: Plugin default server config could not exist in plugins own directory, and had to exist in the instance
+- Bugfix: Terminal handlers had to exist within the root directory, rather than also being possible to exist within the instance directory
+
 ## 1.12.0
 
 - Bugfix: Server handles if implementationDefaults or mediationLayer objects are missing
