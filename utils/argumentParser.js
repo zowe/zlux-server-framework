@@ -179,11 +179,12 @@ exports.createParser = function(stringArray) {
   Prefix can be undefined if desired
   Limitations exist due to small set of allowed characters for env var names.
   Everything is case sensitive.
-  Characters other than A-Z, a-z, 0-9, _ . - are not allowed in the object attribute names.
-  Single leading and trailing _ are not manipulated because leading and trailing '.' would not process correctly.
-  Env _ will be mapped to .
+  All ascii characters except " are allowed in the object attribute names.
+  Env _ will be mapped to ", which gets interpreted as an object separator
   Env __ will be mapped to _
   Env ___ will be mapped to -
+  Env ____ will be mapped to .
+  Env _x9F and other hex values will be mapped to the hex result in ascii
   So, _ and - are discouraged key names for use within the object
 */
 
@@ -204,12 +205,25 @@ function EnvironmentVarsToObject(prefix, env) {
   let prefixLen = prefix ? prefix.length : 0;
   keys.forEach(function(key) {
     let value = stringToValue(envVars[key],true);
-    let decodedKey = key.substr(prefixLen).replace(/___/g, '-')
-        .replace(/[^_]_[A-Za-z0-9]/g, function(match){
-          return match.replace(/_/g,'.');
+    let decodedKey = key.substr(prefixLen)
+        .replace(/[^_]____[^_x]/g, function(match){
+          return match.replace(/____/,'.');
         })
-        .replace(/__/g, '_')
-    let keyParts = decodedKey.split('.')
+        .replace(/[^_]___[^_x]/g, '-')
+        .replace(/[^_]__[^_x]/g, '_')
+        .replace(/_x[0-9a-fA-F][0-9a-fA-F]/g, function(match) {
+          let num = parseInt(match.substring(2),16);
+          return String.fromCodePoint(num);
+        })
+        .replace(/[^_]_/g, function(match){
+          return match.replace(/_/,'"');
+        })
+        .replace(/__/g, function(match){
+          return match.replace(/_/,'"_');
+        })
+
+    
+    let keyParts = decodedKey.split('"')
 
     if (keyParts.length>1) {
       if (typeof obj[keyParts[0]] != 'object') {
@@ -272,110 +286,127 @@ exports.stringToValue = stringToValue;
 
 
 function testEnv() {
-  let input = {ABC:1,
-               ABC_123: 2,
-               ABC__123: 3,
-               ABC___123: 4,
-               _ABC: 5,
-               _ABC_123: 6,
-               _ABC__123: 7,
-               _ABC___123: 8,
-               __ABC: 9,
-               __ABC_123: 10,
-               __ABC__123: 11,
-               __ABC___123: 12,
-               ___ABC: 13,
-               ___ABC_123: 14,
-               ___ABC__123: 15,
-               ___ABC___123: 16,
-               ABC_: 17,
-               ABC_123_: 18,
-               ABC__123_: 19,
-               ABC___123_: 20,
-               ABC__: 21,
-               ABC_123__: 22,
-               ABC__123__: 23,
-               ABC___123__: 24,
-               ABC___: 25,
-               ABC_123___: 26,
-               ABC__123___: 27,
-               ABC___123___: 28,
-               _ABC_: 29,
-               _ABC_123_: 30,
-               _ABC__123_: 31,
-               _ABC___123_: 32,
-               __ABC_: 33,
-               __ABC_123_: 34,
-               __ABC__123_: 35,
-               __ABC___123_: 36,
-               ___ABC_: 37,
-               ___ABC_123_: 38,
-               ___ABC__123_: 39,
-               ___ABC___123_: 40,
-               ___ABC__: 41,
-               ___ABC_123__: 42,
-               ___ABC__123__: 43,
-               ___ABC___123__: 44,
-               ___ABC___: 45,
-               ___ABC_123___: 46,
-               ___ABC__123___: 47,
-               ___ABC___123___: 48,
-               ____ABC____123____: 49,
-               _____ABC_____123_____: 50,
-               ______ABC______123______: 51,
+  let input0 = {ABC:"1",
+               ABC_123: "2",
+               ABC__123: "3",
+               ABC___123: "4",
+               _ABC: "5",
+               _ABC_123: "6",
+               _ABC__123: "7",
+               _ABC___123: "8",
+               __ABC: "9",
+               __ABC_123: "10",
+               __ABC__123: "11",
+               __ABC___123: "12",
+               ___ABC: "13",
+               ___ABC_123: "14",
+               ___ABC__123: "15",
+               ___ABC___123: "16",
+               ABC_: "17",
+               ABC_123_: "18",
+               ABC__123_: "19",
+               ABC___123_: "20",
+               ABC__: "21",
+               ABC_123__: "22",
+               ABC__123__: "23",
+               ABC___123__: "24",
+               ABC___: "25",
+               ABC_123___: "26",
+               ABC__123___: "27",
+               ABC___123___: "28",
+               _ABC_: "29",
+               _ABC_123_: "30",
+               _ABC__123_: "31",
+               _ABC___123_: "32",
+               __ABC_: "33",
+               __ABC_123_: "34",
+               __ABC__123_: "35",
+               __ABC___123_: "36",
+               ___ABC_: "37",
+               ___ABC_123_: "38",
+               ___ABC__123_: "39",
+               ___ABC___123_: "40",
+               ___ABC__: "41",
+               ___ABC_123__: "42",
+               ___ABC__123__: "43",
+               ___ABC___123__: "44",
+               ___ABC___: "45",
+               ___ABC_123___: "46",
+               ___ABC__123___: "47",
+               ___ABC___123___: "48",
+               ____ABC____123____: "49",
+               _____ABC_____123_____: "50",
+               ______ABC______123______: "51",
 
-               aBC:61,
-               aBC_123: 62,
-               aBC__123: 63,
-               aBC___123: 64,
-               _aBC: 65,
-               _aBC_123: 66,
-               _aBC__123: 67,
-               _aBC___123: 68,
-               __aBC: 69,
-               __aBC_123: 70,
-               __aBC__123: 71,
-               __aBC___123: 72,
-               ___aBC: 73,
-               ___aBC_123: 74,
-               ___aBC__123: 75,
-               ___aBC___123: 76,
-               aBC_: 87,
-               aBC_123_: 88,
-               aBC__123_: 89,
-               aBC___123_: 90,
-               aBC__: 91,
-               aBC_123__: 92,
-               aBC__123__: 93,
-               aBC___123__: 94,
-               aBC___: 95,
-               aBC_123___: 96,
-               aBC__123___: 97,
-               aBC___123___: 98,
-               _aBC_: 99,
-               _aBC_123_: 100,
-               _aBC__123_: 101,
-               _aBC___123_: 102,
-               __aBC_: 103,
-               __aBC_123_: 104,
-               __aBC__123_: 105,
-               __aBC___123_: 106,
-               ___aBC_: 107,
-               ___aBC_123_: 108,
-               ___aBC__123_: 109,
-               ___aBC___123_: 110,
-               ___aBC__: 111,
-               ___aBC_123__: 112,
-               ___aBC__123__: 113,
-               ___aBC___123__: 114,
-               ___aBC___: 115,
-               ___aBC_123___: 116,
-               ___aBC__123___: 117,
-               ___aBC___123___: 118,
-               ____aBC____123____: 119,
-               _____aBC_____123_____: 120,
-               ______aBC______123______: 121,
-               _______aBC_______123_______: 122
+               aBC:"61",
+               aBC_123: "62",
+               aBC__123: "63",
+               aBC___123: "64",
+               _aBC: "65",
+               _aBC_123: "66",
+               _aBC__123: "67",
+               _aBC___123: "68",
+               __aBC: "69",
+               __aBC_123: "70",
+               __aBC__123: "71",
+               __aBC___123: "72",
+               ___aBC: "73",
+               ___aBC_123: "74",
+               ___aBC__123: "75",
+               ___aBC___123: "76",
+               aBC_: "87",
+               aBC_123_: "88",
+               aBC__123_: "89",
+               aBC___123_: "90",
+               aBC__: "91",
+               aBC_123__: "92",
+               aBC__123__: "93",
+               aBC___123__: "94",
+               aBC___: "95",
+               aBC_123___: "96",
+               aBC__123___: "97",
+               aBC___123___: "98",
+               _aBC_: "99",
+               _aBC_123_: "100",
+               _aBC__123_: "101",
+               _aBC___123_: "102",
+               __aBC_: "103",
+               __aBC_123_: "104",
+               __aBC__123_: "105",
+               __aBC___123_: "106",
+               ___aBC_: "107",
+               ___aBC_123_: "108",
+               ___aBC__123_: "109",
+               ___aBC___123_: "110",
+               ___aBC__: "111",
+               ___aBC_123__: "112",
+               ___aBC__123__: "113",
+               ___aBC___123__: "114",
+               ___aBC___: "115",
+               ___aBC_123___: "116",
+               ___aBC__123___: "117",
+               ___aBC___123___: "118",
+               ____aBC____123____: "119",
+               _____aBC_____123_____: "120",
+               ______aBC______123______: "121",
+               _______aBC_______123_______: "122",
+                __0__abc__1__def: "123"
+               };
+
+  let input = {
+
+               node_mediationLayer_server_gatewayPort:"$GATEWAY_PORT",
+               node_mediationLayer_server_port:"$DISCOVERY_PORT",
+               node_mediationLayer_enabled:"true",
+               node_https_certificates:"${KEYSTORE}&${KEY_ALIAS},",
+               node_https_certificateAuthorities:"${KEYSTORE_CERTIFICATE_AUTHORITY},${EXTERNAL_ROOT_CA}",
+               agent_jwt_fallback:"$SSO_FALLBACK_TO_NATIVE_AUTH",
+               productDir:"$ROOT_DIR/components/app-server/share/zlux-app-server/defaults",
+               node_https_port:"$ZOWE_ZLUX_SERVER_HTTPS_PORT",
+               node_https__x2dnegative:"-1",
+               logLevels__x5fzsf____auth:"1",
+               logLevels_org____zowe____terminal____tn3270_x2e_x2a:"5"
+               
               };
   console.log('ZWED0139I - Input = '+JSON.stringify(input, null, 2));
   let output = EnvironmentVarsToObject(undefined, input);
