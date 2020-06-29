@@ -898,6 +898,7 @@ export class Raft {
       this.tracePrintf("grant vote to %d because its log is up to date at least as mine log", args.candidateId);
       this.votedFor = args.candidateId;
       this.currentTerm = args.term;
+      this.cancelCurrentElectionTimeoutAndReschedule();
       return {
         term: this.currentTerm,
         voteGranted: true
