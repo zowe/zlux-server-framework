@@ -229,7 +229,6 @@ export class Raft {
   private peers: RaftPeer[]; // RPC end points of all peers
   private me: number;  // this peer's index into peers[]
   private state: State = 'Follower';
-  private readonly electionTimeout = Math.floor(Math.random() * (maxElectionTimeout - minElectionTimeout) + minElectionTimeout);
   private trace = true;
   private started = false;
 
@@ -265,8 +264,12 @@ export class Raft {
     this.isEnabled = raftClusterEnabledEnvVar === 'TRUE' || raftClusterEnabledEnvVar === 'YES';
   }
 
+  get electionTimeout(): number {
+    return Math.floor(Math.random() * (maxElectionTimeout - minElectionTimeout) + minElectionTimeout);
+  }
+
   async start(apiml: ApimlConnector): Promise<void> {
-    raftLog.info(`Starting peer electionTimeout ${this.electionTimeout} ms heartbeatInterval ${this.heartbeatInterval} ms`);
+    raftLog.info(`Starting peer heartbeatInterval ${this.heartbeatInterval} ms`);
     this.apiml = apiml;
     this.persister = Raft.makePersister();
     this.maxLogSize = Raft.getMaxLogSize();
