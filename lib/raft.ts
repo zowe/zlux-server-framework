@@ -369,6 +369,10 @@ export class Raft {
   }
 
   attemptElection(): void {
+    if (this.state === 'Leader') {
+      raftLog.debug(`already leader, do not to attempt election`);
+      return;
+    }
     if (this.state !== 'Candidate') {
       this.state = 'Candidate';
       this.emitState();
@@ -416,6 +420,7 @@ export class Raft {
 
   convertToLeader(): void {
     this.state = 'Leader';
+    this.cancelCurrentElectionTimeout();
     // When a leader first comes to power, it initializes all nextIndex values to the index just after the last one in its log (11 in Figure 7)
     const logLen = this.len();
     for (let i = 0; i < this.peers.length; i++) {
@@ -426,6 +431,10 @@ export class Raft {
     this.tracePrintf("matchIndex %s", JSON.stringify(this.matchIndex));
     setImmediate(() => this.emitState());
     this.sendHeartbeat();
+  }
+
+  cancelCurrentElectionTimeout(): void {
+    clearTimeout(this.electionTimeoutId);
   }
 
   private emitState(): void {
@@ -863,7 +872,7 @@ export class Raft {
   }
 
   cancelCurrentElectionTimeoutAndReschedule(): void {
-    clearTimeout(this.electionTimeoutId);
+    this.cancelCurrentElectionTimeout();
     this.scheduleElectionOnTimeout();
   }
 
