@@ -72,7 +72,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canGetStatus": true,
     "canGetCategories": true,
     //when zosmf cookie becomes invalid, we can purge zss cookie even if it is valid to be consistent
-    "canRefresh": this.usingApiml ? false : true, 
+    "canRefresh": this.usingZss ? true : false, 
     "canAuthenticate": true,
     "canAuthorize": true,
     "canLogout": true,
