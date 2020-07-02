@@ -399,6 +399,14 @@ export class Raft {
         if (done) {
           this.tracePrintf("got vote from peer %s but election already finished", peerAddress);
           return;
+        } else if (this.state === 'Leader') {
+          this.tracePrintf("got vote from peer %s, but already leader", peerAddress);
+          done = true;
+          return;
+        } else if (this.currentTerm !== term) {
+          this.tracePrintf("got vote from peer %s, but current term already changed to %d", peerAddress, this.currentTerm);
+          done = true;
+          return;
         } else if (this.state == 'Follower') {
           this.tracePrintf("got heartbeat, stop election")
           done = true;
