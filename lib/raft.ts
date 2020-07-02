@@ -247,7 +247,7 @@ export class Raft {
   private nextIndex: number[] = [];  //  for each server, index of the next log entry to send to that server (initialized to leader last log index + 1)
   private matchIndex: number[] = []; // for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
   private electionTimeoutId: NodeJS.Timer;
-  private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .75);
+  private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .2);
   private heartbeatTimeoutId: NodeJS.Timer;
   private leaderId: number = -1; // last observed leader id
   private discardCount: number = 0;
