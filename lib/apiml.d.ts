@@ -4,7 +4,7 @@ declare type Status = 'UP' | 'DOWN' | 'STARTING' | 'OUT_OF_SERVICE' | 'UNKNOWN';
 
 declare class ApimlConnector {
   constructor(config: any);
-  registerMainServerInstance(): Promise<void>;
+  registerMainServerInstance(instanceConfigOverrides?: Partial<EurekaInstanceConfig>): Promise<void>;
   getInstanceId(): string;
   getZluxInstances(): EurekaInstanceConfig[];
   waitUntilRaftClusterIsReady(clusterSize: number): Promise<EurekaInstanceConfig[]>;

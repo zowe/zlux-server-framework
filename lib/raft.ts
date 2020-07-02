@@ -292,7 +292,6 @@ export class Raft {
   }
 
   private async waitUntilRaftClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
-    await this.apiml.takeOutOfService();
     const instanceId = this.apiml.getInstanceId();
     let raftClusterSize = +process.env.ZLUX_RAFT_CLUSTER_SIZE;
     if (!Number.isInteger(raftClusterSize) || raftClusterSize < 3) {
