@@ -34,8 +34,6 @@ import { SyncService } from "./sync-service";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
-//(global as any).COM_RS_COMMON_LOGGER.setLogLevelForComponentName("_zsf.raft", 4);
-
 export class RaftPeer extends RaftRPCWebSocketDriver {
   constructor(
     host: string,
