@@ -34,6 +34,8 @@ import { SyncService } from "./sync-service";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
 
+//(global as any).COM_RS_COMMON_LOGGER.setLogLevelForComponentName("_zsf.raft", 4);
+
 export class RaftPeer extends RaftRPCWebSocketDriver {
   constructor(
     host: string,
@@ -1228,9 +1230,7 @@ export class Raft {
             }
             if (state.raftState === 'Follower') {
               if (typeof state.leaderBaseURL === 'string') {
-                const url = `${state.leaderBaseURL}${request.path}`;
-                raftLog.info(`redirect client to Leader at ${url}`);
-                response.redirect(301, url);
+                response.status(503).json({ state });
                 return;
               } else {
                 response.status(503).json({
