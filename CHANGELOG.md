@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 1.14.0
 
+- Bugfix: Support more config parameters as env vars for edge case characters *, ., and _
 - Bugfix: Fix for regression where session would expire prematurely because app server would not request a refresh from ZSS
 
 ## 1.12.0
