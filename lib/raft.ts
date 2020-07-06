@@ -906,7 +906,7 @@ export class Raft {
       this.votedFor = -1;
     }
     this.tracePrintf("vote args %s", JSON.stringify(args));
-    if (this.votedFor != -1 && this.votedFor != this.me) {
+    if (this.votedFor !== -1 && this.votedFor !== args.candidateId) {
       this.tracePrintf("don't grant vote because already voted at term %d", this.currentTerm);
       return {
         voteGranted: false,
