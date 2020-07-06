@@ -139,6 +139,26 @@ function addToServer(appDir, installDir) {
   }
 }
 
+function loadRecognizers(appDir, appId) {
+  let recognizers;
+  try {
+    recognizers = JSON.parse(fs.readFileSync(path.join(appDir, "config/recognizers", appId)));
+  } catch (e) {
+    logger.warn("Could not find recognizers for '" + appId + "'");
+  }
+  return recognizers;
+}
+
+function loadActions(appDir, appId) {
+  let actions;
+  try {
+    actions = JSON.parse(fs.readFileSync(path.join(appDir + "config/actions", appId)));
+  } catch (e) {
+    logger.warn("Could not load actions for '" + appId + "'");
+  }
+  return actions;
+}
+
 if(calledViaCLI){
   if (!isFile(userInput.inputApp)) {
     const pluginDefinition = packagingUtils.validatePluginInDirectory(userInput.inputApp);
@@ -150,6 +170,8 @@ if(calledViaCLI){
 
 module.exports.addToServer = addToServer;
 module.exports.isFile = isFile;
+module.exports.loadRecognizers = loadRecognizers;
+module.exports.loadActions = loadActions;
 
 /*
  This program and the accompanying materials are
