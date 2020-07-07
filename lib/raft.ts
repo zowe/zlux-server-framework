@@ -213,8 +213,8 @@ export class DummyPersister implements Persister {
 
 export type State = 'Leader' | 'Follower' | 'Candidate';
 
-const minElectionTimeout = 1000;
-const maxElectionTimeout = 2000;
+const defaultMinElectionTimeout = 1000;
+const defaultMaxElectionTimeout = 2000;
 
 export interface RaftStateReply {
   isEnabled: boolean;
@@ -247,7 +247,6 @@ export class Raft {
   private nextIndex: number[] = [];  //  for each server, index of the next log entry to send to that server (initialized to leader last log index + 1)
   private matchIndex: number[] = []; // for each server, index of highest log entry known to be replicated on server (initialized to 0, increases monotonically)
   private electionTimeoutId: NodeJS.Timer;
-  private readonly heartbeatInterval: number = Math.round(minElectionTimeout * .2);
   private heartbeatTimeoutId: NodeJS.Timer;
   private leaderId: number = -1; // last observed leader id
   private discardCount: number = 0;
@@ -258,6 +257,9 @@ export class Raft {
   private syncService: SyncService;
   private apiml: ApimlConnector;
 
+  private minElectionTimeoutMs: number = defaultMinElectionTimeout;
+  private maxElectionTimeoutMs: number = defaultMaxElectionTimeout;
+  private heartbeatIntervalMs: number = Math.round(defaultMinElectionTimeout * .2);
 
   constructor() {
     const raftClusterEnabledEnvVar = process.env.ZLUX_RAFT_CLUSTER_ENABLED;
@@ -265,11 +267,12 @@ export class Raft {
   }
 
   get electionTimeout(): number {
-    return Math.floor(Math.random() * (maxElectionTimeout - minElectionTimeout) + minElectionTimeout);
+    return Math.floor(Math.random() * (this.maxElectionTimeoutMs - this.minElectionTimeoutMs) + this.minElectionTimeoutMs);
   }
 
   async start(apiml: ApimlConnector): Promise<void> {
-    raftLog.info(`Starting peer heartbeatInterval ${this.heartbeatInterval} ms`);
+    this.configureTimeouts();
+    raftLog.info(`starting peer with election timeout (min = ${this.minElectionTimeoutMs} ms, max = ${this.maxElectionTimeoutMs} ms), heartbeat interval ${this.heartbeatIntervalMs} ms`)
     this.apiml = apiml;
     this.persister = Raft.makePersister();
     this.maxLogSize = Raft.getMaxLogSize();
@@ -287,6 +290,25 @@ export class Raft {
     this.addOnReRegisterHandler();
     this.started = true;
     raftLog.trace(`peer ${me} started with %s log`, this.log.length > 0 ? 'not empty' : 'empty');
+  }
+
+  private configureTimeouts(): void {
+    const minElectionTimeout = +process.env.ZLUX_RAFT_MIN_ELECTION_TIMEOUT;
+    const maxElectionTimeout = +process.env.ZLUX_RAFT_MAX_ELECTION_TIMEOUT;
+    const heartbeatInterval = +process.env.ZLUX_RAFT_HEARTBEAT_INTERVAL;
+    const isInteger = Number.isInteger;
+    if (!isInteger(minElectionTimeout) || !isInteger(maxElectionTimeout) || !isInteger(heartbeatInterval)) {
+      return;
+    }
+    if (maxElectionTimeout <= minElectionTimeout) {
+      return;
+    }
+    if (heartbeatInterval >= minElectionTimeout) {
+      return;
+    }
+    this.minElectionTimeoutMs = minElectionTimeout;
+    this.maxElectionTimeoutMs = maxElectionTimeout;
+    this.heartbeatIntervalMs = heartbeatInterval;
   }
 
   private async waitUntilRaftClusterIsReady(): Promise<{ peers: RaftPeer[], me: number }> {
@@ -479,7 +501,7 @@ export class Raft {
       this.tracePrintf("stop heartbeat because not leader anymore");
       return;
     }
-    this.heartbeatTimeoutId = setTimeout(() => this.sendHeartbeat(), this.heartbeatInterval)
+    this.heartbeatTimeoutId = setTimeout(() => this.sendHeartbeat(), this.heartbeatIntervalMs)
   }
 
   private adjustNextIndexForServer(server: number, conflict: Conflict) {
@@ -1379,7 +1401,7 @@ export class Raft {
   }
 
   private tracePrintf(...args: any[]): void {
-      raftLog.debug(...args);
+    raftLog.debug(...args);
   }
 
 }
