@@ -128,6 +128,8 @@ function addToServer(appDir, installDir) {
         process.exit(0);
       }
     });
+    loadRecognizers(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
+    loadActions(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
     return {success: true, message: pluginDefinition.identifier};
   } catch (e) {
     if(calledViaCLI){
@@ -139,24 +141,86 @@ function addToServer(appDir, installDir) {
   }
 }
 
-function loadRecognizers(appDir, appId) {
+function loadRecognizers(appDir, appId, appVers) {
   let recognizers;
+  let configRecognizers;
+  let configLocation;
+
   try {
-    recognizers = JSON.parse(fs.readFileSync(path.join(appDir, "config/recognizers", appId)));
+    recognizers = JSON.parse(fs.readFileSync(path.join(appDir, "config/recognizers", appId))).recognizers;
+    const keys = Object.keys(recognizers)
+    for (const key of keys) {
+      recognizers[key].pluginVersion = appVers;
+      recognizers[key].pluginIdentifier = appId;
+    }
+    logger.debug("Found recognizers for '" + appId + "'");
   } catch (e) {
-    logger.warn("Could not find recognizers for '" + appId + "'");
+    logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/recognizers", appId)) + "'");
   }
-  return recognizers;
+
+  try {
+    configLocation = path.join(process.env.ZLUX_CONFIG_FILE.substring(1), "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    configRecognizers = JSON.parse(fs.readFileSync(path.join(configLocation, "recognizers", appId))).recognizers;
+    const keys = Object.keys(configRecognizers)
+    for (const key of keys) {
+      configRecognizers[key].pluginVersion = appVers;
+      configRecognizers[key].pluginIdentifier = appId;
+    }
+    recognizers = Object.assign(configRecognizers, recognizers); // use them too (combine).
+    logger.debug("Found recognizers in config for '" + appId + "'");
+  } catch (e) {
+    logger.debug("No existing recognizers were found in config for '" + appId + "'");
+  }
+
+  if (recognizers) {
+    try {
+      fs.writeFileSync(path.join(configLocation, "recognizers", appId), '{ "recognizers":' + JSON.stringify(recognizers) + '}');
+      logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
+    } catch (e) {
+      logger.debug("Unable to load recognizers for '" + appId + "' into config");
+    }
+  }
 }
 
-function loadActions(appDir, appId) {
+function loadActions(appDir, appId, appVers) {
   let actions;
+  let configActions;
+  let configLocation;
+
   try {
-    actions = JSON.parse(fs.readFileSync(path.join(appDir + "config/actions", appId)));
+    actions = JSON.parse(fs.readFileSync(path.join(appDir, "config/actions", appId))).actions;
+    const keys = Object.keys(actions)
+    for (const key of keys) {
+      actions[key].pluginVersion = appVers;
+      actions[key].pluginIdentifier = appId;
+    }
+    logger.debug("Found recognizers for '" + appId + "'");
   } catch (e) {
-    logger.warn("Could not load actions for '" + appId + "'");
+    logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/actions", appId)) + "'");
   }
-  return actions;
+
+  try {
+    configLocation = path.join(process.env.ZLUX_CONFIG_FILE.substring(1), "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    configActions = JSON.parse(fs.readFileSync(path.join(configLocation, "actions", appId))).actions;
+    const keys = Object.keys(configActions)
+    for (const key of keys) {
+      configActions[key].pluginVersion = appVers;
+      configActions[key].pluginIdentifier = appId;
+    }
+    actions = Object.assign(configActions, actions); // use them too (combine).
+    logger.debug("Found actions in config for '" + appId + "'");
+  } catch (e) {
+    logger.debug("No existing actions were found in config for '" + appId + "'");
+  }
+
+  if (actions) {
+    try {
+      fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
+      logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
+    } catch (e) {
+      logger.debug("Unable to load actions for '" + appId + "' into config");
+    }
+  }
 }
 
 if(calledViaCLI){
@@ -170,8 +234,6 @@ if(calledViaCLI){
 
 module.exports.addToServer = addToServer;
 module.exports.isFile = isFile;
-module.exports.loadRecognizers = loadRecognizers;
-module.exports.loadActions = loadActions;
 
 /*
  This program and the accompanying materials are
