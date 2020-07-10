@@ -146,10 +146,10 @@ function loadRecognizers(appDir, appId, appVers) {
   let configRecognizers;
   let configLocation;
 
-  try {
+  try { // Get recognizers in a plugin's appDir/config/xxx location
     recognizers = JSON.parse(fs.readFileSync(path.join(appDir, "config/recognizers", appId))).recognizers;
     const keys = Object.keys(recognizers)
-    for (const key of keys) {
+    for (const key of keys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
       recognizers[key].pluginVersion = appVers;
       recognizers[key].pluginIdentifier = appId;
     }
@@ -158,22 +158,17 @@ function loadRecognizers(appDir, appId, appVers) {
     logger.debug('ZWED0295I', (path.join(appDir, "config/recognizers", appId)), appId); //logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/recognizers", appId)) + "'");
   }
 
-  try {
+  try { // Get pre-existing recognizers in config, if any
     configLocation = path.join(process.env.ZLUX_CONFIG_FILE.substring(1), "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     configRecognizers = JSON.parse(fs.readFileSync(path.join(configLocation, "recognizers", appId))).recognizers;
-    const keys = Object.keys(configRecognizers)
-    for (const key of keys) {
-      configRecognizers[key].pluginVersion = appVers;
-      configRecognizers[key].pluginIdentifier = appId;
-    }
-    recognizers = Object.assign(configRecognizers, recognizers); // use them too (combine).
+    recognizers = Object.assign(configRecognizers, recognizers); // // If found, combine the ones found in config with ones found in plugin
     logger.debug('ZWED0296I', appId); //logger.debug("Found recognizers in config for '" + appId + "'");
   } catch (e) {
     logger.debug('ZWED0297I', appId); //logger.debug("No existing recognizers were found in config for '" + appId + "'");
   }
 
-  if (recognizers) {
-    try {
+  if (recognizers) { // Attempt to copy recognizers over to config location for Desktop access later
+    try { //TODO: Doing recognizers.recognizers is redundant. We may want to consider refactoring in the future
       fs.writeFileSync(path.join(configLocation, "recognizers", appId), '{ "recognizers":' + JSON.stringify(recognizers) + '}');
       logger.debug('ZWED0298I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
     } catch (e) {
@@ -187,10 +182,10 @@ function loadActions(appDir, appId, appVers) {
   let configActions;
   let configLocation;
 
-  try {
+  try { // Get actions in a plugin's appDir/config/xxx location
     actions = JSON.parse(fs.readFileSync(path.join(appDir, "config/actions", appId))).actions;
     const keys = Object.keys(actions)
-    for (const key of keys) {
+    for (const key of keys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
       actions[key].pluginVersion = appVers;
       actions[key].pluginIdentifier = appId;
     }
@@ -199,22 +194,17 @@ function loadActions(appDir, appId, appVers) {
     logger.debug('ZWED0301I', path.join(appDir, "config/actions", appId)); //logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/actions", appId)) + "'");
   }
 
-  try {
+  try { // Get pre-existing actions in config, if any
     configLocation = path.join(process.env.ZLUX_CONFIG_FILE.substring(1), "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     configActions = JSON.parse(fs.readFileSync(path.join(configLocation, "actions", appId))).actions;
-    const keys = Object.keys(configActions)
-    for (const key of keys) {
-      configActions[key].pluginVersion = appVers;
-      configActions[key].pluginIdentifier = appId;
-    }
-    actions = Object.assign(configActions, actions); // use them too (combine).
+    actions = Object.assign(configActions, actions); // If found, combine the ones found in config with ones found in plugin
     logger.debug('ZWED0302I', appId); //logger.debug("Found actions in config for '" + appId + "'");
   } catch (e) {
     logger.debug('ZWED0303I', appId); //logger.debug("No existing actions were found in config for '" + appId + "'");
   }
 
-  if (actions) {
-    try {
+  if (actions) { // Attempt to copy actions over to config location for Desktop access later
+    try { //TODO: Doing actions.actions is redundant. We may want to consider refactoring in the future
       fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
       logger.info('ZWED0304I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
     } catch (e) {
