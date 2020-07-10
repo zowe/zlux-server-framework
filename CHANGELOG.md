@@ -5,6 +5,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 1.14.0
 
+- Bugfix: Plugin default server config could not exist in plugins own directory, and had to exist in the instance
+- Bugfix: Terminal handlers had to exist within the root directory, rather than also being possible to exist within the instance directory
 - Bugfix: Support more config parameters as env vars for edge case characters *, ., and _
 - Bugfix: Fix for regression where session would expire prematurely because app server would not request a refresh from ZSS
 

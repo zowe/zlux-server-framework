@@ -9,7 +9,7 @@
   "ZWED0102I":"Total TN3270 terminals connected: %d",
   "ZWED0103I":"Total TN5250 terminals connected: %d",
   "ZWED0104I":"Total VT terminals connected: %d",
-  "ZWED0105I":"Found and loaded compatible handler file /lib/%s",
+  "ZWED0105I":"Found and loaded compatible handler file %s",
   "ZWED0106I":"Saw Websocket request, method=%s",
   "ZWED0107I":"Saw Websocket request, method=%s",
   "ZWED0108I":"Saw Websocket request, method=%s",
@@ -53,5 +53,5 @@
   "ZWED0142W":"Error: Host not found",
   "ZWED0143W":"Host communication error=%s",
   "ZWED0144W":"Error when reading file=%s. Error=%s",
-  "ZWED0145W":"Could not load a handler from file /lib/%s"
+  "ZWED0145W":"Could not load a handler from file %s"
 }
