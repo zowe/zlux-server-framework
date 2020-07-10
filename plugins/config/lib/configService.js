@@ -2839,7 +2839,6 @@ function ConfigService(context) {
     let isB64 = b64 ? (b64.toLowerCase() == 'true') : false;
     let timestamp = request.query.lastmod;
     /* NOTE: here, scope only indicates where to place the files. aggregation policy is ignored */
-    console.log("hey, we got here!");
     if (!request.currentResourceList && itemName.length>0) {
       //Replace or create one file
       accessLogger.debug("ZWED0268I", request.resourceURL, itemName, request.scope); //accessLogger.debug(`Configuration service handling element write request. `
