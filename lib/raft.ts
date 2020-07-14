@@ -29,7 +29,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Request, Response } from "express";
 import { NextFunction } from "connect";
-import { StorageDict } from "./clusterManager";
+import { StorageDict, DataserviceStorage } from "./util";
 import { SyncService } from "./sync-service";
 const zluxUtil = require('./util');
 const raftLog = zluxUtil.loggers.raftLogger;
@@ -260,6 +260,7 @@ export class Raft {
   private minElectionTimeoutMs: number = defaultMinElectionTimeout;
   private maxElectionTimeoutMs: number = defaultMaxElectionTimeout;
   private heartbeatIntervalMs: number = Math.round(defaultMinElectionTimeout * .2);
+  private storage: DataserviceStorage; // storage in non-cluster mode
 
   constructor() {
     const raftClusterEnabledEnvVar = process.env.ZLUX_RAFT_CLUSTER_ENABLED;
@@ -680,14 +681,18 @@ export class Raft {
 
   private invokeRPCMethod<T, P>(method: string, args: T): Promise<P> {
     if (!process.clusterManager || process.clusterManager.isMaster) {
-      return this[method](args);
+      let result: P;
+      this[method](args, (res: P) => { result = res; });
+      return Promise.resolve(result);
     }
     return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [args], result => result[0]);
   }
 
   private invokeRaftMethod<T, P>(method: string): Promise<P> {
     if (!process.clusterManager || process.clusterManager.isMaster) {
-      return this[method]();
+      let result: P;
+      this[method]((res: P) => { result = res });
+      return Promise.resolve(result);
     }
     return process.clusterManager.callClusterMethodRemote('./raft', 'raft', method, [], result => result[0]);
   }
@@ -1114,14 +1119,27 @@ export class Raft {
       sessionStore.addSession(sessionData.sid, sessionData.session);
     } else if (isStorageSyncCommand(entry)) {
       const clusterManager = process.clusterManager;
-      if (isStorageActionSetAll(entry.payload)) {
-        clusterManager.setStorageAllLocal(entry.payload.data.pluginId, entry.payload.data.dict);
-      } else if (isStorageActionSet(entry.payload)) {
-        clusterManager.setStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
-      } else if (isStorageActionDeleteAll(entry.payload)) {
-        clusterManager.setStorageAllLocal(entry.payload.data.pluginId, {});
-      } else if (isStorageActionDelete(entry.payload)) {
-        clusterManager.deleteStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key);
+      if (clusterManager) {
+        if (isStorageActionSetAll(entry.payload)) {
+          clusterManager.setStorageAllLocal(entry.payload.data.pluginId, entry.payload.data.dict);
+        } else if (isStorageActionSet(entry.payload)) {
+          clusterManager.setStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key, entry.payload.data.value);
+        } else if (isStorageActionDeleteAll(entry.payload)) {
+          clusterManager.setStorageAllLocal(entry.payload.data.pluginId, {});
+        } else if (isStorageActionDelete(entry.payload)) {
+          clusterManager.deleteStorageByKeyLocal(entry.payload.data.pluginId, entry.payload.data.key);
+        }
+      } else {
+        const storage = this.storage;
+        if (isStorageActionSetAll(entry.payload)) {
+          storage.setAll(entry.payload.data.dict, entry.payload.data.pluginId,);
+        } else if (isStorageActionSet(entry.payload)) {
+          storage.set(entry.payload.data.key, entry.payload.data.value, entry.payload.data.pluginId,);
+        } else if (isStorageActionDeleteAll(entry.payload)) {
+          storage.setAll({}, entry.payload.data.pluginId);
+        } else if (isStorageActionDelete(entry.payload)) {
+          storage.delete(entry.payload.data.key, entry.payload.data.pluginId);
+        }
       }
     } else if (isSnapshotSyncCommand(entry)) {
       this.restoreStateFromSnapshot(entry.payload);
@@ -1394,10 +1412,20 @@ export class Raft {
     for (const sid in session) {
       sessionStore.set(sid, session[sid], () => { });
     }
-    const clusterManager = process.clusterManager;
-    for (const pluginId of Object.keys(storage)) {
-      clusterManager.setStorageAllLocal(pluginId, storage[pluginId]);
+    if (process.clusterManager) {
+      const clusterManager = process.clusterManager;
+      for (const pluginId of Object.keys(storage)) {
+        clusterManager.setStorageAllLocal(pluginId, storage[pluginId]);
+      }
+    } else {
+      for (const pluginId of Object.keys(storage)) {
+        this.storage.setAll(storage[pluginId], pluginId);
+      }
     }
+  }
+
+  setStorage(storage: DataserviceStorage): void {
+    this.storage = storage;
   }
 
   private tracePrintf(...args: any[]): void {

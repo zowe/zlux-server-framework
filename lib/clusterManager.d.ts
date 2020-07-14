@@ -9,14 +9,7 @@
 */
 
 import { EventEmitter } from "events";
-
-interface KeyVal {
-  [key: string]: any;
-}
-
-interface StorageDict {
-  [pluginId: string]: KeyVal;
-}
+import { KeyVal, StorageDict } from './util';
 
 declare class ClusterManager extends EventEmitter {
   isMaster: boolean;
