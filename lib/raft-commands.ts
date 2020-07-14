@@ -8,7 +8,7 @@
   Copyright Contributors to the Zowe Project.
 */
 
-import { KeyVal } from './clusterManager';
+import { KeyVal } from './util';
 import { Snapshot } from './raft';
 
 export interface SyncCommand {

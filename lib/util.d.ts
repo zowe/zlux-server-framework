@@ -8,15 +8,24 @@
   Copyright Contributors to the Zowe Project.
 */
 
-import { ClusterManager } from "./clusterManager";
-
-declare global {
-  namespace NodeJS {
-    export interface Process {
-      clusterManager?: ClusterManager;
-    }
-  }
+export interface KeyVal {
+  [key: string]: any;
 }
+
+export interface StorageDict {
+  [pluginId: string]: KeyVal;
+}
+
+declare class DataserviceStorage {
+  get(key: string, pluginId?: string): any;
+  getAll(pluginId?: string): any;
+  set(key: string, value: any, pluginId?: string): void;
+  setAll(dict: any, pluginId?: string): void;
+  delete(key: string, pluginId?: string): void;
+}
+
+declare var loggers: any;
+
 
 /*
   This program and the accompanying materials are
