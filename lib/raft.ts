@@ -1132,9 +1132,9 @@ export class Raft {
       } else {
         const storage = this.storage;
         if (isStorageActionSetAll(entry.payload)) {
-          storage.setAll(entry.payload.data.dict, entry.payload.data.pluginId,);
+          storage.setAll(entry.payload.data.dict, entry.payload.data.pluginId);
         } else if (isStorageActionSet(entry.payload)) {
-          storage.set(entry.payload.data.key, entry.payload.data.value, entry.payload.data.pluginId,);
+          storage.set(entry.payload.data.key, entry.payload.data.value, entry.payload.data.pluginId);
         } else if (isStorageActionDeleteAll(entry.payload)) {
           storage.setAll({}, entry.payload.data.pluginId);
         } else if (isStorageActionDelete(entry.payload)) {
