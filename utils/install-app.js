@@ -148,19 +148,17 @@ function copyRecognizers(appDir, appId, appVers) {
   let configLocation;
 
   if (process.env.INSTANCE_DIR) {
-    configLocation = path.join(process.env.INSTANCE_DIR, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
       configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     } catch (e) {
-      logger.error('ZWED0152E'); //Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.
+      logger.error('ZWED0152E'); //logger.error('Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.')
     }
   }
 
   try { // Get recognizers in a plugin's appDir/config/xxx location
-    const files = [];
-
     fs.readdirSync(path.join(appDir, "config/recognizers")).forEach(filename => {
       const filepath = path.resolve(path.join(appDir, "config/recognizers"), filename);
       const filepathConfig = path.resolve(path.join(configLocation, "recognizers", filename));
@@ -225,13 +223,13 @@ function copyActions(appDir, appId, appVers) {
   }
 
   if (process.env.INSTANCE_DIR) {
-    configLocation = path.join(process.env.INSTANCE_DIR, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
       configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     } catch (e) {
-      logger.error('ZWED0152E'); //Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.
+      logger.error('ZWED0152E'); //logger.error("Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.")"
     }
   }
 
