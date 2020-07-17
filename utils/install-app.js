@@ -128,8 +128,8 @@ function addToServer(appDir, installDir) {
         process.exit(0);
       }
     });
-    loadRecognizers(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
-    loadActions(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
+    copyRecognizers(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
+    copyActions(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
     return {success: true, message: pluginDefinition.identifier};
   } catch (e) {
     if(calledViaCLI){
@@ -141,26 +141,41 @@ function addToServer(appDir, installDir) {
   }
 }
 
-function loadRecognizers(appDir, appId, appVers) {
+function copyRecognizers(appDir, appId, appVers) {
   let recognizers;
+  let recognizersKeys;
   let configRecognizers;
   let configLocation;
 
   try { // Get recognizers in a plugin's appDir/config/xxx location
     recognizers = JSON.parse(fs.readFileSync(path.join(appDir, "config/recognizers", appId))).recognizers;
-    const keys = Object.keys(recognizers)
-    for (const key of keys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
+    recognizersKeys = Object.keys(recognizers)
+    for (const key of recognizersKeys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
       recognizers[key].pluginVersion = appVers;
       recognizers[key].pluginIdentifier = appId;
+      recognizers[key].key = appId + ":" + key + ":" + recognizers[key].id; // pluginid_that_provided_it:index(or_name)_in_that_provider:actionid
     }
     logger.debug('ZWED0294I', appId); //logger.debug("Found recognizers for '" + appId + "'");
   } catch (e) {
     logger.debug('ZWED0295I', (path.join(appDir, "config/recognizers", appId)), appId); //logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/recognizers", appId)) + "'");
   }
 
+  if (process.env.INSTANCE_DIR) {
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  } else {
+    configLocation = path.join(userInput.zluxConfig, "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  }
+
   try { // Get pre-existing recognizers in config, if any
-    configLocation = path.join(process.env.ZLUX_CONFIG_FILE.substring(1), "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     configRecognizers = JSON.parse(fs.readFileSync(path.join(configLocation, "recognizers", appId))).recognizers;
+    const configRecognizersKeys = Object.keys(configRecognizers);
+    for (const configKey of configRecognizersKeys) { // Traverse config recognizers
+      for (const key of recognizerKeys) { // Traverse plugin recognizers
+        if (configRecognizers[configKey].key && recognizers[key].key && configRecognizers[configKey].key == recognizers[key].key) { // TODO: Need to implement real keys for Recognizers
+          configRecognizers[configKey] = recognizers[key]; // Choose the recognizers originating from plugin
+        }
+      }
+    }
     recognizers = Object.assign(configRecognizers, recognizers); // // If found, combine the ones found in config with ones found in plugin
     logger.debug('ZWED0296I', appId); //logger.debug("Found recognizers in config for '" + appId + "'");
   } catch (e) {
@@ -177,15 +192,16 @@ function loadRecognizers(appDir, appId, appVers) {
   }
 }
 
-function loadActions(appDir, appId, appVers) {
+function copyActions(appDir, appId, appVers) {
   let actions;
+  let actionsKeys;
   let configActions;
   let configLocation;
 
   try { // Get actions in a plugin's appDir/config/xxx location
     actions = JSON.parse(fs.readFileSync(path.join(appDir, "config/actions", appId))).actions;
-    const keys = Object.keys(actions)
-    for (const key of keys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
+    actionsKeys = Object.keys(actions)
+    for (const key of actionsKeys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
       actions[key].pluginVersion = appVers;
       actions[key].pluginIdentifier = appId;
     }
@@ -194,10 +210,23 @@ function loadActions(appDir, appId, appVers) {
     logger.debug('ZWED0301I', path.join(appDir, "config/actions", appId)); //logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/actions", appId)) + "'");
   }
 
+  if (process.env.INSTANCE_DIR) {
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  } else {
+    configLocation = path.join(userInput.zluxConfig, "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  }
+
   try { // Get pre-existing actions in config, if any
-    configLocation = path.join(process.env.ZLUX_CONFIG_FILE.substring(1), "../../ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     configActions = JSON.parse(fs.readFileSync(path.join(configLocation, "actions", appId))).actions;
-    actions = Object.assign(configActions, actions); // If found, combine the ones found in config with ones found in plugin
+    const configActionsKeys = Object.keys(configActions);
+    for (const configKey of configActionsKeys) { // Traverse config actions
+      for (const key of actionsKeys) { // Traverse plugin actions
+        if (configActions[configKey].id == actions[key].id) { // If we encounter a duplicate
+          configActions[configKey] = actions[key]; // Choose the action originating from plugin
+        }
+      }
+    }
+    actions = Object.assign(configActions, actions); // For any new (non-duplicates) combine the rest
     logger.debug('ZWED0302I', appId); //logger.debug("Found actions in config for '" + appId + "'");
   } catch (e) {
     logger.debug('ZWED0303I', appId); //logger.debug("No existing actions were found in config for '" + appId + "'");
