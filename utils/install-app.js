@@ -192,7 +192,7 @@ function copyRecognizers(appDir, appId, appVers) {
         if (recognizers) { // Attempt to copy recognizers over to config location for Desktop access later
           try { //TODO: Doing recognizers.recognizers is redundant. We may want to consider refactoring in the future
             fs.writeFileSync(filepathConfig, '{ "recognizers":' + JSON.stringify(recognizers) + '}');
-            logger.info('ZWED0298I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
+            logger.info('ZWED0294I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
           } catch (e) {
             logger.debug("Unable to load recognizers for '" + appId + "' into config");
           }
@@ -236,7 +236,7 @@ function copyActions(appDir, appId, appVers) {
   if (actions) { // Attempt to copy actions over to config location for Desktop access later
     try { //TODO: Doing actions.actions is redundant. We may want to consider refactoring in the future
       fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
-      logger.info('ZWED0304I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
+      logger.info('ZWED0295I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
     } catch (e) {
       logger.debug("Unable to load actions for '" + appId + "' into config");
     }
