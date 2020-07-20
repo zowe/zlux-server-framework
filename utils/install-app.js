@@ -184,24 +184,24 @@ function copyRecognizers(appDir, appId, appVers) {
             }
           }
           recognizers = Object.assign(configRecognizers, recognizers); // // If found, combine the ones found in config with ones found in plugin
-          logger.debug('ZWED0296I', appId); //logger.debug("Found recognizers in config for '" + appId + "'");
+          logger.debug("Found recognizers in config for '" + appId + "'");
         } catch (e) {
-          logger.debug('ZWED0297I', appId); //logger.debug("No existing recognizers were found in config for '" + appId + "'");
+          logger.debug("No existing recognizers were found in config for '" + appId + "'");
         }
       
         if (recognizers) { // Attempt to copy recognizers over to config location for Desktop access later
           try { //TODO: Doing recognizers.recognizers is redundant. We may want to consider refactoring in the future
             fs.writeFileSync(filepathConfig, '{ "recognizers":' + JSON.stringify(recognizers) + '}');
-            logger.debug('ZWED0298I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
+            logger.info('ZWED0298I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
           } catch (e) {
-            logger.debug('ZWED0299I', appId); //logger.debug("Unable to load recognizers for '" + appId + "' into config");
+            logger.debug("Unable to load recognizers for '" + appId + "' into config");
           }
         }
       }
     });
-    logger.debug('ZWED0294I', appId); //logger.debug("Found recognizers inside '" + appId + "'");
+    logger.debug("Found recognizers inside '" + appId + "'");
   } catch (e) {
-    logger.debug('ZWED0295I', (path.join(appDir, "config/recognizers")), appId); //logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/recognizers")) + "'");
+    logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/recognizers")) + "'");
   }
 }
 
@@ -217,9 +217,9 @@ function copyActions(appDir, appId, appVers) {
       actions[key].pluginVersion = appVers;
       actions[key].pluginIdentifier = appId;
     }
-    logger.debug('ZWED0300I', appId); //logger.debug("Found actions for '" + appId + "'");
+    logger.debug("Found actions for '" + appId + "'");
   } catch (e) {
-    logger.debug('ZWED0301I', path.join(appDir, "config/actions", appId)); //logger.debug("Could not find actions in '" + (path.join(appDir, "config/actions", appId)) + "'");
+    logger.debug("Could not find actions in '" + (path.join(appDir, "config/actions")) + "'");
   }
 
   if (process.env.INSTANCE_DIR) {
@@ -238,7 +238,7 @@ function copyActions(appDir, appId, appVers) {
       fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
       logger.info('ZWED0304I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
     } catch (e) {
-      logger.debug('ZWED0305I', appId); //logger.debug("Unable to load actions for '" + appId + "' into config");
+      logger.debug("Unable to load actions for '" + appId + "' into config");
     }
   }
 }
