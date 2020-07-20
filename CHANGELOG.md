@@ -9,6 +9,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Bugfix: Terminal handlers had to exist within the root directory, rather than also being possible to exist within the instance directory
 - Bugfix: Support more config parameters as env vars for edge case characters *, ., and _
 - Bugfix: Fix for regression where session would expire prematurely because app server would not request a refresh from ZSS
+- Server will now load recognizers & actions from appDir/config/recognizers or /actions into the config
 
 ## 1.12.0
 
