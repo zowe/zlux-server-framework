@@ -17,7 +17,6 @@ if (nodeVersion >= 12) {
   var swcrypto = require("diffie-hellman/browser");
 }
 
-
 var clientVersion = 'SSH-2.0-UNP_1.1';
 var traceCrypto = false;
 var traceSSHMessage = false;
@@ -40,18 +39,17 @@ var hexDump = function(a, offset, length){
   for (i=0; i<len; i++){
     buff += hex(a[start+i])+" ";
     if ((i%16)==15) {
-      console.log(buff);
-      buff = "";
+      // console.log(buff);
+      buff += '\n';
     }
   }
-  if (buff.length > 0){
-    console.log(buff);
-  }
+  return buff;
 }
 
 
 const SSH_MESSAGE = exports.MESSAGE = {
     SSH_MSG_DISCONNECT                  : 1,  // followed by a String with caose of disconnection
+    SSH_MSG_IGNORE                      : 2,  // 
  
     SSH_MSG_SERVICE_REQUEST             : 5,
     SSH_MSG_SERVICE_ACCEPT              : 6,
@@ -114,7 +112,7 @@ var TTY_OP_END = 0;
                                                    
 var maxPacketSize = 0x10000; // lower the size from 2*0x10000 as stack may overflow
 
-var initialWindowSize =  0x100000*2;
+var initialWindowSize = maxPacketSize * 64; // 0x100000*2
 var SSH_CONNECTION= 'ssh-connection';
 var KEYBOARD_INTERACTIVE='keyboard-interactive';
 var Min_N_Max =[ new Number(1024),new Number(4096),new Number(8192) ];  
@@ -232,6 +230,8 @@ exports.sendSSHData = function(terminalWebsocketProxy,data) {
 };
 
 ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
+   const clientIP = terminalWebsocketProxy.clientIP;
+
    var sessionData = terminalWebsocketProxy.sshSessionData;
    if(!sessionData){
      return; // error thrown
@@ -286,10 +286,13 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
          msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_DATA);
          var shellData = [msgCodeBuffer,new Number(channel.serverChannelNumber), new VarData(dataBuffer)];
          if(traceSSHMessage) console.log("sending SSH_MSG_CHANNEL_DATA:\n"+ dataBuffer.toString('hex') +" to channel "+channel.serverChannelNumber);
+         sshLogger.log(sshLogger.FINER, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + "sending SSH_MSG_CHANNEL_DATA  to channel " + channel.serverChannelNumber + ': \n' + hexDump(dataBuffer));
           pdu = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_CHANNEL_DATA,generateSSHv2PDUBytes(shellData));
        } else {
          //TODO this occurs occasionally, something must be unimplemented.
-         sshLogger.warn('Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found\n');
+         sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                 + 'Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found');
        }
        break;
      }
@@ -307,7 +310,8 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
        }
        else {
          //TODO this occurs occasionally, something must be unimplemented.
-         sshLogger.warn('Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found\n');
+         sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                 + 'Not sending MSG_CHANNEL_REQUEST because channel & primaryShellChannel cannot be found');
        }
        break;
      }
@@ -335,7 +339,7 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
 
 // main method. 
 ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
-
+  const clientIP = terminalWebsocketProxy.clientIP;
   var sshMessages = [];
    
   var returnError = function(msg) {
@@ -344,46 +348,74 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
   
   var sessionData = terminalWebsocketProxy.sshSessionData;
   if (!sessionData){
-       
     sessionData = new SSHSessionData();
     var serverVersion = new String(rawData).trim();
-
     sessionData.serverVersion = Buffer.from(serverVersion,'utf8');
    
     var dataBuffer = Buffer.from(clientVersion+'\r\n');
     terminalWebsocketProxy.netSend(dataBuffer);
     terminalWebsocketProxy.sshSessionData=sessionData;
+
+    sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}] - serverVersion: ${serverVersion}`);
     return sshMessages;
   }
        
   
   var currentPosition = 0;
   var channelNumber = sessionData.primaryShellChannel==null?sessionData.highestChannel:sessionData.primaryShellChannel;
- 
-  if (sessionData.incompletePacketBuffer){      
+  let channel = sessionData.channels[channelNumber];
+   if (channel && channel.clientWindowSize){
+    channel.clientWindowSize-=rawData.length;
+   
+    if (channel.clientWindowSize < maxPacketSize){
+      const bytesToBeAdded = initialWindowSize - channel.clientWindowSize;
+      channel.clientWindowSize = initialWindowSize;
+      
+      const msgCodeBuffer = Buffer.alloc(1);
+      msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_WINDOW_ADJUST);
+
+      const windowAdjustData = [msgCodeBuffer, new Number(channel.recipientChannel), new Number (bytesToBeAdded) ];
+      if(traceSSHMessage) console.log("channelNumber " + channelNumber + "   windowAdjustData" + bytesToBeAdded);
+
+      const windowAdjustPDU = new SSHv2PDU( SSH_MESSAGE.SSH_MSG_CHANNEL_WINDOW_ADJUST, generateSSHv2PDUBytes(windowAdjustData));
+      writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,windowAdjustPDU);
+    }
+  }
+  if (sessionData.incompletePacketBuffer){
+    sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                          + `fragmented packet continued. Data length: ${rawData.length}`);
     if (sessionData.incompletePacketBuffer.length>sessionData.readCipherBlockLength && (sessionData.encryptCipher!=null)){
        sessionData.isFirstBlockDecrypted = true;
     }
     rawData = Buffer.concat([sessionData.incompletePacketBuffer,rawData]);
     if (traceCrypto) console.log("combined rawData.length " + rawData.length);
+    sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                          + `fragmented packet combined. Combined data length: ${rawData.length}`);  
     sessionData.incompletePacketBuffer=null;
   }
   
   var rawDataLength = rawData.length;
   while (currentPosition<rawDataLength){ 
+    sshLogger.log(sshLogger.FINER, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                          + `Raw data length: ${rawDataLength}, position before read: ${currentPosition}`);
  
-    var readObject = readSSHv2PDUData(sessionData,rawData,currentPosition);
+    var readObject = readSSHv2PDUData(sessionData,rawData,currentPosition, clientIP); // JERRY: Payload is stored in readObject.sshv2PDU.data
   
     if (!readObject){
       return returnError('SSH parsing failed, socket closed.');
     }
-    if (readObject.Continue){
+    if (readObject.Continue){  // JERRY: Incomplete packet, continue receiving next part of data.
       terminalWebsocketProxy.sshSessionData=sessionData;
+
+      sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                    + 'sshMessages: ' + JSON.stringify(sshMessages));
       return sshMessages;
     }
     var sshv2PDU = readObject.sshv2PDU;
     currentPosition = readObject.readLength;
-    var msgCode = sshv2PDU.readByte()&0xff;
+    sshLogger.log(sshLogger.FINER, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                          + `Raw data length: ${rawDataLength}, position after read: ${currentPosition}`);  
+    var msgCode = sshv2PDU.readByte()&0xff;  // JERRY: read a byte from Payload
     var sshMessage = {};
     if (msgCode) {
       sshMessage.type = msgCode;
@@ -398,29 +430,38 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       case SSH_MESSAGE.SSH_MSG_DISCONNECT:{
         sshMessage.reasonCode = sshv2PDU.readInt();
         sshMessage.reasonLine = sshv2PDU.readSizedData();
-        sshLogger.debug("processed SSH_MSG_DISCONNECT: "+ sshMessage.reasonCode +'\n', Buffer.from(sshMessage.reasonLine,'ascii').toString());
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + "processed SSH_MSG_DISCONNECT: "+ sshMessage.reasonCode +'\n'+ Buffer.from(sshMessage.reasonLine,'ascii').toString());
         sshMessages.push(sshMessage);
         break;
       }
+      // JSTE-3559: ignore data message
+      case SSH_MESSAGE.SSH_MSG_IGNORE:{
+        break;
+      }
       case SSH_MESSAGE.SSH_MSG_PK_OK: {
+        if(traceSSHMessage) console.log("SSH_MESSAGE.SSH_MSG_PK_OK ");
         sshMessage.algorithm=sshv2PDU.readSizedData();
         sshMessage.blob=sshv2PDU.readSizedData();
         sshMessages.push(sshMessage);        
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER : {
+        if(traceSSHMessage) console.log("SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER ");
         sshMessage.message=sshv2PDU.readSizedData();
         sshMessage.language=sshv2PDU.readSizedData();        
         sshMessages.push(sshMessage);
         break;
       } 
       case SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE:{
+        if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE ');
         sshMessages.push(sshMessage);
        // processData = Buffer.alloc(sshv2PDU.data.length);
        // sshv2PDU.data.copy(processData,0);
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST:{
+        if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST ');
         sshMessage.name = sshv2PDU.readSizedData();
         sshMessage.inst = sshv2PDU.readSizedData();
         sshMessage.lang = sshv2PDU.readSizedData();
@@ -436,12 +477,16 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_SUCCESS:{
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                              + `SSH_MSG_USERAUTH_SUCCESS`);
         sshMessages.push(sshMessage);
         terminalWebsocketProxy.sshAuthenticated = true;
         
         // open a channel here. 
      
         if(traceSSHMessage) console.log('openning new channel, channelNumber: '+channelNumber);
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                              + 'openning new channel, channelNumber: '+channelNumber);
 
         var msgCodeBuffer = Buffer.alloc(1);
         msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_OPEN);
@@ -479,7 +524,9 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           }
         }
         if(traceSSHMessage) console.log('SSH_MSG_CHANNEL_OPEN_CONFIRMATION received');
-        
+        sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + 'SSH_MSG_CHANNEL_OPEN_CONFIRMATION received');
+
         if (sshv2PDU.readInt() != channelNumber) {
           //error return
           return returnError('SSH_MSG_CHANNEL_OPEN_CONFIRMATION contained incorrect channelNumber. Expected='+channelNumber);
@@ -488,7 +535,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         var peerChannelNumber = sshv2PDU.readInt();
         var peerWindowSize = sshv2PDU.readInt();
         var peerMaxPacketSize = sshv2PDU.readInt();
-        var channel = new SSH2ChannelData(channelNumber,
+        channel = new SSH2ChannelData(channelNumber,
                                           peerChannelNumber,
                                           initialWindowSize,
                                           maxPacketSize,
@@ -538,6 +585,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       } 
       case SSH_MESSAGE.SSH_MSG_CHANNEL_FAILURE:{
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + 'SSH_MSG_CHANNEL_FAILURE ');
         break;
       } 
       case SSH_MESSAGE.SSH_MSG_CHANNEL_DATA : {
@@ -545,6 +594,10 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         var recipientChannel = sshv2PDU.readInt();
         sshMessage.readData = sshv2PDU.readSizedData();
         sshMessages.push(sshMessage);
+
+        // sshLogger.log(sshLogger.FINER, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+        //                         + 'channel data: \n' + hexDump(sshMessage.readData));
+
         
         // test code for rekey
         /*if (sessionData.isKeyExchanging1 == false ){
@@ -576,6 +629,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
             sessionData.highestChannel++;
             sessionData.sshMessageCode = SSH_MESSAGE.SSH_MSG_CHANNEL_SUCCESS;
             
+            sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                    + 'SSH_MSG_CHANNEL_SUCCESS built, channel number: ' + sessionData.primaryShellChannel);
             break ;
           }
         }
@@ -584,10 +639,14 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       }
       case SSH_MESSAGE.SSH_MSG_CHANNEL_WINDOW_ADJUST:{
         if(traceSSHMessage) console.log('SSH_MSG_CHANNEL_WINDOW_ADJUST received');
+        sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + 'SSH_MSG_CHANNEL_WINDOW_ADJUST received');
         if(sessionData.channels[channelNumber]){
           var currentChannel = sessionData.channels[channelNumber];
           var recipientChannel = sshv2PDU.readInt();
           if(traceSSHMessage) console.log("adjusting SSH_MSG_CHANNEL_WINDOW_ADJUST, channel number "+recipientChannel);
+          sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                  + 'adjusting SSH_MSG_CHANNEL_WINDOW_ADJUST, channel number '+recipientChannel);
           currentChannel.serverWindowSize += sshv2PDU.readInt();
         }
         break;
@@ -598,11 +657,13 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         
         if (sessionData.expectedReplyMsgCode){
           if (sessionData.expectedReplyMsgCode!=msgCode){
-            sshLogger.debug("SSH rekeying");
+            sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                    + 'SSH rekeying... ');
           }
         }
         sshv2PDU.readBytes(sessionData.serverCookie);
         if(traceCrypto) console.log("Server Cookie is " + sessionData.serverCookie.toString('hex'));
+        
         var keyExchangeAlgorithms = sshv2PDU.readNameList() ;
         var serverHostKeyAlgorithms = sshv2PDU.readNameList();
  
@@ -716,7 +777,6 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         if (sessionData.expectedReplyMsgCode){
           if (sessionData.expectedReplyMsgCode!=msgCode){
             //DISCONNECT_ERROR
-            sshLogger.warn('Disconnect_error');
             return returnError('Unexpected reply message code SSH_MSG_KEX_DH_GEX_GROUP ('+msgCode+'). Expected='+sessionData.expectedReplyMsgCode);
           }
         }
@@ -727,13 +787,14 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           var dh = nodeVersion >= 12
               ? swcrypto.createDiffieHellman(sessionData.prime,sessionData.generator)
               : crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
-	        sshLogger.debug('made dh');
+               sshLogger.debug('made dh');
           sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY;
           var msgCodeBuffer = Buffer.alloc(1);
           msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_INIT);
           dh.generateKeys();
           sshLogger.debug('made keys');
           var publicKeys = dh.getPublicKey();
+          
           var idx = 0;
           var len = publicKeys.length;
           while (publicKeys[idx] === 0x00) {
@@ -970,6 +1031,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           console.log("exchangeDataBuffer:\n", exchangeDataBuffer.toString('hex'));
           console.log(`exchangeDataBuffer length : ${exchangeDataBuffer.length}`);
         }
+
         
         sessionData.h = sessionData.hash.update(exchangeDataBuffer).digest(); // the H
         if (sessionData.id == null){
@@ -1002,7 +1064,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         if (sessionData.isKeyExchanging){
           sessionData.isKeyExchanging = false;
           sessionData.isKeyExchangingInitSent = false;
-          sshLogger.debug("SSH key exchanged finished... ");
+          sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                  + 'SSH key exchanged finished... ');
           var pdu = sessionData.rekeyQueue.shift();
           while (pdu){
             writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,pdu);
@@ -1023,7 +1086,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       }
       default :{
-        sshLogger.warn("unknown msgCode, something unimplemented "+ msgCode);
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + 'unknown msgCode, something unimplemented '+ msgCode);
         break;
       }
      
@@ -1032,6 +1096,9 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
     terminalWebsocketProxy.sshSessionData=sessionData;
   }
   if (traceCrypto) console.log('Done with socket read');
+
+  sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                            + 'sshMessages: ' + JSON.stringify(sshMessages));
   return sshMessages;
 };
 
@@ -1134,6 +1201,9 @@ SSHv2PDU.prototype.readSizedData = function (){
   var payload = this.data;
   var length = payload.readUInt32BE(currentOffset);
   var res = Buffer.alloc(length);
+  if (length > payload.length - currentOffset - 4){
+    console.warn(`SSH payload data is not complete. Expected data size: ${length}, remaining data length: ${payload.length - currentOffset - 4}` );
+  }
   payload.copy(res,0,currentOffset+4,currentOffset+length+4);
   this.offset+= (length+4);
   return res;
@@ -1171,10 +1241,7 @@ function SSH2ChannelData(channelNumber,peerChannelNumber,initialWindowSize,maxPa
   this.secondShellRequest = isSecondShellRequest;
 }
 
-
-
-
-function readSSHv2PDUData(sessionData,rawData,currentPosition){
+function readSSHv2PDUData(sessionData,rawData,currentPosition,clientIP){
  
   var computedMac = null;
   var readCipherBlockLength = sessionData.readCipherBlockLength;
@@ -1184,6 +1251,9 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
   if (sessionData.decryptCipher != null) {
     
     if(traceCrypto) console.log("decryption attempted...");
+    sshLogger.log(sshLogger.FINER, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                          + `decryption attempated.`); // FINE
+    
     
     var bytesRead=0;
     var firstBlock;
@@ -1191,6 +1261,8 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     var decryptedFirstBlock;
     if (sessionData.isFirstBlockDecrypted){
       if(traceCrypto) console.log("first block is already decrypted...");
+      sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                            + `first block is already decrypted.`); 
       bytesRead = readCipherBlockLength;
       decryptedFirstBlock = rawData.slice(currentPosition,currentPosition+readCipherBlockLength);
       sessionData.isFirstBlockDecrypted = false;
@@ -1198,11 +1270,15 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
       if (rawData.length>readCipherBlockLength+currentPosition){
         bytesRead = readCipherBlockLength;
         firstBlock = rawData.slice(currentPosition,currentPosition+readCipherBlockLength);
-      } else {
+      } else {  // Cipher data is incomplete. 
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                              + `fragmented packet. Cipher data is incomplete.`); 
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                              + `fragmented packet. Expected cipher block length: ${readCipherBlockLength}; received packet length: ${rawData.length}`); 
         bytesRead = rawData.length-currentPosition;
         sessionData.incompletePacketBuffer = Buffer.alloc(bytesRead);
         rawData.copy(sessionData.incompletePacketBuffer,0,currentPosition);
-        return {Continue: true};;
+        return {Continue: true};
        
       }
   
@@ -1214,21 +1290,27 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     // sometimes it is larger than maxPacketSize, perhaps due to random padding; 50 tolerance was added here
     var maxSize = maxPacketSize + 4 + sessionData.readingMACLength+50; 
     if (packetLength > maxSize || packetLength < 0) {
-      if(traceCrypto) console.log('incorrect decrypt packet length = '+packetLength);
+      if(traceCrypto) console.log('incorrect decrypt packet length = '+packetLength);  // JERRY: this should always be output.
+      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                + `incorrect decrypt packet length = ${packetLength}`); 
       return;
     }
     var remainingPacketLengthInThisRawDataLength = rawData.length - currentPosition;
-    if ((packetLength + sessionData.readingMACLength+4) > remainingPacketLengthInThisRawDataLength){  // sometimes the mac is incomplete, to combine with next packet
+    if ((packetLength + sessionData.readingMACLength+4) > remainingPacketLengthInThisRawDataLength){  // sometimes the mac is incomplete, to combine with next packet  // JERRY: High risk
       if(traceCrypto) console.log('decrypt packet length large than remainning data , length of remainingPacketLengthInThisRawData = '+remainingPacketLengthInThisRawDataLength);
+      sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                            + `fragmented packet. Remain packet length: ${remainingPacketLengthInThisRawDataLength} < decrypted packet length: ${packetLength} + readingMACLength: ${sessionData.readingMACLength} + 4`); 
       sessionData.incompletePacketBuffer = Buffer.alloc(remainingPacketLengthInThisRawDataLength);
       rawData.copy(sessionData.incompletePacketBuffer,0,currentPosition);
       decryptedFirstBlock.copy(sessionData.incompletePacketBuffer,0);
-      return {Continue: true};;
+      sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                            + `expecting next fragment packet to arrive`); 
+      return {Continue: true};
     }
     
-
-    
     if(traceCrypto) console.log('decrypt packet length ' +packetLength);
+    sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
+                          + `decrypted packet length: ${packetLength}`);
     var readDataLength = packetLength - bytesRead;//because we already read length and some bytes more, depend on readCipherBlockLength
   
     var encryptedBytesRead = 0;
@@ -1261,14 +1343,16 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
     
   }
      
-  var packetLength = decryptedData.readUInt32BE(currentPosition);
+  var packetLength = decryptedData.readUInt32BE(currentPosition);  // JERRY: useful in case the raw data is decrypted
   currentPosition+=4;
 
   if (packetLength > rawData.length){
-    // this only happens before key exchange, when kex init is incomplete. 
-     sessionData.incompletePacketBuffer = Buffer.alloc(rawData.length);
-     rawData.copy(sessionData.incompletePacketBuffer,0,0);
-     return {Continue: true};;
+      sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                            + `fragmented packet. Packet length: ${packetLength}, raw data length: ${rawData.length}`); 
+      // this only happens before key exchange, when kex init is incomplete. 
+      sessionData.incompletePacketBuffer = Buffer.alloc(rawData.length);
+      rawData.copy(sessionData.incompletePacketBuffer,0,0);
+      return {Continue: true};
   }
   
   sessionData.messagesReceived++;
@@ -1282,25 +1366,25 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition){
   var payload = Buffer.alloc(payloadLength);
      
   decryptedData.copy(payload,0,currentPosition);
+  
+  sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - Decrypted payload: \n${hexDump(payload)}`); 
+
   currentPosition+=payloadLength+paddingLength;
   if (sessionData.readingMACAlgorithm) {
    
     var receivedMac = Buffer.alloc(sessionData.readingMACLength);
     rawData.copy(receivedMac,0,currentPosition);
     currentPosition+=receivedMac.length;
-    if (computedMac == undefined) {
-      sshLogger.warn('mac verification failed - unable to get computed version');
-    } else {
-      if (receivedMac.toString('hex')!=computedMac.toString('hex')){
-        sshLogger.warn("mac verification failed - computed does not match received");
-      }
-      if(traceCrypto) {
-        console.log("received mac: "+receivedMac.toString('hex'));
-        console.log("computed mac: "+computedMac.toString('hex'));
-      }
-      //should disconnect if not matching.
+    if (receivedMac.toString('hex')!=computedMac.toString('hex')){
+      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - MAC verification failed!`); 
+      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - received MAC: ${receivedMac.toString('hex')}`); 
+      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - computed MAC: ${computedMac.toString('hex')}`); 
     }
+    if(traceCrypto) console.log("received mac: "+receivedMac.toString('hex'));
+    if(traceCrypto) console.log("computed mac: "+computedMac.toString('hex'));
+      //should disconnect if not matching.
   }
+  sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - PDU read complete`); 
   return  {readLength: currentPosition, sshv2PDU: new SSHv2PDU(0,payload)};
 }
 
