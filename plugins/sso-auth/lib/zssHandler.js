@@ -19,6 +19,7 @@ const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
 class ZssHandler {
   constructor(pluginDef, pluginConf, serverConf, context) {
     this.logger = context.logger;
+    this.instanceID = serverConf.instanceID;
     this.sessionExpirationMS = DEFAULT_EXPIRATION_MS; //ahead of time assumption of unconfigurable zss session length
     this.authorized = Promise.coroutine(function *authorized(request, sessionState, 
                                                              options) {
