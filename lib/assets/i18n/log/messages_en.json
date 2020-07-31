@@ -178,6 +178,8 @@
   "ZWED0291I":"Server is ready at %s Plugins successfully loaded: %s% (%s/%s)",
   "ZWED0292I":"Plugin (%s) loaded.",
   "ZWED0293I":"Handling scan plugin request from worker=%d",
+  "ZWED0294I":"Successfully loaded %d recognizers for '%s' into config",
+  "ZWED0295I":"Successfully loaded %d actions for '%s' into config",
   
   "ZWED0003W":"%s: Session security call %s failed for auth handler %s. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
@@ -288,6 +290,8 @@
   "ZWED0168W":"RESERVED: Unable to retrieve storage value from cluster %s",
   "ZWED0169W":"RESERVED: Error deleting the storage with id: %s %s",
   "ZWED0170W":"Plugin (%s) loading failed. Message: \"%s\"",
+  "ZWED0171W":"Rejected undefined referrer for url=%s, ip=%s",
+  "ZWED0172W":"Rejected bad referrer=%s for url=%s, ip=%s",
   
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
@@ -353,5 +357,6 @@
   "ZWED0148E":"Exception thrown when reading SAF keyring, e=",
   "ZWED0149E":"SAF keyring reference missing userId \"%s\", keyringName \"%s\", or label \"%s\"",
   "ZWED0150E":"Cannot load SAF keyring due to missing keyring_js library",
-  "ZWED0151E":"RESERVED: Env var %s not found"
+  "ZWED0151E":"RESERVED: Env var %s not found",
+  "ZWED0152E":"Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist."
 }

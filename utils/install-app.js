@@ -128,6 +128,8 @@ function addToServer(appDir, installDir) {
         process.exit(0);
       }
     });
+    copyRecognizers(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
+    copyActions(appDir, pluginDefinition.identifier, pluginDefinition.pluginVersion);
     return {success: true, message: pluginDefinition.identifier};
   } catch (e) {
     if(calledViaCLI){
@@ -136,6 +138,108 @@ function addToServer(appDir, installDir) {
     }
     logger.warn(`ZWED0149W`, appDir, e.message); //logger.warn(`Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`)
     return {success: false, message: `Could not find pluginDefinition.json file in App (dir=${appDir}). Error=${e.message}`};
+  }
+}
+
+function copyRecognizers(appDir, appId, appVers) {
+  let recognizers;
+  let recognizersKeys;
+  let configRecognizers;
+  let configLocation;
+
+  if (process.env.INSTANCE_DIR) {
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  } else {
+    try {
+      let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
+      configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    } catch (e) {
+      logger.error('ZWED0152E'); //logger.error('Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.')
+    }
+  }
+
+  try { // Get recognizers in a plugin's appDir/config/xxx location
+    fs.readdirSync(path.join(appDir, "config/recognizers")).forEach(filename => {
+      const filepath = path.resolve(path.join(appDir, "config/recognizers"), filename);
+      const filepathConfig = path.resolve(path.join(configLocation, "recognizers", filename));
+      const stat = fs.statSync(filepath);
+      
+      if (stat.isFile()) {
+        recognizers = JSON.parse(fs.readFileSync(filepath)).recognizers;
+        recognizersKeys = Object.keys(recognizers)
+        for (const key of recognizersKeys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
+          recognizers[key].pluginVersion = appVers;
+          recognizers[key].pluginIdentifier = appId;
+          recognizers[key].key = appId + ":" + key + ":" + recognizers[key].id; // pluginid_that_provided_it:index(or_name)_in_that_provider:actionid
+        }
+
+        try { // Get pre-existing recognizers in config, if any
+          configRecognizers = JSON.parse(fs.readFileSync(filepathConfig)).recognizers;
+          const configRecognizersKeys = Object.keys(configRecognizers);
+          for (const configKey of configRecognizersKeys) { // Traverse config recognizers
+            for (const key of recognizerKeys) { // Traverse plugin recognizers
+              if (configRecognizers[configKey].key && recognizers[key].key && configRecognizers[configKey].key == recognizers[key].key) { // TODO: Need to implement real keys for Recognizers
+                configRecognizers[configKey] = recognizers[key]; // Choose the recognizers originating from plugin
+              }
+            }
+          }
+          recognizers = Object.assign(configRecognizers, recognizers); // // If found, combine the ones found in config with ones found in plugin
+          logger.debug("Found recognizers in config for '" + appId + "'");
+        } catch (e) {
+          logger.debug("No existing recognizers were found in config for '" + appId + "'");
+        }
+      
+        if (recognizers) { // Attempt to copy recognizers over to config location for Desktop access later
+          try { //TODO: Doing recognizers.recognizers is redundant. We may want to consider refactoring in the future
+            fs.writeFileSync(filepathConfig, '{ "recognizers":' + JSON.stringify(recognizers) + '}');
+            logger.info('ZWED0294I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
+          } catch (e) {
+            logger.debug("Unable to load recognizers for '" + appId + "' into config");
+          }
+        }
+      }
+    });
+    logger.debug("Found recognizers inside '" + appId + "'");
+  } catch (e) {
+    logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/recognizers")) + "'");
+  }
+}
+
+function copyActions(appDir, appId, appVers) {
+  let actions;
+  let actionsKeys;
+  let configLocation;
+
+  try { // Get actions in a plugin's appDir/config/xxx location
+    actions = JSON.parse(fs.readFileSync(path.join(appDir, "config/actions", appId))).actions;
+    actionsKeys = Object.keys(actions)
+    for (const key of actionsKeys) { // Add metadata for plugin version & plugin identifier of origin (though objects don't have to be plugin specific)
+      actions[key].pluginVersion = appVers;
+      actions[key].pluginIdentifier = appId;
+    }
+    logger.debug("Found actions for '" + appId + "'");
+  } catch (e) {
+    logger.debug("Could not find actions in '" + (path.join(appDir, "config/actions")) + "'");
+  }
+
+  if (process.env.INSTANCE_DIR) {
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  } else {
+    try {
+      let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
+      configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    } catch (e) {
+      logger.error('ZWED0152E'); //logger.error("Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.")"
+    }
+  }
+
+  if (actions) { // Attempt to copy actions over to config location for Desktop access later
+    try { //TODO: Doing actions.actions is redundant. We may want to consider refactoring in the future
+      fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
+      logger.info('ZWED0295I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
+    } catch (e) {
+      logger.debug("Unable to load actions for '" + appId + "' into config");
+    }
   }
 }
 
