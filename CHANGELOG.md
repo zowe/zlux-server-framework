@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.15.0
+
+- Bugfix: Fixed desktop prompting for session renewal and failure due to sso-auth plugin incorrectly stating that session refresh is possible when using Zowe SSO. In reality, the SSO tokens are non-renewable with expiration after several hours, leading to a prompt to re-authenticate to continue using the Desktop. This bugfix should now allow for that behavior.
+
 ## 1.14.0
 
 - Bugfix: Plugin default server config could not exist in plugins own directory, and had to exist in the instance
