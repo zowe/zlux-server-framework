@@ -292,6 +292,7 @@
   "ZWED0170W":"Plugin (%s) loading failed. Message: \"%s\"",
   "ZWED0171W":"Rejected undefined referrer for url=%s, ip=%s",
   "ZWED0172W":"Rejected bad referrer=%s for url=%s, ip=%s",
+  "ZWED0173W":"Unable to decode P12 certificate (different password than keystore?). Attempting to use empty string as password. Decode error: %s.",
   
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
