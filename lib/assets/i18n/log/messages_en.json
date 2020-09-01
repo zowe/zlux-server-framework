@@ -295,8 +295,12 @@
   "ZWED0170W":"Plugin (%s) loading failed. Message: \"%s\"",
   "ZWED0171W":"Rejected undefined referrer for url=%s, ip=%s",
   "ZWED0172W":"Rejected bad referrer=%s for url=%s, ip=%s",
+<<<<<<< HEAD
   "ZWED0173W":"%s could not verify (%s) as a supported platform to install (%s). Proceeding anyway...",
   "ZWED0174W":"%s could not verify (%s) as a supported architecture to install (%s). Proceeding anyway...",
+=======
+  "ZWED0173W":"Unable to decode P12 certificate (different password than keystore?). Attempting to use empty string as password. Decode error: %s.",
+>>>>>>> 8c562d1b43aeea146672704db1c1062f77ecd656
   
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
