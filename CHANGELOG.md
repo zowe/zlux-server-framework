@@ -6,6 +6,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 1.16.0
 
 - Add support for PKCS#12 certificates and certificate authorities
+- Enhancement: Added JSON plugin environment checks for App server and Agent components that verify if plugin requirements, specified in
+the plugin definition, for OS, CPU, endpoints are satisfied.
 
 ## 1.15.0
 
