@@ -154,7 +154,7 @@ function copyRecognizers(appDir, appId, appVers) {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
       configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     } catch (e) {
-      logger.error('ZWED0152E'); //logger.error('Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.')
+      logger.severe('ZWED0152E'); //logger.error('Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.')
     }
   }
 
@@ -229,7 +229,7 @@ function copyActions(appDir, appId, appVers) {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
       configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     } catch (e) {
-      logger.error('ZWED0152E'); //logger.error("Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.")"
+      logger.severe('ZWED0152E'); //logger.error("Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.")"
     }
   }
 
