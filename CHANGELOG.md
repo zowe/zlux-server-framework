@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 1.16.0
 
+- [D] Feature: Expose GET /server/environment endpoint with minimal data when RBAC is off, to share only environment details that are required to do dependency checks and more accurate server-to-server communication (#237)
 - Add support for PKCS#12 certificates and certificate authorities
 - Enhancement: Added JSON plugin environment checks for App server and Agent components that verify if plugin requirements, specified in
 the plugin definition, for OS, CPU, endpoints are satisfied.
