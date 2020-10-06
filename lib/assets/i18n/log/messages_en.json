@@ -367,5 +367,6 @@
   "ZWED0152E":"Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.",
   "ZWED0153E":"RESERVED: (%s) is not a supported platform for %s. Skipping (%s)... Supported: %s",
   "ZWED0154E":"RESERVED: (%s) is not a supported architecture for %s. Skipping (%s)... Supported: %s",
-  "ZWED0155E":"RESERVED: (%s) is not a supported endpoint for %s. Skipping (%s)... Supported: %s"
+  "ZWED0155E":"RESERVED: (%s) is not a supported endpoint for %s. Skipping (%s)... Supported: %s",
+  "ZWED0156E":"RESERVED: Could not register default plugins into app-server"
 }
