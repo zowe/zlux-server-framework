@@ -32,6 +32,7 @@ class ZssHandler {
           '/password',
           '/unixfile',
           '/datasetContents',
+          '/datasetEnqueue',
           '/VSAMdatasetContents',
           '/datasetMetadata',
           '/omvs',
