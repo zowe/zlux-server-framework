@@ -19,6 +19,7 @@ const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
 class ZssHandler {
   constructor(pluginDef, pluginConf, serverConf, context) {
     this.logger = context.logger;
+    this.instanceID = serverConf.instanceID;
     this.sessionExpirationMS = DEFAULT_EXPIRATION_MS; //ahead of time assumption of unconfigurable zss session length
     this.authorized = Promise.coroutine(function *authorized(request, sessionState, 
                                                              options) {
@@ -145,7 +146,7 @@ class ZssHandler {
   _authenticateOrRefresh(request, sessionState, isRefresh) {
     return new Promise((resolve, reject) => {
       if (isRefresh && !sessionState.zssCookies) {
-        reject(new Error('No cookie given for refresh or check, skipping zss request'));
+        resolve({success: false, error: {message: 'No cookie given for refresh or check'}});
         return;
       }
       let options = isRefresh ? {

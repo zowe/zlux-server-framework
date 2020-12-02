@@ -16,6 +16,7 @@ var net = require('net');
 const tls = require('tls');
 const crypto = require('crypto');
 const fs = require('fs');
+const pathModule = require('path');
 const ssh = require('./ssh');
 const SSH_MESSAGE = ssh.MESSAGE;
 
@@ -701,22 +702,49 @@ var handlerModules = null;
 let scanAndImportHandlers = function(logger) {
   if (handlerModules == null) {
     handlerModules = [];
-    let filenames = fs.readdirSync(__dirname);
-    let len = filenames.length;
-    for (let i = 0; i < len; i++) {
-      let filename = filenames[i];
+    let handlers = {}; //key: filename, value: path
 
-      if (filename.endsWith('.js') && (filename != 'terminalProxy.js') && (filename != 'ssh.js')) {
-        try {
-          let module = require('./'+filename);
-          if (typeof module.handleClientMessage == 'function'){
-            logger.info('ZWED0105I', filename); //logger.info('Found and loaded compatible handler file /lib/'+filename);            
-            handlerModules.push(module);
-          }
-        } catch (e) {
-          logger.warn('ZWED0145W', filename); //logger.warn('Could not load a handler from file /lib/'+filename);
+    let filenames;
+    let len;
+    try {
+      let handlerDir = pathModule.join(process.env.INSTANCE_DIR,'workspace','app-server','org.zowe.terminal.proxy','handlers');
+      filenames = fs.readdirSync(handlerDir);
+      len = filenames.length;
+      for (let i = 0; i < len; i++) {
+        let filename = filenames[i];
+        if (filename.endsWith('.js')) {
+          handlers[filename] = pathModule.join(handlerDir, filename);
         }
       }
+    } catch (e) {
+      //folder does not exist, skip
+    }
+
+    filenames = fs.readdirSync(__dirname);
+    len = filenames.length;
+    for (let i = 0; i < len; i++) {
+      let filename = filenames[i];
+      if (filename.endsWith('.js') && (filename != 'terminalProxy.js') && (filename != 'ssh.js')) {
+        if (!handlers[filename]) {
+          handlers[filename] = pathModule.resolve(pathModule.join(__dirname,filename));
+        }
+        
+      }
+    }
+
+
+    let paths = Object.values(handlers);
+    for (let i = 0; i < paths.length; i++) {
+      try {
+        let module = require(paths[i]);
+        if (typeof module.handleClientMessage == 'function'){
+          logger.info('ZWED0105I', paths[i]); //logger.info('Found and loaded compatible handler file filename);
+          handlerModules.push(module);
+        }
+      } catch (e) {
+        logger.warn('ZWED0145W', paths[i]); //logger.warn('Could not load a handler from file filename);
+      }
+
     }
   }
   return handlerModules;

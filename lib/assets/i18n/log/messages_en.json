@@ -178,7 +178,12 @@
   "ZWED0291I":"Server is ready at %s Plugins successfully loaded: %s% (%s/%s)",
   "ZWED0292I":"Plugin (%s) loaded.",
   "ZWED0293I":"Handling scan plugin request from worker=%d",
-  
+  "ZWED0294I":"Successfully loaded %d recognizers for '%s' into config",
+  "ZWED0295I":"Successfully loaded %d actions for '%s' into config",
+  "ZWED0296I": "(%s) is a supported platform for %s to install (%s).",
+  "ZWED0297I": "(%s) is a supported architecture for %s to install (%s).",
+  "ZWED0298I": "(%s) is a supported endpoint for %s to install (%s).",
+
   "ZWED0003W":"%s: Session security call %s failed for auth handler %s. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
   "ZWED0005W":"",
@@ -288,7 +293,12 @@
   "ZWED0168W":"RESERVED: Unable to retrieve storage value from cluster %s",
   "ZWED0169W":"RESERVED: Error deleting the storage with id: %s %s",
   "ZWED0170W":"Plugin (%s) loading failed. Message: \"%s\"",
-  
+  "ZWED0171W":"Rejected undefined referrer for url=%s, ip=%s",
+  "ZWED0172W":"Rejected bad referrer=%s for url=%s, ip=%s",
+  "ZWED0173W":"Unable to decode P12 certificate (different password than keystore?). Attempting to use empty string as password. Decode error: %s.",
+  "ZWED0174W":"%s could not verify (%s) as a supported platform to install (%s). Proceeding anyway...",
+  "ZWED0175W":"%s could not verify (%s) as a supported architecture to install (%s). Proceeding anyway...",
+
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
   "ZWED0003E":"Loopback configuration not valid,%s\nLoopback calls will fail!",
@@ -353,5 +363,10 @@
   "ZWED0148E":"Exception thrown when reading SAF keyring, e=",
   "ZWED0149E":"SAF keyring reference missing userId \"%s\", keyringName \"%s\", or label \"%s\"",
   "ZWED0150E":"Cannot load SAF keyring due to missing keyring_js library",
-  "ZWED0151E":"RESERVED: Env var %s not found"
+  "ZWED0151E":"RESERVED: Env var %s not found",
+  "ZWED0152E":"Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.",
+  "ZWED0153E":"RESERVED: (%s) is not a supported platform for %s. Skipping (%s)... Supported: %s",
+  "ZWED0154E":"RESERVED: (%s) is not a supported architecture for %s. Skipping (%s)... Supported: %s",
+  "ZWED0155E":"RESERVED: (%s) is not a supported endpoint for %s. Skipping (%s)... Supported: %s",
+  "ZWED0156E":"RESERVED: Could not register default plugins into app-server"
 }
