@@ -266,7 +266,8 @@ class ZssHandler {
   _callAgent(zluxData, userName, resourceName) {
     //console.log("resourceName", resourceName)
     userName = encodeURIComponent(userName);
-    resourceName = encodeURIComponent(resourceName);
+    resourceName = encodeURI(resourceName);
+    resourceName = resourceName.replace(/%/g,':');
     const path = `${resourceName}/READ`;
     //console.log('trying path ', path);
     //console.log(new Error("stack trace before calling root serivce"))
