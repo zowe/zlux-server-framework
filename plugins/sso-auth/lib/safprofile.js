@@ -113,6 +113,7 @@ function makeProfileName(type, parms) {
 function makeProfileNameForRequest(url, method, instanceID) {
   let urlData;
   let type;
+  url = decodeURI(url);
   if (!url.match(/^\/[A-Za-z0-9]+\/plugins\//)) {
     url = url.toUpperCase();
     type = "core";
