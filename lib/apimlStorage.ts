@@ -29,7 +29,7 @@ const LOGIN_URI = '/api/v1/gateway/auth/login';
 export interface ApimlStorageSettings {
   host: string;
   port: number;
-  tlsOptions?: any;
+  tlsOptions?: https.AgentOptions;
 }
 
 interface ApimlRequest {
@@ -152,7 +152,8 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
       method: req.method,
       url: req.path,
       data: req.body,
-      headers: req.headers
+      headers: req.headers,
+      httpsAgent: new https.Agent(req.tlsOptions ? req.tlsOptions : {rejectUnauthorized: false}) 
     });
     const apimlResponse: ApimlResponse = {
       headers: response.headers,
@@ -226,7 +227,6 @@ export async function loginWithCertificate(tlsOptions: https.AgentOptions): Prom
   const loginRequest: ApimlRequest = {
     method: 'POST',
     path: LOGIN_URI,
-    body: {},
     tlsOptions: tlsOptions
   };
   const response = await apimlDoRequest(loginRequest);
@@ -428,14 +428,24 @@ export class ApimlStorage {
 
 
 if (require.main === module) {
-  if (process.argv.length !== 6) {
-    console.log(`Usage: node lib/apimlStorage.js <apiml-host> <apiml-port> <username> <password>`);
+  const fs = require('fs');
+  if (process.argv.length !== 7) {
+    console.log(`Usage: `);
+    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-port> credentials <username> <password>`);
+    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-port> cert <user-cert-file> <user-key-file>`);
+    console.log(`for example:`)
+    console.log(`       node lib/apimlStorage.js localhost 10010 credentials USER validPassword`);
+    console.log(`       node lib/apimlStorage.js localhost 10010 cert ../../api-layer/keystore/client_cert/USER-cert.cer ../../api-layer/keystore/client_cert/USER-PRIVATEKEY.key`);
     process.exit(1);
   }
+
   const host = process.argv[2];
   const port = +process.argv[3];
-  const username = process.argv[4];
-  const password = process.argv[5];
+  const method = process.argv[4];
+  if (method !== 'cert' && method !== 'credentials') {
+    console.log(`Unknown auth method '${method}', must be 'credentials' or 'cert'`);
+    process.exit(1);
+  }
   (async () => {
     const settings: ApimlStorageSettings = {
       host: host,
@@ -445,13 +455,27 @@ if (require.main === module) {
     configureApimlStorage(settings);
     const pluginId = 'com.company.department.first' + Math.ceil(Math.random() * 1000);
     const storage = new ApimlStorage(pluginId);
-    console.log(`${JSON.stringify(process.argv)}`);
-    const credentials = {
-      username: username,
-      password: password
-    };
-    const token = await loginWithCredentials(credentials);
-    console.log(`login successful token = ${token}`);
+    if (method === 'credentials') {
+      const username = process.argv[5];
+      const password = process.argv[6];
+      const credentials = {
+        username: username,
+        password: password
+      };
+      const token = await loginWithCredentials(credentials);
+      console.log(`login with credeintial successful, token = ${token}`);
+    } else if (method === 'cert') {
+      const certFile = process.argv[5];
+      const keyFile = process.argv[6];
+      const tlsOptionsForLogin: https.AgentOptions = {
+        cert: fs.readFileSync(certFile),
+        key: fs.readFileSync(keyFile),
+        rejectUnauthorized: false,
+      };
+      const token = await loginWithCertificate(tlsOptionsForLogin);
+      console.log(`login with cert successful, token = ${token}`);
+      
+    }
     const key = 'keyA';
     const value = 'abcd';
     await storage.set(key, value);
