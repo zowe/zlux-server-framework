@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.19.0
+
+- Increased default retry attempts to connect to api discovery server from 3 to 100, for a total retry duration of a little over 15 minutes.
+
 ## 1.17.0
 
 - Add support for DER encoded X.509 certificates
