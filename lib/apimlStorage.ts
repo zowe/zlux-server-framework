@@ -14,7 +14,6 @@ import axios from 'axios';
 import { AxiosInstance } from 'axios';
 
 let apimlClient: AxiosInstance;
-let apimlToken: string;
 
 export function configureApimlStorage(settings: ApimlStorageSettings) {
   apimlClient = axios.create({
@@ -24,7 +23,6 @@ export function configureApimlStorage(settings: ApimlStorageSettings) {
 }
 
 const CACHING_SERVICE_URI = '/cachingservice/api/v1/cache';
-const LOGIN_URI = '/api/v1/gateway/auth/login';
 
 export interface ApimlStorageSettings {
   host: string;
@@ -74,6 +72,7 @@ class ApimlStorageError extends Error {
   }
 
   toString(): string {
+    console.log(this.apimlResponse);
     const apimlMessages = this.getApimlMessages();
     const errorMessage = this.cause ? this.cause.message : undefined;
     let resultMessage = this.code;
@@ -153,7 +152,6 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
       url: req.path,
       data: req.body,
       headers: req.headers,
-      httpsAgent: new https.Agent(req.tlsOptions ? req.tlsOptions : {rejectUnauthorized: false}) 
     });
     const apimlResponse: ApimlResponse = {
       headers: response.headers,
@@ -207,63 +205,6 @@ function checkHttpResponse(response: ApimlResponse): ApimlStorageError | undefin
       return new ApimlStorageError('APIML_STORAGE_UNKNOWN_ERROR', undefined, response);
   }
 }
-
-export async function loginWithCredentials(credentials: Credentials): Promise<string> {
-  const loginRequest: ApimlRequest = {
-    method: 'POST',
-    path: LOGIN_URI,
-    body: credentials,
-  };
-  const response = await apimlDoRequest(loginRequest);
-  const token = findAuthTokenInResponse(response);
-  if (!token) {
-    throw new ApimlStorageError('APIML_STORAGE_TOKEN_NOT_FOUND', undefined, response);
-  }
-  apimlToken = token;
-  return token;
-}
-
-export async function loginWithCertificate(tlsOptions: https.AgentOptions): Promise<string> {
-  const loginRequest: ApimlRequest = {
-    method: 'POST',
-    path: LOGIN_URI,
-    tlsOptions: tlsOptions
-  };
-  const response = await apimlDoRequest(loginRequest);
-  const token = findAuthTokenInResponse(response);
-  if (!token) {
-    throw new ApimlStorageError('APIML_STORAGE_TOKEN_NOT_FOUND', undefined, response);
-  }
-  apimlToken = token;
-  return token;
-}
-
-function findAuthTokenInResponse(response: ApimlResponse): string | undefined {
-  const cookies = response.headers['set-cookie'];
-  if (cookies) {
-    for (const cookie of cookies) {
-      const token = extractTokenFromCookie(cookie);
-      if (token) {
-        return token;
-      }
-    }
-  }
-}
-
-function extractTokenFromCookie(cookie: string): string | undefined {
-  const name = 'apimlAuthenticationToken=';
-  let start = cookie.indexOf(name);
-  if (start < 0) {
-    return undefined;
-  }
-  const end = cookie.indexOf(';', start + name.length);
-  if (end < 0) {
-    return undefined;
-  }
-  start += name.length;
-  return cookie.substr(start, end - start);
-}
-
 export class ApimlStorage {
   private keyPrefix: string;
 
@@ -278,7 +219,6 @@ export class ApimlStorage {
   }
 
   async doRequest(req: ApimlRequest): Promise<ApimlResponse> {
-    req.headers = apimlToken ? { Authorization: `Bearer ${apimlToken}` } : {}
     return apimlDoRequest(req);
   }
 
@@ -429,53 +369,31 @@ export class ApimlStorage {
 
 if (require.main === module) {
   const fs = require('fs');
-  if (process.argv.length !== 7) {
+  if (process.argv.length !== 6) {
     console.log(`Usage: `);
-    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-port> credentials <username> <password>`);
-    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-port> cert <user-cert-file> <user-key-file>`);
+    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-port> <user-cert-file> <user-key-file>`);
     console.log(`for example:`)
-    console.log(`       node lib/apimlStorage.js localhost 10010 credentials USER validPassword`);
-    console.log(`       node lib/apimlStorage.js localhost 10010 cert ../../api-layer/keystore/client_cert/USER-cert.cer ../../api-layer/keystore/client_cert/USER-PRIVATEKEY.key`);
+    console.log(`       node lib/apimlStorage.js localhost 10010 ../../api-layer/keystore/client_cert/USER-cert.cer ../../api-layer/keystore/client_cert/USER-PRIVATEKEY.key`);
     process.exit(1);
   }
 
   const host = process.argv[2];
   const port = +process.argv[3];
-  const method = process.argv[4];
-  if (method !== 'cert' && method !== 'credentials') {
-    console.log(`Unknown auth method '${method}', must be 'credentials' or 'cert'`);
-    process.exit(1);
-  }
+  const certFile = process.argv[4];
+  const keyFile = process.argv[5];
   (async () => {
     const settings: ApimlStorageSettings = {
       host: host,
       port: port,
-      tlsOptions: { rejectUnauthorized: false }
+      tlsOptions: {
+        cert: fs.readFileSync(certFile),
+        key: fs.readFileSync(keyFile),
+        rejectUnauthorized: false,
+      }
     };
     configureApimlStorage(settings);
     const pluginId = 'com.company.department.first' + Math.ceil(Math.random() * 1000);
     const storage = new ApimlStorage(pluginId);
-    if (method === 'credentials') {
-      const username = process.argv[5];
-      const password = process.argv[6];
-      const credentials = {
-        username: username,
-        password: password
-      };
-      const token = await loginWithCredentials(credentials);
-      console.log(`login with credeintial successful, token = ${token}`);
-    } else if (method === 'cert') {
-      const certFile = process.argv[5];
-      const keyFile = process.argv[6];
-      const tlsOptionsForLogin: https.AgentOptions = {
-        cert: fs.readFileSync(certFile),
-        key: fs.readFileSync(keyFile),
-        rejectUnauthorized: false,
-      };
-      const token = await loginWithCertificate(tlsOptionsForLogin);
-      console.log(`login with cert successful, token = ${token}`);
-      
-    }
     const key = 'keyA';
     const value = 'abcd';
     await storage.set(key, value);
