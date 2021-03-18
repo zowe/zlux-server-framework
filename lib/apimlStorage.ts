@@ -52,15 +52,13 @@ type ApimlStorageErrorCode =
   'APIML_STORAGE_CONNECTION_ERROR' |
   'APIML_STORAGE_KEY_NOT_FOUND' |
   'APIML_STORAGE_JSON_ERROR' |
-  'APIML_STORAGE_INVALID_JWT_TOKEN' |
+  'APIML_STORAGE_UNKNOWN_CLIENT_CERT' |
+  'APIML_STORAGE_UNAUTHORIZED' |
   'APIML_STORAGE_NO_AUTH_PROVIDED' |
   'APIML_STORAGE_INVALID_PAYLOAD' |
   'APIML_STORAGE_UNKNOWN_ERROR' |
   'APIML_STORAGE_RESPONSE_ERROR' |
-  'APIML_STORAGE_NOT_CONFIGURED' |
-  'APIML_STORAGE_TOKEN_NOT_FOUND';
-
-
+  'APIML_STORAGE_NOT_CONFIGURED';
 
 class ApimlStorageError extends Error {
   constructor(
@@ -72,7 +70,6 @@ class ApimlStorageError extends Error {
   }
 
   toString(): string {
-    console.log(this.apimlResponse);
     const apimlMessages = this.getApimlMessages();
     const errorMessage = this.cause ? this.cause.message : undefined;
     let resultMessage = this.code;
@@ -184,8 +181,10 @@ function checkHttpResponse(response: ApimlResponse): ApimlStorageError | undefin
   switch (response.statusCode) {
     case 404: /* HTTP_STATUS_NOT_FOUND */
       return new ApimlStorageError('APIML_STORAGE_KEY_NOT_FOUND', undefined, response);
+    case 403: /* HTTP_STATUS_FORBIDDEN */
+      return new ApimlStorageError('APIML_STORAGE_UNKNOWN_CLIENT_CERT', undefined, response);
     case 401: /* HTTP_STATUS_UNAUTHORIZED */
-      return new ApimlStorageError('APIML_STORAGE_INVALID_JWT_TOKEN', undefined, response);
+      return new ApimlStorageError('APIML_STORAGE_UNAUTHORIZED', undefined, response);
     case 400: /* HTTP_STATUS_BAD_REQUEST */
       const errorKey = apimlResponseGetMessageKey(response);
       if (errorKey === 'org.zowe.apiml.cache.invalidPayload') {
