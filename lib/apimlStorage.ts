@@ -15,20 +15,29 @@ import { AxiosInstance } from 'axios';
 
 let apimlClient: AxiosInstance;
 
-export function configureApimlStorage(settings: ApimlStorageSettings) {
+export function configure(settings: ApimlStorageSettings) {
   apimlClient = axios.create({
     baseURL: `https://${settings.host}:${settings.port}`,
     httpsAgent: new https.Agent(settings.tlsOptions)
   });
 }
 
-const CACHING_SERVICE_URI = '/cachingservice/api/v1/cache';
+export function isConfigured(): boolean {
+  return apimlClient != null;
+}
 
 export interface ApimlStorageSettings {
   host: string;
   port: number;
   tlsOptions?: https.AgentOptions;
 }
+
+
+export function makeStorageForPlugin(pluginId: string): ApimlStorage {
+  return new ApimlStorage(pluginId);
+}
+
+const CACHING_SERVICE_URI = '/cachingservice/api/v1/cache';
 
 interface ApimlRequest {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
@@ -48,7 +57,7 @@ interface ApimlResponse {
   headers: http.IncomingHttpHeaders;
 }
 
-type ApimlStorageErrorCode =
+export type ApimlStorageErrorCode =
   'APIML_STORAGE_CONNECTION_ERROR' |
   'APIML_STORAGE_KEY_NOT_FOUND' |
   'APIML_STORAGE_JSON_ERROR' |
@@ -60,11 +69,11 @@ type ApimlStorageErrorCode =
   'APIML_STORAGE_RESPONSE_ERROR' |
   'APIML_STORAGE_NOT_CONFIGURED';
 
-class ApimlStorageError extends Error {
+export class ApimlStorageError extends Error {
   constructor(
-    public code: ApimlStorageErrorCode,
-    public cause?: Error,
-    public apimlResponse?: ApimlResponse) {
+    public readonly code: ApimlStorageErrorCode,
+    private cause?: Error,
+    private apimlResponse?: ApimlResponse) {
     super(code);
     Object.setPrototypeOf(this, ApimlStorageError.prototype);
   }
@@ -94,17 +103,21 @@ class ApimlStorageError extends Error {
 
 }
 
-function isApimlStorageKeyNotFoundError(e: Error) {
-  return e instanceof ApimlStorageError && e.code === 'APIML_STORAGE_KEY_NOT_FOUND';
+export function isApimlStorageError(e: Error): e is ApimlStorageError {
+  return e instanceof ApimlStorageError;
 }
 
-interface ApimlErrorMessage {
+export function isApimlStorageKeyNotFoundError(e: Error) {
+  return isApimlStorageError(e) && e.code === 'APIML_STORAGE_KEY_NOT_FOUND';
+}
+
+export interface ApimlErrorMessage {
   messageType: 'ERROR' | 'INFO' | 'WARN';
   messageNumber: string;
   messageContent: string;
   messageKey: string;
 }
-interface ApimlErrorMessages {
+export interface ApimlErrorMessages {
   messages: ApimlErrorMessage[];
 }
 
@@ -120,11 +133,6 @@ function isApimlErrorMessages(obj: any): obj is ApimlErrorMessages {
 
 function getApimlErrorMessageString(message: ApimlErrorMessage): string {
   return `${message.messageType}(${message.messageKey}) ${message.messageNumber} ${message.messageContent}`;
-}
-
-interface Credentials {
-  username: string;
-  password: string;
 }
 
 function apimlResponseGetMessageKey(response: ApimlResponse): string | undefined {
@@ -204,7 +212,7 @@ function checkHttpResponse(response: ApimlResponse): ApimlStorageError | undefin
       return new ApimlStorageError('APIML_STORAGE_UNKNOWN_ERROR', undefined, response);
   }
 }
-export class ApimlStorage {
+class ApimlStorage {
   private keyPrefix: string;
 
   constructor(
@@ -364,8 +372,6 @@ export class ApimlStorage {
 
 }
 
-
-
 if (require.main === module) {
   const fs = require('fs');
   if (process.argv.length !== 6) {
@@ -390,7 +396,7 @@ if (require.main === module) {
         rejectUnauthorized: false,
       }
     };
-    configureApimlStorage(settings);
+    configure(settings);
     const pluginId = 'com.company.department.first' + Math.ceil(Math.random() * 1000);
     const storage = new ApimlStorage(pluginId);
     const key = 'keyA';
