@@ -372,5 +372,4 @@
   "ZWED0154E":"RESERVED: (%s) is not a supported architecture for %s. Skipping (%s)... Supported: %s",
   "ZWED0155E":"RESERVED: (%s) is not a supported endpoint for %s. Skipping (%s)... Supported: %s",
   "ZWED0156E":"RESERVED: Could not register default plugins into app-server"
-  
 }
