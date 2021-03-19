@@ -29,7 +29,7 @@ export function isConfigured(): boolean {
 export interface ApimlStorageSettings {
   host: string;
   port: number;
-  tlsOptions?: https.AgentOptions;
+  tlsOptions: https.AgentOptions;
 }
 
 
@@ -44,7 +44,6 @@ interface ApimlRequest {
   path: string;
   headers?: { [key: string]: string };
   body?: any;
-  tlsOptions?: https.AgentOptions;
 }
 
 interface KeyValuePair {
