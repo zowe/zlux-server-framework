@@ -376,7 +376,7 @@ if (require.main === module) {
   const fs = require('fs');
   if (process.argv.length !== 6) {
     console.log(`Usage: `);
-    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-port> <user-cert-file> <user-key-file>`);
+    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-gateway-port> <user-cert-file> <user-key-file>`);
     console.log(`for example:`)
     console.log(`       node lib/apimlStorage.js localhost 10010 ../../api-layer/keystore/client_cert/USER-cert.cer ../../api-layer/keystore/client_cert/USER-PRIVATEKEY.key`);
     process.exit(1);
