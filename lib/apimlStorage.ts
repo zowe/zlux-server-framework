@@ -371,62 +371,6 @@ class ApimlStorage {
 
 }
 
-if (require.main === module) {
-  const fs = require('fs');
-  if (process.argv.length !== 6) {
-    console.log(`Usage: `);
-    console.log(`       node lib/apimlStorage.js <apiml-host> <apiml-gateway-port> <user-cert-file> <user-key-file>`);
-    console.log(`for example:`)
-    console.log(`       node lib/apimlStorage.js localhost 10010 ../../api-layer/keystore/client_cert/USER-cert.cer ../../api-layer/keystore/client_cert/USER-PRIVATEKEY.key`);
-    process.exit(1);
-  }
-
-  const host = process.argv[2];
-  const port = +process.argv[3];
-  const certFile = process.argv[4];
-  const keyFile = process.argv[5];
-  (async () => {
-    const settings: ApimlStorageSettings = {
-      host: host,
-      port: port,
-      tlsOptions: {
-        cert: fs.readFileSync(certFile),
-        key: fs.readFileSync(keyFile),
-        rejectUnauthorized: false,
-      }
-    };
-    configure(settings);
-    const pluginId = 'com.company.department.first' + Math.ceil(Math.random() * 1000);
-    const storage = new ApimlStorage(pluginId);
-    const key = 'keyA';
-    const value = 'abcd';
-    await storage.set(key, value);
-    console.log(`set ${key}=${value} successful`);
-
-    const data = await storage.getAll();
-    console.log(`storage contains:`);
-    console.log(`${JSON.stringify(data, null, 2)}`);
-    const newValue = await storage.get(key);
-    console.log(`got new value '${newValue}'`);
-    if (newValue !== value) {
-      throw new Error(`value doesn't match`);
-    }
-    await storage.deleteAll();
-    await storage.delete(key);
-    const newValueAgain = await storage.get(key);
-    if (typeof newValueAgain !== 'undefined') {
-      console.log(`got not undefined after delete ${newValueAgain}`);
-    }
-    const dict = { a: 1, b: 2 };
-    await storage.setAll(dict);
-    const newDict = await storage.getAll();
-    console.log(`storage contains:`);
-    console.log(`${JSON.stringify(newDict, null, 2)}`);
-    console.log(`test complete`);
-  })().catch(err => console.log(`Storage error: ${err}`));
-}
-
-
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
