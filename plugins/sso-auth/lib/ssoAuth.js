@@ -31,10 +31,19 @@ function doesApimlExist(serverConf) {
        so it is possible our auth logic will work for other agents, as long as they do SAF
 */
 function doesZssExist(serverConf) {
-  return (serverConf.agent !== undefined)
-    && (serverConf.agent.host !== undefined)
-    && (serverConf.agent.http !== undefined)
-    && (serverConf.agent.http.port !== undefined)
+   if (typeof serverConf.agent !== 'object') {
+    return false;
+   }
+   if (typeof serverConf.agent.host !== 'string') {
+     return false;
+   }
+   if (typeof serverConf.agent.https === 'object' && typeof serverConf.agent.https.port === 'number') {
+     return true;
+   }
+   if (typeof serverConf.agent.http === 'object' && typeof serverConf.agent.http.port === 'number') {
+     return true;
+   }
+   return false;
 }
 
 
