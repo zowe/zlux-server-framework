@@ -13,6 +13,7 @@ const ipaddr = require('ipaddr.js');
 const url = require('url');
 const makeProfileNameForRequest = require('./safprofile').makeProfileNameForRequest;
 const DEFAULT_CLASS = "ZOWE";
+const ZSS_SESSION_TIMEOUT_HEADER = "session-expires-seconds";
 const DEFAULT_EXPIRATION_MS = 3600000 //hour;
 const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
 
@@ -181,8 +182,13 @@ class ZssHandler {
           }
           //intended to be known as result of network call
           sessionState.zssCookies = zssCookie;
+          let expiresSec = response.headers[ZSS_SESSION_TIMEOUT_HEADER];
+          let expiresMs = DEFAULT_EXPIRATION_MS;
+          if (expiresSec) {
+            expiresMs = expiresSec == -1 ? expiresSec : Number(expiresSec)*1000;
+          }
           resolve({ success: true, username: sessionState.username,
-                    expms: DEFAULT_EXPIRATION_MS})
+                    expms: expiresMs});
         } else {
           let res = { success: false, error: {message: `ZSS ${response.statusCode} ${response.statusMessage}`}};
           if (response.statusCode === 500) {
@@ -267,7 +273,8 @@ class ZssHandler {
   _callAgent(zluxData, userName, resourceName) {
     //console.log("resourceName", resourceName)
     userName = encodeURIComponent(userName);
-    resourceName = encodeURIComponent(resourceName);
+    resourceName = encodeURI(resourceName);
+    resourceName = resourceName.replace(/%/g,':');
     const path = `${resourceName}/READ`;
     //console.log('trying path ', path);
     //console.log(new Error("stack trace before calling root serivce"))
