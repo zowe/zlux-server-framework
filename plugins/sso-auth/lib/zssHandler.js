@@ -34,6 +34,7 @@ class ZssHandler {
           '/unixfile',
           '/datasetContents',
           '/datasetEnqueue',
+          '/datasetHeartbeat',
           '/VSAMdatasetContents',
           '/datasetMetadata',
           '/omvs',
