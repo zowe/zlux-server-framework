@@ -300,7 +300,7 @@
   "ZWED0173W":"Unable to decode P12 certificate (different password than keystore?). Attempting to use empty string as password. Decode error: %s.",
   "ZWED0174W":"%s could not verify (%s) as a supported platform to install (%s). Proceeding anyway...",
   "ZWED0175W":"%s could not verify (%s) as a supported architecture to install (%s). Proceeding anyway...",
-  "ZWED0176W":"Failed to load client cert/key pair for Caching Service (%s)",
+  "ZWED0176W":"Failed to load client cert/key pair for Caching Service",
 
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
