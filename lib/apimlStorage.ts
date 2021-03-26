@@ -37,6 +37,7 @@ export function makeStorageForPlugin(pluginId: string): ApimlStorage {
   return new ApimlStorage(pluginId);
 }
 
+// The URI of Caching Service mounted at /cachingservice
 const CACHING_SERVICE_URI = '/cachingservice/api/v1/cache';
 
 interface ApimlRequest {
