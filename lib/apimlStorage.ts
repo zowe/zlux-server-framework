@@ -276,7 +276,7 @@ class ApimlStorage {
       path: `${CACHING_SERVICE_URI}`,
     };
     const response = await this.doRequest(getRequest);
-    if (response.statusCode !== 200 || typeof response.json !== 'object') {
+    if (response.statusCode !== 200) {
       throw new ApimlStorageError('APIML_STORAGE_RESPONSE_ERROR', undefined, response);
     }
     if (typeof response.json !== 'object') {
