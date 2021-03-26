@@ -131,7 +131,7 @@ function isApimlErrorMessages(obj: any): obj is ApimlErrorMessages {
 }
 
 function getApimlErrorMessageString(message: ApimlErrorMessage): string {
-  return `${message.messageType}(${message.messageKey}) ${message.messageNumber} ${message.messageContent}`;
+  return `${message.messageKey} ${message.messageNumber} ${message.messageContent}`;
 }
 
 function apimlResponseGetMessageKey(response: ApimlResponse): string | undefined {
