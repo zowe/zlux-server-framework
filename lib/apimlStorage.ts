@@ -221,7 +221,9 @@ class ApimlStorage {
   }
 
   private makeKeyPrefix(pluginId: string): string {
-    return pluginId.replace(/\./g, '');
+    // Remove non-alphanumeric characters
+    // TODO: Remove the line when https://github.com/zowe/api-layer/issues/1300 has fixed
+    return pluginId.replace(/[\W_]+/g, '');
   }
 
   async doRequest(req: ApimlRequest): Promise<ApimlResponse> {
