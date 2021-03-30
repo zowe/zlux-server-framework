@@ -6,6 +6,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 1.21.0
 
 - Bugfix: Use hostname given by zowe config in order to avoid errors from the hostname certificate matching when accessing the app server through APIML
+- Enhancement: app-server will contact zss through apiml if apiml is enabled and app-server finds that zss is accessible from apiml
+- sso-auth plugin no longer keeps zss cookie within app-server; the cookie will now be sent to and used from the browser, to facilitate high availability
 
 ## 1.19.0
 

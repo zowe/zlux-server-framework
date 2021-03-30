@@ -87,8 +87,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canLogout": true,
     "canResetPassword": this.usingZss ? true : false,
     "proxyAuthorizations": true,
-    //TODO do we need to process proxy headers for both?
-    "processesProxyHeaders": this.usingZss ? true: false
+    "processesProxyHeaders": false
   };
 }
 
@@ -303,14 +302,6 @@ SsoAuthenticator.prototype = {
     if (this.usingZss && !this.usingSso) {
       this.zssHandler.addProxyAuthorizations(req1, req2Options, sessionState);
     }
-  },
-
-  processProxiedHeaders(req, headers, sessionState) {
-    if (this.usingZss) {
-      headers = this.zssHandler.processProxiedHeaders(req, headers, sessionState);
-    }
-    //TODO does apiml need this too?
-    return headers;
   }
 };
 
