@@ -79,6 +79,17 @@ describe('APIML Storage', function () {
     }
   });
 
+  it('should set/get/delete key with non-alphanumeric chars', async () => {
+    const key = "a-b.c#d_e";
+    const val = 'hello world';
+    await storage.set(key, val);
+    const newVal = await storage.get(key);
+    expect(newVal).to.equal(val);
+    await storage.delete(key);
+    const newVal2 = await storage.get(key);
+    expect(newVal2).to.be.undefined;
+  });
+
 });
 
 /*

@@ -40,6 +40,8 @@ export function makeStorageForPlugin(pluginId: string): ApimlStorage {
 // The URI of Caching Service mounted at /cachingservice
 const CACHING_SERVICE_URI = '/cachingservice/api/v1/cache';
 
+const SERVICE_ID_HEADER = 'X-CS-Service-ID';
+
 interface ApimlRequest {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE',
   path: string;
@@ -213,21 +215,17 @@ function checkHttpResponse(response: ApimlResponse): ApimlStorageError | undefin
   }
 }
 class ApimlStorage {
-  private keyPrefix: string;
 
   constructor(
     private pluginId: string
   ) {
-    this.keyPrefix = this.makeKeyPrefix(this.pluginId);
-  }
-
-  private makeKeyPrefix(pluginId: string): string {
-    // Remove non-alphanumeric characters
-    // TODO: Remove the line when https://github.com/zowe/api-layer/issues/1300 has fixed
-    return pluginId.replace(/[\W_]+/g, '');
   }
 
   async doRequest(req: ApimlRequest): Promise<ApimlResponse> {
+    if (typeof req.headers !== 'object') {
+      req.headers = {};
+    }
+    req.headers[SERVICE_ID_HEADER] = this.pluginId;
     return apimlDoRequest(req);
   }
 
@@ -251,10 +249,9 @@ class ApimlStorage {
   }
 
   async get(key: string): Promise<string | undefined> {
-    const wrappedKey = this.wrapKey(key);
     const getRequest: ApimlRequest = {
       method: 'GET',
-      path: `${CACHING_SERVICE_URI}/${wrappedKey}`,
+      path: `${CACHING_SERVICE_URI}/${encodeURIComponent(key)}`,
     };
     let response: ApimlResponse;
     try {
@@ -284,12 +281,12 @@ class ApimlStorage {
       return {};
     }
     const json = response.json as { [key: string]: KeyValuePair };
-    const validKeys = Object.keys(json).filter(key => this.keyHasPrefix(key));
+    const keys = Object.keys(json);
     const result = {};
-    for (const key of validKeys) {
+    for (const key of keys) {
       const kv = json[key];
       if (typeof kv.value === 'string') {
-        result[this.unwrapKey(key)] = this.unwrapValue(kv.value);
+        result[key] = this.unwrapValue(kv.value);
       } else {
         throw new ApimlStorageError('APIML_STORAGE_RESPONSE_ERROR', undefined, response);
       }
@@ -299,10 +296,9 @@ class ApimlStorage {
 
   async delete(key: string): Promise<void> {
     try {
-      const wrappedKey = this.wrapKey(key);
       const getRequest: ApimlRequest = {
         method: 'DELETE',
-        path: `${CACHING_SERVICE_URI}/${wrappedKey}`,
+        path: `${CACHING_SERVICE_URI}/${encodeURIComponent(key)}`,
       };
       await this.doRequest(getRequest);
     } catch (e) {
@@ -313,31 +309,11 @@ class ApimlStorage {
   }
 
   async deleteAll(): Promise<void> {
-    const data = await this.getAll();
-    for (const key in data) {
-      try {
-        await this.delete(key);
-      } catch (e) {
-        if (!isApimlStorageKeyNotFoundError(e)) {
-          throw e;
-        }
-      }
-    }
-  }
-
-  private wrapKey(key: string): string {
-    return `${this.keyPrefix}${key}`;
-  }
-
-  private keyHasPrefix(key: string): boolean {
-    return key.startsWith(this.keyPrefix);
-  }
-
-  private unwrapKey(key: string): string {
-    if (this.keyHasPrefix(key)) {
-      return key.substring(this.keyPrefix.length);
-    }
-    throw new Error(`Unable to unwrap ${key}`);
+    const getRequest: ApimlRequest = {
+      method: 'DELETE',
+      path: `${CACHING_SERVICE_URI}`,
+    };
+    await this.doRequest(getRequest);
   }
 
   private wrapValue(value: any): string {
@@ -357,7 +333,7 @@ class ApimlStorage {
     const createRequest: ApimlRequest = {
       method: 'POST',
       path: CACHING_SERVICE_URI,
-      body: { key: this.wrapKey(key), value: this.wrapValue(value) },
+      body: { key: key, value: this.wrapValue(value) },
     };
     const response = await this.doRequest(createRequest);
   }
@@ -366,7 +342,7 @@ class ApimlStorage {
     const createRequest: ApimlRequest = {
       method: 'PUT',
       path: CACHING_SERVICE_URI,
-      body: { key: this.wrapKey(key), value: this.wrapValue(value) },
+      body: { key: key, value: this.wrapValue(value) },
     };
     const response = await this.doRequest(createRequest);
     return response;
