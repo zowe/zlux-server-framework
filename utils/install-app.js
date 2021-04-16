@@ -184,7 +184,7 @@ function copyRecognizers(appDir, appId, appVers) {
             }
           }
           recognizers = Object.assign(configRecognizers, recognizers); // // If found, combine the ones found in config with ones found in plugin
-          logger.debug("Found recognizers in config for '" + appId + "'");
+          logger.info("Found recognizers in config for '" + appId + "'");
         } catch (e) {
           logger.debug("No existing recognizers were found in config for '" + appId + "'");
         }
@@ -194,7 +194,7 @@ function copyRecognizers(appDir, appId, appVers) {
             fs.writeFileSync(filepathConfig, '{ "recognizers":' + JSON.stringify(recognizers) + '}');
             logger.info('ZWED0294I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
           } catch (e) {
-            logger.debug("Unable to load recognizers for '" + appId + "' into config");
+            logger.info("Unable to load recognizers for '" + appId + "' into config");
           }
         }
       }
@@ -217,7 +217,7 @@ function copyActions(appDir, appId, appVers) {
       actions[key].pluginVersion = appVers;
       actions[key].pluginIdentifier = appId;
     }
-    logger.debug("Found actions for '" + appId + "'");
+    logger.info("Found actions for '" + appId + "'");
   } catch (e) {
     logger.debug("Could not find actions in '" + (path.join(appDir, "config/actions")) + "'");
   }
@@ -238,7 +238,7 @@ function copyActions(appDir, appId, appVers) {
       fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
       logger.info('ZWED0295I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
     } catch (e) {
-      logger.debug("Unable to load actions for '" + appId + "' into config");
+      logger.info("Unable to load actions for '" + appId + "' into config");
     }
   }
 }
