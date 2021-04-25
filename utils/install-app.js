@@ -145,37 +145,23 @@ function copyRecognizers(appDir, appId, appVers) {
   let recognizers;
   let recognizersKeys;
   let configRecognizers;
-  let pluginStorageRoot;
+  let configLocation;
 
   if (process.env.INSTANCE_DIR) {
-    pluginStorageRoot = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/");
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
-      pluginStorageRoot = path.join(instanceDir, "/ZLUX/pluginStorage/");
+      configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     } catch (e) {
       logger.severe('ZWED0152E'); //logger.error('Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.')
     }
   }
 
-  const desktopPluginStorage = path.join(pluginStorageRoot, "org.zowe.zlux.ng2desktop/");
-  const recognizerStorage =  path.join(desktopPluginStorage, "recognizers");
-
-  if (fs.existsSync(pluginStorageRoot)) {
-    if(!fs.existsSync(desktopPluginStorage)) {
-      fs.mkdirSync(desktopPluginStorage);
-    }
-    if(!fs.existsSync(recognizerStorage)) {
-      fs.mkdirSync(recognizerStorage);
-    }
-  } else {
-    throw new Error('either instance directory does not exists or do not have compatible structure');
-  }
- 
   try { // Get recognizers in a plugin's appDir/config/xxx location
     fs.readdirSync(path.join(appDir, "config/recognizers")).forEach(filename => {
       const filepath = path.resolve(path.join(appDir, "config/recognizers"), filename);
-      const filepathConfig = path.resolve(path.join(recognizerStorage, filename));
+      const filepathConfig = path.resolve(path.join(configLocation, "recognizers", filename));
       const stat = fs.statSync(filepath);
       
       if (stat.isFile()) {
@@ -199,7 +185,7 @@ function copyRecognizers(appDir, appId, appVers) {
           }
           recognizers = Object.assign(configRecognizers, recognizers); // // If found, combine the ones found in config with ones found in plugin
         } catch (e) {
-          logger.info("No existing recognizers were found in config for '" + appId + "'");
+          logger.debug("No existing recognizers were found in config for '" + appId + "'");
         }
       
         if (recognizers) { // Attempt to copy recognizers over to config location for Desktop access later
@@ -207,7 +193,6 @@ function copyRecognizers(appDir, appId, appVers) {
             fs.writeFileSync(filepathConfig, '{ "recognizers":' + JSON.stringify(recognizers) + '}');
             logger.info('ZWED0294I', recognizers.length, appId); //logger.info("Successfully loaded " + recognizers.length + " recognizers for '" + appId + "' into config");
           } catch (e) {
-            log.info(e);
             logger.info('ZWED0157E', 'recognizers', appId);
           }
         }
@@ -222,6 +207,7 @@ function copyRecognizers(appDir, appId, appVers) {
 function copyActions(appDir, appId, appVers) {
   let actions;
   let actionsKeys;
+  let configLocation;
 
   try { // Get actions in a plugin's appDir/config/xxx location
     actions = JSON.parse(fs.readFileSync(path.join(appDir, "config/actions", appId))).actions;
@@ -235,38 +221,22 @@ function copyActions(appDir, appId, appVers) {
     logger.debug("Could not find actions in '" + (path.join(appDir, "config/actions")) + "'");
   }
 
-  let pluginStorageRoot;
   if (process.env.INSTANCE_DIR) {
-    pluginStorageRoot = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/");
+    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
-      pluginStorageRoot = path.join(instanceDir, "/ZLUX/pluginStorage/");
+      configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
     } catch (e) {
-      logger.severe('ZWED0152E'); //logger.error('Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.')
+      logger.severe('ZWED0152E'); //logger.error("Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.")"
     }
-  }
-
-  const desktopPluginStorage = path.join(pluginStorageRoot, "org.zowe.zlux.ng2desktop/");
-  const actionsStorage =  path.join(desktopPluginStorage, "actions");
-
-  if (fs.existsSync(pluginStorageRoot)) {
-    if(!fs.existsSync(desktopPluginStorage)) {
-      fs.mkdirSync(desktopPluginStorage);
-    }
-    if(!fs.existsSync(actionsStorage)) {
-      fs.mkdirSync(actionsStorage);
-    }
-  } else {
-    throw new Error('either instance directory does not exists or do not have compatible structure');
   }
 
   if (actions) { // Attempt to copy actions over to config location for Desktop access later
     try { //TODO: Doing actions.actions is redundant. We may want to consider refactoring in the future
-      fs.writeFileSync(path.join(actionsStorage, appId), '{ "actions":' + JSON.stringify(actions) + '}');
+      fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
       logger.info('ZWED0295I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
     } catch (e) {
-      log.info(e);
       logger.info('ZWED0157E', 'actions', appId);
     }
   }
