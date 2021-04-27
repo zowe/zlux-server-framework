@@ -5,9 +5,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 1.22.0
 
-- Enhancement: Plugins can push state out to the Caching Service for high availability storage via a new storage API, context.storageV2
+- Enhancement: Plugins can push state out to the Caching Service for high availability storage via a improved storage API, available to dataservices as `context.storage`
 - Enhancement: Storage API V2 added which has parameters to specify whether plugin cache and state should be stored local to a worker, in the cluster, or remote for high availability
-- Note: Previous Storage API, V1, is now available in the object context.storageV1 in addition to previous location context.storage
 
 ## 1.21.0
 
