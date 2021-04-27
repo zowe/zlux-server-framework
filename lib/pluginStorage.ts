@@ -40,23 +40,6 @@ export interface IPluginStorage {
   getAll(locationType?: StorageLocationType): Promise<{ [key: string]: any }>;
   setAll(dict: { [key: string]: any }, locationType?: StorageLocationType): Promise<void>;
   deleteAll(locationType?: StorageLocationType): Promise<void>;
-
-  getSync(key: string, locationType?: StorageLocationType): any;
-  setSync(key: string, value: any, locationType?: StorageLocationType): void;
-  deleteSync(key: string, locationType?: StorageLocationType): void;
-  getAllSync(locationType?: StorageLocationType): { [key: string]: any };
-  setAllSync(dict: { [key: string]: any }, locationType?: StorageLocationType): void;
-  deleteAllSync(locationType?: StorageLocationType): void;
-}
-
-export interface IPluginSyncStorage {
-  get(key: string, locationType?: StorageLocationType): any;
-  set(key: string, value: any, locationType?: StorageLocationType): void;
-  delete(key: string, locationType?: StorageLocationType): void;
-  getAll(locationType?: StorageLocationType): { [key: string]: any };
-  setAll(dict: { [key: string]: any }, locationType?: StorageLocationType): void;
-  deleteAll(locationType?: StorageLocationType): void;
-
 }
 
 export interface ILocalStorage {
@@ -67,25 +50,8 @@ export interface ILocalStorage {
   setAll(dict: { [key: string]: any }, pluginId?: string): void;
 }
 
-export interface IHAStorage {
-  get(key: string, locationType?: StorageLocationType): Promise<any>;
-  set(key: string, value: any, locationType?: StorageLocationType): Promise<void>;
-  delete(key: string, locationType?: StorageLocationType): Promise<void>;
-  getAll(locationType?: StorageLocationType): Promise<any>;
-  setAll(dict: { [key: string]: any }, locationType?: StorageLocationType): Promise<void>;
-  deleteAll(locationType?: StorageLocationType): Promise<void>;
-}
-
-export function PluginStorageSyncFactory(pluginId: string, logger): IPluginSyncStorage {
-  const storage:any = PluginStorageFactory(pluginId, logger);
-  storage.get = storage.getSync;
-  storage.set = storage.setSync;
-  storage.delete = storage.deleteSync;
-  storage.getAll = storage.getAllSync;
-  storage.setAll = storage.setAllSync;
-  storage.deleteAll = storage.deleteAllSync;
-  return (storage as IPluginSyncStorage);
-}
+//identical to IPluginStorage at this point, maybe not in the future.
+export type IHAStorage = IPluginStorage;
 
 export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
 
@@ -113,32 +79,13 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.get(key));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          resolve(process.clusterManager.getStorageByKey(pluginId, key));
+          return process.clusterManager.getStorageByKey(pluginId, key);
         } else if (locationType == StorageLocationType.HA) {
           haStorage.get(key).then((val) => resolve(val)).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
-    },
-
-    getSync: (key: string, locationType?:StorageLocationType): any => {
-      if (locationType===undefined) {
-        locationType = this.getDefaultLocationType();
-      } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
-      if (StorageLocationType.HA) {
-        return logger.warn(`Plugin ${pluginId} storage error, storage type HA is not supported in sync mode`);
-      }
-
-      if (locationType == StorageLocationType.Local) {
-        return localStorage.get(key);
-      } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-        return process.clusterManager.getStorageByKey(pluginId, key);
-      } else {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
     },
 
     set: (key: string, value: any, locationType?:StorageLocationType): Promise<void> => {
@@ -152,33 +99,13 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.set(key, value));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          resolve(process.clusterManager.setStorageByKey(pluginId, key, value));
+          return process.clusterManager.setStorageByKey(pluginId, key, value);
         } else if (locationType == StorageLocationType.HA) {
           haStorage.set(key, value).then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
-    },
-    
-    setSync: (key: string, value: any, locationType?:StorageLocationType): void => {
-      if (locationType===undefined) {
-        locationType = this.getDefaultLocationType();
-      } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
-      if (StorageLocationType.HA) {
-        return logger.warn(`Plugin ${pluginId} storage error, storage type HA is not supported in sync mode`);
-      }
-
-      
-      if (locationType == StorageLocationType.Local) {
-        return localStorage.set(key, value);
-      } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-        return process.clusterManager.setStorageByKey(pluginId, key, value);
-      } else {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
     },
     
     delete: (key: string, locationType?:StorageLocationType): Promise<void> => {
@@ -192,32 +119,13 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.delete(key));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          resolve(process.clusterManager.deleteStorageByKey(pluginId, key));
+          return process.clusterManager.deleteStorageByKey(pluginId, key);
         } else if (locationType == StorageLocationType.HA) {
           haStorage.delete(key).then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
-    },
-
-    deleteSync: (key: string, locationType?:StorageLocationType): void => {
-      if (locationType===undefined) {
-        locationType = this.getDefaultLocationType();
-      } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
-      if (StorageLocationType.HA) {
-        return logger.warn(`Plugin ${pluginId} storage error, storage type HA is not supported in sync mode`);
-      }
-
-      if (locationType == StorageLocationType.Local) {
-        return localStorage.delete(key);
-      } else if (locationType == StorageLocationType.Cluster) {
-        return process.clusterManager.deleteStorageByKey(pluginId, key);
-      } else {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
     },
                          
     getAll: (locationType?:StorageLocationType): Promise<{ [key: string]: any }> => {
@@ -231,32 +139,13 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.getAll());
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          resolve(process.clusterManager.getStorageAll(pluginId));
+          return process.clusterManager.getStorageAll(pluginId);
         } else if (locationType == StorageLocationType.HA) {
           haStorage.getAll().then((dict) => resolve(dict)).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
-    },
-
-    getAllSync: (locationType?:StorageLocationType): { [key: string]: any } => {
-      if (locationType===undefined) {
-        locationType = this.getDefaultLocationType();
-      } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
-      if (StorageLocationType.HA) {
-        return logger.warn(`Plugin ${pluginId} storage error, storage type HA is not supported in sync mode`);
-      }
-
-      if (locationType == StorageLocationType.Local) {
-        return localStorage.getAll();
-      } else if (locationType == StorageLocationType.Cluster) {
-        return process.clusterManager.getStorageAll(pluginId);
-      } else {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
     },
                          
     setAll: (dict:any, locationType?:StorageLocationType): Promise<void> => {
@@ -270,32 +159,13 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.setAll(dict));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          resolve(process.clusterManager.setStorageAll(pluginId, dict));
+          return process.clusterManager.setStorageAll(pluginId, dict);
         } else if (locationType == StorageLocationType.HA) {
           haStorage.setAll(dict).then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
-    },
-    
-    setAllSync: (dict:any, locationType?:StorageLocationType): void => {
-      if (locationType===undefined) {
-        locationType = this.getDefaultLocationType();
-      } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
-      if (StorageLocationType.HA) {
-        return logger.warn(`Plugin ${pluginId} storage error, storage type HA is not supported in sync mode`);
-      }
-
-      if (locationType == StorageLocationType.Local) {
-        return localStorage.setAll(dict);
-      } else if (locationType == StorageLocationType.Cluster) {
-        return process.clusterManager.setStorageAll(pluginId, dict);
-      } else {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
     },
 
     deleteAll: (locationType?:StorageLocationType): Promise<void> => {
@@ -309,32 +179,13 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.setAll({}));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          resolve(process.clusterManager.setStorageAll(pluginId, {}));
+          return process.clusterManager.setStorageAll(pluginId, {});
         } else if (locationType == StorageLocationType.HA) {
           haStorage.deleteAll().then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
-    },
-
-    deleteAllSync: (locationType?:StorageLocationType): void => {
-      if (locationType===undefined) {
-        locationType = this.getDefaultLocationType();
-      } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
-      if (StorageLocationType.HA) {
-        return logger.warn(`Plugin ${pluginId} storage error, storage type HA is not supported in sync mode`);
-      }
-      
-      if (locationType == StorageLocationType.Local) {
-        return localStorage.setAll({});
-      } else if (locationType == StorageLocationType.Cluster) {
-        return process.clusterManager.setStorageAll(pluginId, {});
-      } else {
-        return logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType);
-      }
     }
   }
 }
