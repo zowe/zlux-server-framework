@@ -115,7 +115,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
           resolve(process.clusterManager.getStorageByKey(pluginId, key));
         } else if (locationType == StorageLocationType.HA) {
-          return haStorage.get(key);
+          haStorage.get(key).then((val) => resolve(val)).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -154,7 +154,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
           resolve(process.clusterManager.setStorageByKey(pluginId, key, value));
         } else if (locationType == StorageLocationType.HA) {
-          return haStorage.set(key, value);
+          haStorage.set(key, value).then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -194,7 +194,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
           resolve(process.clusterManager.deleteStorageByKey(pluginId, key));
         } else if (locationType == StorageLocationType.HA) {
-          return haStorage.delete(key);
+          haStorage.delete(key).then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -233,7 +233,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
           resolve(process.clusterManager.getStorageAll(pluginId));
         } else if (locationType == StorageLocationType.HA) {
-          return haStorage.getAll();
+          haStorage.getAll().then((dict) => resolve(dict)).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -272,7 +272,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
           resolve(process.clusterManager.setStorageAll(pluginId, dict));
         } else if (locationType == StorageLocationType.HA) {
-          return haStorage.setAll(dict);
+          haStorage.setAll(dict).then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -311,7 +311,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
           resolve(process.clusterManager.setStorageAll(pluginId, {}));
         } else if (locationType == StorageLocationType.HA) {
-          return haStorage.deleteAll();
+          haStorage.deleteAll().then(() => resolve()).catch((e) => reject(e));
         } else {
           reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
