@@ -71,7 +71,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
     get: (key: string, locationType?:StorageLocationType): Promise<any> => {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
-          locationType = this.getDefaultLocationType();
+          locationType = getDefaultLocationType();
         } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
           return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -79,7 +79,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.get(key));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          return process.clusterManager.getStorageByKey(pluginId, key);
+          process.clusterManager.getStorageByKey(pluginId, key).then((val) => resolve(val)).catch((e) => reject(e));;
         } else if (locationType == StorageLocationType.HA) {
           haStorage.get(key).then((val) => resolve(val)).catch((e) => reject(e));
         } else {
@@ -91,7 +91,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
     set: (key: string, value: any, locationType?:StorageLocationType): Promise<void> => {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
-          locationType = this.getDefaultLocationType();
+          locationType = getDefaultLocationType();
         } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
           return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -99,7 +99,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.set(key, value));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          return process.clusterManager.setStorageByKey(pluginId, key, value);
+          process.clusterManager.setStorageByKey(pluginId, key, value).then(() => resolve()).catch((e) => reject(e));
         } else if (locationType == StorageLocationType.HA) {
           haStorage.set(key, value).then(() => resolve()).catch((e) => reject(e));
         } else {
@@ -111,7 +111,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
     delete: (key: string, locationType?:StorageLocationType): Promise<void> => {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
-          locationType = this.getDefaultLocationType();
+          locationType = getDefaultLocationType();
         } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
           return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -119,7 +119,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.delete(key));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          return process.clusterManager.deleteStorageByKey(pluginId, key);
+          process.clusterManager.deleteStorageByKey(pluginId, key).then(() => resolve()).catch((e) => reject(e));
         } else if (locationType == StorageLocationType.HA) {
           haStorage.delete(key).then(() => resolve()).catch((e) => reject(e));
         } else {
@@ -131,7 +131,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
     getAll: (locationType?:StorageLocationType): Promise<{ [key: string]: any }> => {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
-          locationType = this.getDefaultLocationType();
+          locationType = getDefaultLocationType();
         } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
           return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -139,7 +139,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.getAll());
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          return process.clusterManager.getStorageAll(pluginId);
+          process.clusterManager.getStorageAll(pluginId).then((dict) => resolve(dict)).catch((e) => reject(e));
         } else if (locationType == StorageLocationType.HA) {
           haStorage.getAll().then((dict) => resolve(dict)).catch((e) => reject(e));
         } else {
@@ -151,7 +151,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
     setAll: (dict:any, locationType?:StorageLocationType): Promise<void> => {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
-          locationType = this.getDefaultLocationType();
+          locationType = getDefaultLocationType();
         } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
           return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -159,7 +159,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.setAll(dict));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          return process.clusterManager.setStorageAll(pluginId, dict);
+          process.clusterManager.setStorageAll(pluginId, dict).then(() => resolve()).catch((e) => reject(e));
         } else if (locationType == StorageLocationType.HA) {
           haStorage.setAll(dict).then(() => resolve()).catch((e) => reject(e));
         } else {
@@ -171,7 +171,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
     deleteAll: (locationType?:StorageLocationType): Promise<void> => {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
-          locationType = this.getDefaultLocationType();
+          locationType = getDefaultLocationType();
         } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
           return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
@@ -179,7 +179,7 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
         if (locationType == StorageLocationType.Local) {
           resolve(localStorage.setAll({}));
         } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          return process.clusterManager.setStorageAll(pluginId, {});
+          process.clusterManager.setStorageAll(pluginId, {}).then(() => resolve()).catch((e) => reject(e));
         } else if (locationType == StorageLocationType.HA) {
           haStorage.deleteAll().then(() => resolve()).catch((e) => reject(e));
         } else {
@@ -188,6 +188,10 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       });
     }
   }
+}
+
+function getDefaultLocationType() {
+  return StorageLocationType.Cluster;
 }
 
 export function LocalStorageFactory(id?: string): ILocalStorage {
