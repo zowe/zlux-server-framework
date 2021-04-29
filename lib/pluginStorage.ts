@@ -16,20 +16,21 @@ declare var process: {
   clusterManager: any;
 };
 
-export enum StorageLocationType {
-  Local = 0,
-  Cluster = 1,
-  HA = 2,
-}
+export type StorageLocationType = 'local' | 'cluster' | 'ha';
 
+const allowedStorageTypeLocations = ['local', 'cluster', 'ha'];
+
+function isStorageLocationType(locationType: string): locationType is StorageLocationType {
+  return allowedStorageTypeLocations.indexOf(locationType) !== -1;
+}
 
 function getDefaultLocationType(): StorageLocationType {
   if (apimlStorage.isConfigured()) {
-    return StorageLocationType.HA;
+    return 'ha';
   } else if (process.clusterManager) {
-    return StorageLocationType.Cluster;
+    return 'cluster';
   } else {
-    return StorageLocationType.Local;
+    return 'local';
   }
 }
 
@@ -72,18 +73,19 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
           locationType = getDefaultLocationType();
-        } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-          return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
+        } else if (!isStorageLocationType(locationType)) {
+          const msg = `Plugin ${pluginId} storage error, unknown locationType given=${locationType}, allowed one of ${allowedStorageTypeLocations.join(', ')}`;
+          logger.warn(msg);
+          reject(new Error(msg));
+          return;
         }
 
-        if (locationType == StorageLocationType.Local) {
+        if (locationType == 'local') {
           resolve(localStorage.get(key));
-        } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
-          process.clusterManager.getStorageByKey(pluginId, key).then((val) => resolve(val)).catch((e) => reject(e));;
-        } else if (locationType == StorageLocationType.HA) {
+        } else if (locationType == 'cluster' || locationType == 'ha' && !haStorage) {
+          process.clusterManager.getStorageByKey(pluginId, key).then((val) => resolve(val)).catch((e) => reject(e));
+        } else if (locationType == 'ha') {
           haStorage.get(key).then((val) => resolve(val)).catch((e) => reject(e));
-        } else {
-          reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
     },
@@ -92,18 +94,19 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
           locationType = getDefaultLocationType();
-        } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-          return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
+        } else if (!isStorageLocationType(locationType)) {
+          const msg = `Plugin ${pluginId} storage error, unknown locationType given=${locationType}, allowed one of ${allowedStorageTypeLocations.join(', ')}`;
+          logger.warn(msg);
+          reject(new Error(msg));
+          return;
         }
 
-        if (locationType == StorageLocationType.Local) {
+        if (locationType == 'local') {
           resolve(localStorage.set(key, value));
-        } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
+        } else if (locationType == 'cluster' || locationType == 'ha' && !haStorage) {
           process.clusterManager.setStorageByKey(pluginId, key, value).then(() => resolve()).catch((e) => reject(e));
-        } else if (locationType == StorageLocationType.HA) {
+        } else if (locationType == 'ha') {
           haStorage.set(key, value).then(() => resolve()).catch((e) => reject(e));
-        } else {
-          reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
     },
@@ -112,18 +115,19 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
           locationType = getDefaultLocationType();
-        } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-          return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
+        } else if (!isStorageLocationType(locationType)) {
+          const msg = `Plugin ${pluginId} storage error, unknown locationType given=${locationType}, allowed one of ${allowedStorageTypeLocations.join(', ')}`;
+          logger.warn(msg);
+          reject(new Error(msg));
+          return;
         }
 
-        if (locationType == StorageLocationType.Local) {
+        if (locationType == 'local') {
           resolve(localStorage.delete(key));
-        } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
+        } else if (locationType == 'cluster' || locationType == 'ha' && !haStorage) {
           process.clusterManager.deleteStorageByKey(pluginId, key).then(() => resolve()).catch((e) => reject(e));
-        } else if (locationType == StorageLocationType.HA) {
+        } else if (locationType == 'ha') {
           haStorage.delete(key).then(() => resolve()).catch((e) => reject(e));
-        } else {
-          reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
     },
@@ -132,18 +136,19 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
           locationType = getDefaultLocationType();
-        } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-          return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
+        } else if (!isStorageLocationType(locationType)) {
+          const msg = `Plugin ${pluginId} storage error, unknown locationType given=${locationType}, allowed one of ${allowedStorageTypeLocations.join(', ')}`;
+          logger.warn(msg);
+          reject(new Error(msg));
+          return;
         }
 
-        if (locationType == StorageLocationType.Local) {
+        if (locationType == 'local') {
           resolve(localStorage.getAll());
-        } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
+        } else if (locationType == 'cluster' || locationType == 'ha' && !haStorage) {
           process.clusterManager.getStorageAll(pluginId).then((dict) => resolve(dict)).catch((e) => reject(e));
-        } else if (locationType == StorageLocationType.HA) {
+        } else if (locationType == 'ha') {
           haStorage.getAll().then((dict) => resolve(dict)).catch((e) => reject(e));
-        } else {
-          reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
     },
@@ -152,18 +157,19 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
           locationType = getDefaultLocationType();
-        } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-          return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
+        } else if (!isStorageLocationType(locationType)) {
+          const msg = `Plugin ${pluginId} storage error, unknown locationType given=${locationType}, allowed one of ${allowedStorageTypeLocations.join(', ')}`;
+          logger.warn(msg);
+          reject(new Error(msg));
+          return;
         }
 
-        if (locationType == StorageLocationType.Local) {
+        if (locationType == 'local') {
           resolve(localStorage.setAll(dict));
-        } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
+        } else if (locationType == 'cluster' || locationType == 'ha' && !haStorage) {
           process.clusterManager.setStorageAll(pluginId, dict).then(() => resolve()).catch((e) => reject(e));
-        } else if (locationType == StorageLocationType.HA) {
+        } else if (locationType == 'ha') {
           haStorage.setAll(dict).then(() => resolve()).catch((e) => reject(e));
-        } else {
-          reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
     },
@@ -172,18 +178,19 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       return new Promise((resolve, reject)=> {
         if (locationType===undefined) {
           locationType = getDefaultLocationType();
-        } else if ((typeof locationType != 'number') || locationType < 0 || locationType > 2) {
-          return reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
+        } else if (!isStorageLocationType(locationType)) {
+          const msg = `Plugin ${pluginId} storage error, unknown locationType given=${locationType}, allowed one of ${allowedStorageTypeLocations.join(', ')}`;
+          logger.warn(msg);
+          reject(new Error(msg));
+          return;
         }
 
-        if (locationType == StorageLocationType.Local) {
+        if (locationType == 'local') {
           resolve(localStorage.setAll({}));
-        } else if (locationType == StorageLocationType.Cluster || locationType == StorageLocationType.HA && !haStorage) {
+        } else if (locationType == 'cluster' || locationType == 'ha' && !haStorage) {
           process.clusterManager.setStorageAll(pluginId, {}).then(() => resolve()).catch((e) => reject(e));
-        } else if (locationType == StorageLocationType.HA) {
+        } else if (locationType == 'ha') {
           haStorage.deleteAll().then(() => resolve()).catch((e) => reject(e));
-        } else {
-          reject(logger.warn(`Plugin ${pluginId} storage error, unknown locationType given=`,locationType));
         }
       });
     }

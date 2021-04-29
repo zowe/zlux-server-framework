@@ -16,7 +16,7 @@ const fs = require('fs');
 
 describe('APIML Storage via Unified interface', function () {
   let storage = null;
-  const location = pluginStorage.StorageLocationType.HA;
+  const location = 'ha';
 
   before(function () {
     const pluginId = 'com.rs.plugin.id';
