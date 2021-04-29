@@ -23,8 +23,8 @@ export enum StorageLocationType {
 }
 
 
-function getLocationType(apimlStorage) {
-  if (apimlStorage) {
+function getDefaultLocationType(): StorageLocationType {
+  if (apimlStorage.isConfigured()) {
     return StorageLocationType.HA;
   } else if (process.clusterManager) {
     return StorageLocationType.Cluster;
@@ -188,10 +188,6 @@ export function PluginStorageFactory(pluginId: string, logger): IPluginStorage {
       });
     }
   }
-}
-
-function getDefaultLocationType() {
-  return StorageLocationType.Cluster;
 }
 
 export function LocalStorageFactory(id?: string): ILocalStorage {
