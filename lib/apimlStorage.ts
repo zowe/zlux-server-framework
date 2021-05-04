@@ -69,7 +69,8 @@ export type ApimlStorageErrorCode =
   'APIML_STORAGE_INVALID_PAYLOAD' |
   'APIML_STORAGE_UNKNOWN_ERROR' |
   'APIML_STORAGE_RESPONSE_ERROR' |
-  'APIML_STORAGE_NOT_CONFIGURED';
+  'APIML_STORAGE_NOT_CONFIGURED' |
+  'APIML_STORAGE_ENDPOINT_NOT_FOUND';
 
 export class ApimlStorageError extends Error {
   constructor(
@@ -187,7 +188,23 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
   }
 }
 
+function isCachingServiceEndpointNotFound(response: ApimlResponse): boolean {
+  if (response.statusCode === 405) {
+    return true;
+  }
+  if (response.statusCode === 404 &&
+    apimlResponseGetMessageKey(response) === 'org.zowe.apiml.common.endPointNotFound'
+  ) {
+    return true;
+  }
+  return false;
+}
+
 function checkHttpResponse(response: ApimlResponse): ApimlStorageError | undefined {
+  if (isCachingServiceEndpointNotFound(response)) {
+    return new ApimlStorageError('APIML_STORAGE_ENDPOINT_NOT_FOUND', undefined, response);
+  }
+
   switch (response.statusCode) {
     case 404: /* HTTP_STATUS_NOT_FOUND */
       return new ApimlStorageError('APIML_STORAGE_KEY_NOT_FOUND', undefined, response);
