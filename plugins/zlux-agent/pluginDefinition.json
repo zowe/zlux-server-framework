@@ -1,0 +1,39 @@
+{
+  "identifier": "org.zowe.zlux.agent",
+  "apiVersion": "1.0.0",
+  "pluginVersion": "1.0.0",
+  "pluginType": "application",
+  "dataServices": [
+    {
+      "type": "router",
+      "name": "fileapi",
+      "filename": "helloWorld.js",
+      "routerFactory": "helloWorldRouter",
+      "dependenciesIncluded": true,
+      "initializerLookupMethod": "external",
+      "version": "1.0.0"
+    },
+    {
+      "type": "router",
+      "name": "security-mgmt-api",
+      "filename": "helloWorld.js",
+      "routerFactory": "helloWorldRouter",
+      "dependenciesIncluded": true,
+      "initializerLookupMethod": "external",
+      "version": "1.0.0"
+    },
+    {
+      "type": "router",
+      "name": "server-plugins-api",
+      "filename": "helloWorld.js",
+      "routerFactory": "helloWorldRouter",
+      "dependenciesIncluded": true,
+      "initializerLookupMethod": "external",
+      "version": "1.0.0"
+    }
+  ],
+  "swagger": {
+    "host": "agent",
+    "basePath": "/"
+  }
+}
