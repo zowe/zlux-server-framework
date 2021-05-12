@@ -235,6 +235,8 @@ class ZssHandler {
     if (req1.cookies && req1.cookies[COOKIE_NAME]) {
       req2Options.headers['cookie'] = req1.headers['cookie'];
     }
+    delete req2Options.headers['referer'];
+    delete req2Options.headers['referrer'];
   }
 
   passwordReset(request, sessionState) {
