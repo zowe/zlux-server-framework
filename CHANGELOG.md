@@ -3,6 +3,11 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.22.0
+
+- Enhancement: Plugins can push state out to the Caching Service for high availability storage via a improved storage API, available to dataservices as `context.storage`
+- Enhancement: Storage API V2 added which has parameters to specify whether plugin cache and state should be stored local to a worker, in the cluster, or remote for high availability
+
 ## 1.21.0
 
 - Bugfix: Use hostname given by zowe config in order to avoid errors from the hostname certificate matching when accessing the app server through APIML
