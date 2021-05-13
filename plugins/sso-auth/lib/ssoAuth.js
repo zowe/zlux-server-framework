@@ -31,10 +31,19 @@ function doesApimlExist(serverConf) {
        so it is possible our auth logic will work for other agents, as long as they do SAF
 */
 function doesZssExist(serverConf) {
-  return (serverConf.agent !== undefined)
-    && (serverConf.agent.host !== undefined)
-    && (serverConf.agent.http !== undefined)
-    && (serverConf.agent.http.port !== undefined)
+   if (typeof serverConf.agent !== 'object') {
+    return false;
+   }
+   if (typeof serverConf.agent.host !== 'string') {
+     return false;
+   }
+   if (typeof serverConf.agent.https === 'object' && typeof serverConf.agent.https.port === 'number') {
+     return true;
+   }
+   if (typeof serverConf.agent.http === 'object' && typeof serverConf.agent.http.port === 'number') {
+     return true;
+   }
+   return false;
 }
 
 
@@ -78,8 +87,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canLogout": true,
     "canResetPassword": this.usingZss ? true : false,
     "proxyAuthorizations": true,
-    //TODO do we need to process proxy headers for both?
-    "processesProxyHeaders": this.usingZss ? true: false
+    "processesProxyHeaders": false
   };
 }
 
@@ -294,14 +302,6 @@ SsoAuthenticator.prototype = {
     if (this.usingZss && !this.usingSso) {
       this.zssHandler.addProxyAuthorizations(req1, req2Options, sessionState);
     }
-  },
-
-  processProxiedHeaders(req, headers, sessionState) {
-    if (this.usingZss) {
-      headers = this.zssHandler.processProxiedHeaders(req, headers, sessionState);
-    }
-    //TODO does apiml need this too?
-    return headers;
   }
 };
 

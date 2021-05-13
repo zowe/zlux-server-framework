@@ -13,8 +13,11 @@ const ipaddr = require('ipaddr.js');
 const url = require('url');
 const makeProfileNameForRequest = require('./safprofile').makeProfileNameForRequest;
 const DEFAULT_CLASS = "ZOWE";
+const ZSS_SESSION_TIMEOUT_HEADER = "session-expires-seconds";
 const DEFAULT_EXPIRATION_MS = 3600000 //hour;
 const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
+const COOKIE_NAME = 'jedHTTPSession';
+const COOKIE_NAME_LENGTH = COOKIE_NAME.length;
 
 class ZssHandler {
   constructor(pluginDef, pluginConf, serverConf, context) {
@@ -41,6 +44,7 @@ class ZssHandler {
         for(let i = 0; i < bypassUrls.length; i++){
           if(request.originalUrl.startsWith(bypassUrls[i])){
             result.authorized = true;
+            this.setCookieFromRequest(request, sessionState);
             return result;
           }
         }
@@ -51,6 +55,7 @@ class ZssHandler {
         request.username = sessionState.username;
         if (options.bypassAuthorizatonCheck) {
           result.authorized = true;
+          this.setCookieFromRequest(request, sessionState);
           return result;
         }
         if (request.originalUrl.startsWith("/saf-auth")) {
@@ -61,6 +66,9 @@ class ZssHandler {
           // 2. They can run the request agains the ZSS host itself. The firewall
           //    would allow that. So, simply go back to item 1
           this._allowIfLoopback(request, result);
+          if (result.authorized === true) {
+            this.setCookieFromRequest(request, sessionState);
+          }
           return result;
         }
         const resourceName = this._makeProfileName(request.originalUrl, 
@@ -72,6 +80,7 @@ class ZssHandler {
                    `Allowing ${sessionState.username} access to ${resourceName} ` +
                    'unconditinally');
           result.authorized = true;
+          this.setCookieFromRequest(request, sessionState);
           return result;
         }
         const httpResponse = yield this._callAgent(request.zluxData, 
@@ -95,13 +104,12 @@ class ZssHandler {
       delete sessionState.zssUsername;
       let options = {
         method: 'GET',
-        headers: {'cookie': sessionState.zssCookies+''}
+        headers: {'cookie': `${COOKIE_NAME}=${request.cookies[COOKIE_NAME]}`}
       };
-      delete sessionState.zssCookies;
       request.zluxData.webApp.callRootService("logout", options).then((response) => {
         //did logout or already logged out
         if (response.statusCode === 200 || response.statusCode === 401) {
-          resolve({ success: true });
+          resolve({ success: true, cookies: this.deleteClientCookie()});
         } else {
           resolve({ success: false, reason: response.statusCode });
         }
@@ -131,7 +139,19 @@ class ZssHandler {
   }
   
   cleanupSession(sessionState) {
+    delete sessionState.zssUsername;
+    //TODO zssCookies probably isnt needed anymore as they are sent to client, but continuing to manage it in case extenders were using it somehow
     delete sessionState.zssCookies;
+  }
+
+  deleteClientCookie() {
+    return [
+      {name:COOKIE_NAME,
+       value:'non-token',
+       options: {httpOnly: true,
+                 secure: true,
+                 expires: new Date(1)}}
+    ]
   }
 
   refreshStatus(request, sessionState) {
@@ -144,13 +164,17 @@ class ZssHandler {
 
   _authenticateOrRefresh(request, sessionState, isRefresh) {
     return new Promise((resolve, reject) => {
-      if (isRefresh && !sessionState.zssCookies) {
+      let clientCookie;
+      if (request.cookies) {
+        clientCookie = request.cookies[COOKIE_NAME];
+      }
+      if (isRefresh && !clientCookie) {
         resolve({success: false, error: {message: 'No cookie given for refresh or check'}});
         return;
       }
       let options = isRefresh ? {
         method: 'GET',
-        headers: {'cookie': sessionState.zssCookies}
+        headers: {'cookie': `${COOKIE_NAME}=${clientCookie}`}
       } : {
         method: 'POST',
         body: request.body
@@ -159,28 +183,33 @@ class ZssHandler {
         this.logger.debug(`Login rc=`,response.statusCode);
         if (response.statusCode == HTTP_STATUS_PRECONDITION_REQUIRED) {
           sessionState.authenticated = false;
-          delete sessionState.zssUsername;
-          delete sessionState.zssCookies;
-          resolve({ success: false, reason: 'Expired Password'});
+          this.cleanupSession();
+          resolve({ success: false, reason: 'Expired Password', cookies: this.deleteClientCookie()});
         }
-        let zssCookie;
+        let serverCookie, cookieValue;
         if (typeof response.headers['set-cookie'] === 'object') {
           for (const cookie of response.headers['set-cookie']) {
             const content = cookie.split(';')[0];
-            //TODO proper manage cookie expiration
-            if (content.indexOf('jedHTTPSession') >= 0) {
-              zssCookie = content;
+            let index = content.indexOf(COOKIE_NAME);
+            if (index >= 0) {
+              serverCookie = content;
+              cookieValue = content.substring(index+1+COOKIE_NAME_LENGTH);
             }
           }
         }
-        if (zssCookie) {
+        if (serverCookie) {
           if (!isRefresh) {
             sessionState.username = request.body.username.toUpperCase();
           }
           //intended to be known as result of network call
-          sessionState.zssCookies = zssCookie;
-          resolve({ success: true, username: sessionState.username,
-                    expms: DEFAULT_EXPIRATION_MS})
+          sessionState.zssCookies = serverCookie;
+          let expiresSec = response.headers[ZSS_SESSION_TIMEOUT_HEADER];
+          let expiresMs = DEFAULT_EXPIRATION_MS;
+          if (expiresSec) {
+            expiresMs = expiresSec == -1 ? expiresSec : Number(expiresSec)*1000;
+          }
+          resolve({ success: true, username: sessionState.username, expms: expiresMs,
+                    cookies: [{name:COOKIE_NAME, value:cookieValue, options: {httpOnly: true, secure: true, encode: String}}]});
         } else {
           let res = { success: false, error: {message: `ZSS ${response.statusCode} ${response.statusMessage}`}};
           if (response.statusCode === 500) {
@@ -195,15 +224,17 @@ class ZssHandler {
       });
     });
   }
+  
+  setCookieFromRequest(req, sessionState) {
+    if (req.cookies && req.cookies[COOKIE_NAME]) {
+      sessionState.zssCookies = `${COOKIE_NAME}=${req.cookies[COOKIE_NAME]}`;
+    }
+  }
 
   addProxyAuthorizations(req1, req2Options, sessionState) {
-    if (req1.cookies) {
-      delete req1.cookies['jedHTTPSession'];
+    if (req1.cookies && req1.cookies[COOKIE_NAME]) {
+      req2Options.headers['cookie'] = req1.headers['cookie'];
     }
-    if (!sessionState.zssCookies) {
-      return;
-    }
-    req2Options.headers['cookie'] = sessionState.zssCookies;
   }
 
   passwordReset(request, sessionState) {
@@ -223,25 +254,6 @@ class ZssHandler {
       });
     });
   }
-
-  processProxiedHeaders(req, headers, sessionState) {
-    let cookies = headers['set-cookie'];
-    if (cookies) {
-      let modifiedCookies = [];
-      for (let i = 0; i < cookies.length; i++) {
-        if (cookies[i].startsWith('jedHTTPSession')) {
-          let zssCookie = cookies[i];
-          let semiIndex = zssCookie.indexOf(';');
-          sessionState.zssCookies = semiIndex != -1 ? zssCookie.substring(0,semiIndex) : zssCookie;
-          
-        } else {
-          modifiedCookies.push(cookies[i]);
-        }
-      }
-      headers['set-cookie']=modifiedCookies;
-    }
-    return headers;
-  }  
   
   _allowIfLoopback(request, result) {
     const requestIP = ipaddr.process(request.ip);
