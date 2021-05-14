@@ -12,12 +12,12 @@ info:
   version: "1.0.0"
   title: "Security Management API"
 host: "localhost"
-basePath: "/security-mgmt"
+basePath: /
 schemes:
   - "https"
   - "http"
 paths:
-  /user-profiles:
+  /security-mgmt/user-profiles:
     get:
       summary: "Retrieve a list of user profiles"
       description: ""
@@ -58,7 +58,7 @@ paths:
             $ref: "#/definitions/ZoweError"
         501:
           description: "Unsupported request"
-  '/classes/{className}/profiles':
+  '/security-mgmt/classes/{className}/profiles':
     get:
       summary: "Retrieve a list of profiles in a class"
       description: ""
@@ -104,7 +104,7 @@ paths:
             $ref: "#/definitions/ZoweError"
         501:
           description: "Unsupported request"
-  /classes/{className}/profiles/{profileName}:
+  /security-mgmt/classes/{className}/profiles/{profileName}:
     post:
       summary: "Add a new profile to a class"
       description: ""
@@ -195,7 +195,7 @@ paths:
           description: "Internal MXM error"
           schema:
             $ref: "#/definitions/ZoweError"
-  /classes/{className}/profiles/{profileName}/access-list:
+  /security-mgmt/classes/{className}/profiles/{profileName}/access-list:
     get:
       summary: "Retrieve the access list of a profile in a specific class"
       description: ""
@@ -231,7 +231,7 @@ paths:
             $ref: "#/definitions/ZoweError"
         501:
           description: "Unsupported request"
-  /classes/{className}/profiles/{profileName}/access-list/{userId}:
+  /security-mgmt/classes/{className}/profiles/{profileName}/access-list/{userId}:
     put:
       summary: "Add/update an access list entry (grant a user access to a profile)"
       description: ""
@@ -336,7 +336,7 @@ paths:
           description: "Internal MXM error"
           schema:
             $ref: "#/definitions/ZoweError"
-  '/groups':
+  '/security-mgmt/groups':
     get:
       summary: "Retrieve a list of groups"
       description: ""
@@ -377,7 +377,7 @@ paths:
             $ref: "#/definitions/ZoweError"
         501:
           description: "Unsupported request"
-  /groups/{groupName}:
+  /security-mgmt/groups/{groupName}:
     post:
       summary: "Add a new group"
       description: ""
@@ -460,7 +460,7 @@ paths:
           description: "Internal MXM error"
           schema:
             $ref: "#/definitions/ZoweError"
-  /groups/{groupName}/access-list:
+  /security-mgmt/groups/{groupName}/access-list:
     get:
       summary: "Retrieve the access list of a group"
       description: ""
@@ -491,7 +491,7 @@ paths:
             $ref: "#/definitions/ZoweError"
         501:
           description: "Unsupported request"
-  /groups/{groupName}/access-list/{userId}:
+  /security-mgmt/groups/{groupName}/access-list/{userId}:
     put:
       summary: "Add/update an access list entry (connect a user to a group)"
       description: ""
@@ -585,8 +585,6 @@ paths:
 definitions:
   ProfileAccessEntry:
     type: "object"
-    required:
-      - "accessType"
     properties:
       accesType:
         type: "string"
@@ -680,8 +678,6 @@ definitions:
           accessType: "UPDATE"
   GroupAccessEntry:
     type: "object"
-    required:
-      - "accessType"
     properties:
       accesType:
         type: "string"
