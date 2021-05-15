@@ -5,35 +5,31 @@
   "pluginType": "application",
   "dataServices": [
     {
-      "type": "router",
+      "type": "external",
       "name": "fileapi",
-      "filename": "helloWorld.js",
-      "routerFactory": "helloWorldRouter",
-      "dependenciesIncluded": true,
-      "initializerLookupMethod": "external",
+      "host": "agent",
+      "port": "8542",
+      "urlPrefix": "/",
+      "isHttps": true,
       "version": "1.0.0"
     },
     {
-      "type": "router",
+      "type": "external",
       "name": "security-mgmt-api",
-      "filename": "helloWorld.js",
-      "routerFactory": "helloWorldRouter",
-      "dependenciesIncluded": true,
-      "initializerLookupMethod": "external",
+      "host": "agent",
+      "port": "8542",
+      "urlPrefix": "/",
+      "isHttps": true,
       "version": "1.0.0"
     },
     {
-      "type": "router",
+      "type": "external",
       "name": "server-plugins-api",
-      "filename": "helloWorld.js",
-      "routerFactory": "helloWorldRouter",
-      "dependenciesIncluded": true,
-      "initializerLookupMethod": "external",
+      "host": "agent",
+      "port": "8542",
+      "urlPrefix": "/",
+      "isHttps": true,
       "version": "1.0.0"
     }
-  ],
-  "swagger": {
-    "host": "agent",
-    "basePath": "/"
-  }
+  ]
 }
