@@ -13,6 +13,7 @@ const expect = chai.expect;
 const pluginStorage = require('../../lib/pluginStorage');
 const apimlStorage = require('../../lib/apimlStorage');
 const fs = require('fs');
+const utilLog = require('../../lib/util').loggers.utilLogger;
 
 describe('APIML Storage via Unified interface', function () {
   let storage = null;
@@ -36,7 +37,7 @@ describe('APIML Storage via Unified interface', function () {
         }
       };
       apimlStorage.configure(settings);
-      storage = pluginStorage.PluginStorageFactory(pluginId);
+      storage = pluginStorage.PluginStorageFactory(pluginId, utilLog);
     } else {
       console.log(`Required environment variables not found. Set these env vars to run tests:`);
       console.log(`  export GATEWAY_HOST=<gateway-host>`);
