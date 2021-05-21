@@ -9,6 +9,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Enhancement: Storage API V2 added which has parameters to specify whether plugin cache and state should be stored local to a worker, in the cluster, or remote for high availability
 - Enhancement: Change missing swagger warning message to debug as it is a warning for developers, not for end users.
 - Enhancement: Decrease verbosity and duplication of startup logs. Log messages omitted have been moved to debug messaging.
+- Bugfix: Removed warning ZWED0144W about failure to read keyrings by having terminal proxy read the tls options loaded by the server instead of loading twice
 
 ## 1.21.0
 
