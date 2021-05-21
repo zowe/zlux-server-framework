@@ -47,6 +47,97 @@ paths:
         506:
           description: "Set dataserviceAuthentication.rbac to true in server configuration"
           
+  /server/agent:
+    get:
+      tags:
+      - "server"
+      summary: "Get the agent server (often ZSS server)"
+      description: "Get the agent server (often ZSS server)"
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Success"
+        401:
+          description: "Unauthorized"
+        506:
+          description: "Set dataserviceAuthentication.rbac to true in server configuration"
+          
+  /server/agent/config:
+    get:
+      tags:
+      - "server"
+      summary: "Get the config of the agent"
+      description: "Get the config of the agent"
+
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/agentConfigDefinition"
+        401:
+          description: "Unauthorized"
+        506:
+          description: "Set dataserviceAuthentication.rbac to true in server configuration"
+          
+  /server/agent/log:
+    get:
+      tags:
+      - "server"
+      summary: "Get the log of the agent"
+      description: "Get the log of the agent"
+
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Success"
+        401:
+          description: "Unauthorized"
+        506:
+          description: "Set dataserviceAuthentication.rbac to true in server configuration"
+          
+  /server/agent/logLevels:
+    get:
+      tags:
+      - "server"
+      summary: "Get the log of the agent"
+      description: "Get the log of the agent"
+
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/logLevelDefinition"
+        401:
+          description: "Unauthorized"
+        506:
+          description: "Set dataserviceAuthentication.rbac to true in server configuration"
+          
+  /server/agent/environment:
+    get:
+      tags:
+      - "server"
+      summary: "Get the log of the agent"
+      description: "Get the log of the agent"
+
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Success"
+          schema:
+            $ref: "#/definitions/agentEnvDefinition"
+        401:
+          description: "Unauthorized"
+        506:
+          description: "Set dataserviceAuthentication.rbac to true in server configuration"
+          
+
   /server/config:
     get:
       tags:
@@ -370,7 +461,47 @@ definitions:
         type: "string"
       nodeRelease:
         type: "object"
-               
+        
+  agentEnvDefinition:
+    type: "object"
+    properties:
+      timestamp:
+        type: "string"
+      logDirectory:
+        type: "string"
+      agentName:
+        type: "string"
+      agentVersion:
+        type: "string"
+      arch:
+        type: "string"
+      osRelease:
+        type: "string"
+      osVersion:
+        type: "string"
+      hardwareIdentifier:
+        type: "string"
+      hostname:
+        type: "string"
+      nodename:
+        type: "string"
+      userEnvironment:
+        type: "object"
+      demandPagingRate:
+        type: "number"
+      stdCP_CPU_Util:
+        type: "number"
+      stdCP_MVS_SRM_CPU_Util:
+        type: "number"
+      ZAAP_CPU_Util:
+        type: "number"
+      ZIIP_CPU_Util:
+        type: "number"
+      PID:
+        type: "number"
+      PPID:
+        type: "number"
+        
   logLevelDefinition:
     type: "object"
     properties:
@@ -391,6 +522,7 @@ definitions:
               type: "string"
             type:
               type: "string"
+      
             
   serverConfigDefinition:
     type: "object"
@@ -483,7 +615,99 @@ definitions:
             type: "string"
           logLevels:
             type: "object"
-                        
+            
+  agentConfigDefinition:
+    type: "object"
+    properties:
+      options:
+        type: "object"
+        properties:
+          node:
+            type: "object"
+            properties:
+              https:
+                type: "object"
+                properties:
+                  ipAddresses:
+                    type: "array"
+                    items:
+                      type: "string"
+                  port:
+                    type: "number"
+                  keys:
+                    type: "array"
+                    items:
+                      type: "string"
+                  certificates:
+                    type: "array"
+                    items:
+                      type: "string"
+                  certificateAuthorities:
+                    type: "array"
+                    items:
+                      type: "string"
+                  enabled:
+                    type: "boolean"
+              mediationLayer:
+                type: "object"
+                properties:
+                  server:
+                    type: "object"
+                    properties:
+                      hostname:
+                        type: "string"
+                      port:
+                        type: "number"
+                      isHttps:
+                        type: boolean
+                  enabled:
+                    type: boolean
+              childProcesses:
+                type: "object"
+          agent:
+            type: "object"
+            properties:
+              host:
+                type: "string"
+              http:
+                type: "object"
+                properties:
+                  ipAddresses:
+                    type: "array"
+                    items:
+                      type: "string"
+                  port:
+                    type: "number"
+          rootDir:
+            type: "string"
+          productDir:
+            type: "string"
+          siteDir: 
+            type: "string"
+          instanceDir:
+            type: "string"
+          groupsDir:
+            type: "string"
+          usersDir:
+            type: "string"
+          pluginsDir:
+            type: "string"
+          dataserviceAuthentication:
+            type: "object"
+            properties:
+              defaultAthentication:
+                type: "string"
+              rbac:
+                type: boolean
+              implementationDefaults:
+                type: "object"
+          zssPort:
+            type: "number"
+          logLanguage:
+            type: "string"
+          logLevels:
+            type: "object"
+            
   allowedConfigChangesDefinition:
     type: "object"
     properties:
