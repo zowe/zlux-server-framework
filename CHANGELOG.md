@@ -7,6 +7,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 - Enhancement: Plugins can push state out to the Caching Service for high availability storage via a improved storage API, available to dataservices as `context.storage`
 - Enhancement: Storage API V2 added which has parameters to specify whether plugin cache and state should be stored local to a worker, in the cluster, or remote for high availability
+- Bugfix: Removed warning ZWED0144W about failure to read keyrings by having terminal proxy read the tls options loaded by the server instead of loading twice
 
 ## 1.21.0
 
