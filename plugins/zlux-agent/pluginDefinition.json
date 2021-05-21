@@ -24,7 +24,7 @@
     },
     {
       "type": "external",
-      "name": "server-plugins-api",
+      "name": "agent-plugins-api",
       "host": "agent",
       "port": "8542",
       "urlPrefix": "/",
