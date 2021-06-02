@@ -1,0 +1,35 @@
+{
+  "identifier": "org.zowe.zlux.agent",
+  "apiVersion": "1.0.0",
+  "pluginVersion": "1.0.0",
+  "pluginType": "application",
+  "dataServices": [
+    {
+      "type": "external",
+      "name": "fileapi",
+      "host": "agent",
+      "port": "8542",
+      "urlPrefix": "/",
+      "isHttps": true,
+      "version": "1.0.0"
+    },
+    {
+      "type": "external",
+      "name": "security-mgmt-api",
+      "host": "agent",
+      "port": "8542",
+      "urlPrefix": "/",
+      "isHttps": true,
+      "version": "1.0.0"
+    },
+    {
+      "type": "external",
+      "name": "agent-plugins-api",
+      "host": "agent",
+      "port": "8542",
+      "urlPrefix": "/",
+      "isHttps": true,
+      "version": "1.0.0"
+    }
+  ]
+}
