@@ -185,6 +185,7 @@
   "ZWED0298I": "(%s) is a supported endpoint for %s to install (%s).",
   "ZWED0299I": "Loading remote iframe app %s located at %s",
   "ZWED0300I": "APIML Storage configured",
+  "ZWED0301I": "Found %s in config for '%s'",
 
   "ZWED0003W":"%s: Session security call %s failed for auth handler %s. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
@@ -301,6 +302,7 @@
   "ZWED0174W":"%s could not verify (%s) as a supported platform to install (%s). Proceeding anyway...",
   "ZWED0175W":"%s could not verify (%s) as a supported architecture to install (%s). Proceeding anyway...",
   "ZWED0176W":"Failed to load client cert/key pair for Caching Service",
+  "ZWED0177W":"Unable to load %s for '%s' into config",
 
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
