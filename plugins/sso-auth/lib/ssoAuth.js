@@ -87,7 +87,8 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canLogout": true,
     "canResetPassword": this.usingZss ? true : false,
     "proxyAuthorizations": true,
-    "processesProxyHeaders": false
+    "processesProxyHeaders": false,
+    "haCompatible": this.usingSso,
   };
 }
 
@@ -302,6 +303,13 @@ SsoAuthenticator.prototype = {
     if (this.usingZss && !this.usingSso) {
       this.zssHandler.addProxyAuthorizations(req1, req2Options, sessionState);
     }
+  },
+
+  restoreSessionState(request, sessionState) {
+    if (this.usingSso) {
+      return this.apimlHandler.restoreSessionState(request, sessionState);
+    }
+    return Promise.resolve();
   }
 };
 
