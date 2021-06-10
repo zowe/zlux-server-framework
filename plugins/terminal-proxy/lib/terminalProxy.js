@@ -671,30 +671,13 @@ var openTerminalConnectionsVT = 0;
 var openTerminalConnections3270 = 0;
 var openTerminalConnections5250 = 0;
 
-function createSecurityObjects(httpsConfig,logger) {
-  var readFilesToArray = function(fileList) {
-    var contentArray = [];
-    fileList.forEach(function(filePath) {
-      try {
-        contentArray.push(fs.readFileSync(filePath));
-      } catch (e) {
-        logger.warn('ZWED0144W', filePath, e.message); //logger.warn('Error when reading file='+filePath+'. Error='+e.message);
-      }
-    });
-    if (contentArray.length > 0) {
-      return contentArray;
-    }
-    else {
-      return null;
-    }
-  };
+function createSecurityObjects(tlsOptions) {
   TerminalWebsocketProxy.securityObjects = {};
-  if (httpsConfig.certificateAuthorities) {
-    logger.debug('ZWED0285I'); //logger.debug('I see and will read in the CAs');
-    TerminalWebsocketProxy.securityObjects.ca = readFilesToArray(httpsConfig.certificateAuthorities);
+  if (tlsOptions.ca) {
+    TerminalWebsocketProxy.securityObjects.ca = tlsOptions.ca;
   }
-  if (httpsConfig.certificateRevocationLists) {
-    TerminalWebsocketProxy.securityObjects.crl = readFilesToArray(httpsConfig.certificateRevocationLists);
+  if (tlsOptions.crl) {
+    TerminalWebsocketProxy.securityObjects.crl = tlsOptions.crl;
   };
 }
 
@@ -762,9 +745,8 @@ exports.tn3270WebsocketRouter = function(context) {
   */
   let handlers = scanAndImportHandlers(context.logger);
   return new Promise(function(resolve, reject) {
-    let securityConfig = context.plugin.server.config.user.node.https;
-    if (securityConfig && !TerminalWebsocketProxy.securityObjects) {
-      createSecurityObjects(securityConfig,context.logger);
+    if (!TerminalWebsocketProxy.securityObjects) {
+      createSecurityObjects(context.tlsOptions);
     }
 
     let router = express.Router();
@@ -790,9 +772,8 @@ exports.tn3270WebsocketRouter = function(context) {
 exports.tn5250WebsocketRouter = function(context) {
   let handlers = scanAndImportHandlers(context.logger);
   return new Promise(function(resolve, reject) {
-    let securityConfig = context.plugin.server.config.user.node.https;
-    if (securityConfig && !TerminalWebsocketProxy.securityObjects) {
-      createSecurityObjects(securityConfig,context.logger);
+    if (!TerminalWebsocketProxy.securityObjects) {
+      createSecurityObjects(context.tlsOptions);
     }
 
     let router = express.Router();
@@ -816,9 +797,8 @@ exports.vtWebsocketRouter = function(context) {
   let handlers = scanAndImportHandlers(context.logger);
   ssh.setLogger(context.logger);
   return new Promise(function(resolve, reject) {
-    let securityConfig = context.plugin.server.config.user.node.https;
-    if (securityConfig && !TerminalWebsocketProxy.securityObjects) {
-      createSecurityObjects(securityConfig,context.logger);
+    if (!TerminalWebsocketProxy.securityObjects) {
+      createSecurityObjects(context.tlsOptions);
     }
 
     let router = express.Router();
