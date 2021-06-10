@@ -6,6 +6,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 1.23.0
 
 - Bugfix: Removed warning ZWED0144W about failure to read keyrings by having terminal proxy read the tls options loaded by the server instead of loading twice
+- Bugfix: Dynamic plugins could not be loaded due to parameter mismatch
 
 ## 1.22.0
 
