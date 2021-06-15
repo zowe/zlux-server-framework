@@ -89,6 +89,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "proxyAuthorizations": true,
     "processesProxyHeaders": false,
     "haCompatible": this.usingSso,
+    "canGenerateHaSessionId": this.usingSso,
   };
 }
 
@@ -310,6 +311,14 @@ SsoAuthenticator.prototype = {
       return this.apimlHandler.restoreSessionState(request, sessionState);
     }
     return Promise.resolve();
+  },
+
+  generateHaSessionId (request) {
+    const TOKEN_NAME = 'apimlAuthenticationToken';
+    if (request.cookies && request.cookies[TOKEN_NAME]) {
+      return request.cookies[TOKEN_NAME];
+    }
+    return;
   }
 };
 
