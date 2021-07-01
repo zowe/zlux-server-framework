@@ -8,6 +8,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Bugfix: Removed warning ZWED0144W about failure to read keyrings by having terminal proxy read the tls options loaded by the server instead of loading twice
 - Bugfix: Dynamic plugins could not be loaded due to parameter mismatch
 - Enhancement: Any HA incompatible security plugins are disabled if Zowe runs in HA mode.
+- Enhancement: Updated proxy utility to treat PATCH similarly to PUT and POST
 - Cleanup: Removed 'x-powered-by' header
 
 ## 1.22.0
