@@ -91,6 +91,8 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "haCompatible": this.usingSso,
     "canGenerateHaSessionId": this.usingSso,
   };
+
+  this.logger.info(`SSO ${this.usingSso ? 'enabled' : 'disabled'}`);
 }
 
 SsoAuthenticator.prototype = {
