@@ -150,6 +150,7 @@ class ZssHandler {
        value:'non-token',
        options: {httpOnly: true,
                  secure: true,
+                 sameSite: true,
                  expires: new Date(1)}}
     ]
   }
@@ -209,7 +210,7 @@ class ZssHandler {
             expiresMs = expiresSec == -1 ? expiresSec : Number(expiresSec)*1000;
           }
           resolve({ success: true, username: sessionState.username, expms: expiresMs,
-                    cookies: [{name:COOKIE_NAME, value:cookieValue, options: {httpOnly: true, secure: true, encode: String}}]});
+                    cookies: [{name:COOKIE_NAME, value:cookieValue, options: {httpOnly: true, secure: true, sameSite: true, encode: String}}]});
         } else {
           let res = { success: false, error: {message: `ZSS ${response.statusCode} ${response.statusMessage}`}};
           if (response.statusCode === 500) {
