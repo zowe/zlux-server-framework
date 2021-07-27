@@ -390,6 +390,28 @@ class ApimlHandler {
       req2Options.headers['Authorization'] = 'Bearer '+sessionState.apimlToken;
     }
   }
+
+  restoreSessionState(request, sessionState) {
+    return new Promise((resolve, _reject) => {
+      const token = request.cookies[TOKEN_NAME];
+      if (!token) {
+        sessionState.authenticated = false;
+        resolve({success: false});
+      }
+      this.queryToken(token).then(data => {
+        this.logger.debug(`received info using token ${JSON.stringify(data, null, 2)}`);
+        const { userId: username, expiration: expms, expired} = data;
+        this.setState(token, username, sessionState);
+        sessionState.authenticated = !expired;
+        this.logger.debug(`state updated ${JSON.stringify(sessionState, null, 2)}`);
+        resolve({success: true, expms});
+      })
+      .catch(e => {
+        sessionState.authenticated = false;
+        resolve({success: false});
+      });
+    });
+  }
 }
 
 module.exports = function(pluginDef, pluginConf, serverConf, context) {
