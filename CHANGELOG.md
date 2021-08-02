@@ -3,6 +3,12 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.25.0
+
+- Enhancement: Improved callRootService when targeting agents such as ZSS to issue the request direct to the destination rather than using an additional loopback request to the app-server first. This should improve performance, reduce the need for the app-server being a client of itself, and allow for more request options when calling the agent.
+- Enhancement: Allow timeout parameter to be specified in a callService or callRootService command, such as when needing a long timeout to request an agent response.
+- Enhancement: Removed need for app-server to be a client of itself when using the callService API, by adding the option for requests to this API to be executed internal to app-server. This option is very compatible with pre-existing use of callService but is disabled by default to avoid disruption. You can enable it by setting the server configuration property `node.internalRouting=true`
+
 ## 1.24.0
 
 - Bugfix: Fixed issue where server could not bind to a hostname value for node.https.ipAddresses
