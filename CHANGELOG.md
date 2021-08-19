@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.24.0
+
+- Enhancement: Add ciphers for use with TLS 1.3
+
 ## 1.23.0
 
 - Bugfix: Removed warning ZWED0144W about failure to read keyrings by having terminal proxy read the tls options loaded by the server instead of loading twice
