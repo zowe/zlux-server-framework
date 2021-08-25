@@ -5,6 +5,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 1.24.0
 
+- Bugfix: Fixed issue where server could not bind to a hostname value for node.https.ipAddresses
+- Bugfix: Fixed issue where if the server started slowly, a timeout at cluster storage setup could be encountered.
 - Enhancement: Add ciphers for use with TLS 1.3
 
 ## 1.23.0
