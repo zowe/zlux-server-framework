@@ -7,6 +7,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 - Bugfix: Fixed issue where server could not bind to a hostname value for node.https.ipAddresses
 - Bugfix: Fixed issue where if the server started slowly, a timeout at cluster storage setup could be encountered.
+- Bugfix: Fix no agent section causing server error (makes trivial-auth work)
 - Enhancement: Add ciphers for use with TLS 1.3
 - Enhancement: sso-auth plugin now sends error.body containing a server's error response so that it can be shown in browser if appropriate
 
