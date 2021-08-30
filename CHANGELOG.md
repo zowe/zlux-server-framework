@@ -10,6 +10,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Bugfix: Fix no agent section causing server error (makes trivial-auth work)
 - Enhancement: Add ciphers for use with TLS 1.3
 - Enhancement: sso-auth plugin now sends error.body containing a server's error response so that it can be shown in browser if appropriate
+- Enhancement: Version numbers of plugins are shown when loading, even if loading failed.
 
 ## 1.23.0
 
