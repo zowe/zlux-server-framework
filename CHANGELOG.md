@@ -3,6 +3,15 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.24.0
+
+- Bugfix: Fixed issue where server could not bind to a hostname value for node.https.ipAddresses
+- Bugfix: Fixed issue where if the server started slowly, a timeout at cluster storage setup could be encountered.
+- Bugfix: Fix no agent section causing server error (makes trivial-auth work)
+- Enhancement: Add ciphers for use with TLS 1.3
+- Enhancement: sso-auth plugin now sends error.body containing a server's error response so that it can be shown in browser if appropriate
+- Enhancement: Version numbers of plugins are shown when loading, even if loading failed.
+
 ## 1.23.0
 
 - Bugfix: Removed warning ZWED0144W about failure to read keyrings by having terminal proxy read the tls options loaded by the server instead of loading twice
