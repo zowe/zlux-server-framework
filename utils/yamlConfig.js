@@ -1,10 +1,21 @@
+
+/*
+  This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License v2.0 which accompanies
+  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+  
+  SPDX-License-Identifier: EPL-2.0
+  
+  Copyright Contributors to the Zowe Project.
+*/
+
 const fs = require('fs');
 const path = require('path');
 const _ = require('lodash');
 const YAWN = require('yawn-yaml/cjs');
 const mergeUtils = require('./mergeUtils');
 
-function normalize(key) {
+function encodeKey(key) {
   return key.replace(/[^a-zA-Z0-9]/g, char => '_x' + char.charCodeAt(0).toString(16));
 }
 
@@ -16,8 +27,8 @@ function flattenObject(obj, prefix) {
 
   function flattenObject2(obj, path, result) {
     for (const key of Object.keys(obj)) {
-      const normalizedKey = normalize(key);
-      const newPath = path ? `${path}_${normalizedKey}` : normalizedKey;
+      const encodedKey = encodeKey(key);
+      const newPath = path ? `${path}_${encodedKey}` : encodedKey;
       const val = obj[key];
       if (typeof val === 'object') {
         flattenObject2(val, newPath, result);
@@ -30,13 +41,13 @@ function flattenObject(obj, prefix) {
   }
 }
 
-function convert (obj) {
-  return flattenObject(obj, 'ZWED');
+function convertConfigToEnvObj(config) {
+  return flattenObject(config, 'ZWED');
 }
 
-convertToSource = function convertToSource (obj) {
-  const env = convert(obj);
-  return Object.keys(env).map(key => `export ${key}="${env[key]}"`).join('\n');
+function convertConfigToEnvSource(config) {
+  const envObj = convertConfigToEnvObj(config);
+  return Object.keys(envObj).map(key => `export ${key}="${envObj[key]}"`).join('\n');
 }
 
 function getHaInstanceId() {
@@ -62,21 +73,11 @@ function omitCommonConfigKeys(config) {
 function getComponentConfig(yawn, component, haInstanceId) {
   const componentLevelConfig = _.get(yawn.json, ['components', component]);
   const instanceLevelConfig = _.get(yawn.json, ['haInstances', haInstanceId, 'components', component]);
-  return mergeUtils.deepAssign(componentLevelConfig, instanceLevelConfig ? instanceLevelConfig : {});
-}
-
-function getZssConfig(yawn, haInstanceId) {
-  const config = getComponentConfig(yawn, 'zss', haInstanceId);
+  const config = mergeUtils.deepAssign(componentLevelConfig, instanceLevelConfig ? instanceLevelConfig : {});
   return omitCommonConfigKeys(config);
 }
 
-function getAppServerConfig(yawn, haInstanceId) {
-  const config = getComponentConfig(yawn, 'app-server', haInstanceId);
-  return omitCommonConfigKeys(config);
-}
-
-function loadConfigs() {
-  const haInstanceId = getHaInstanceId();
+function loadZoweDotYaml() {
   const instanceDir = getInstanceDir();
   const zoweDotYamlFile = path.join(instanceDir, 'zowe.yaml');
   const instanceDotEnvFile = path.join(instanceDir, 'instance.env');
@@ -89,17 +90,7 @@ function loadConfigs() {
     return;
   }
   const yawn = parseZoweDotYaml(zoweDotYamlFile);
-  if (!yawn) {
-    return;
-  }
-  zssConfig = getZssConfig(yawn, haInstanceId);
-  appServerConfig = getAppServerConfig(yawn, haInstanceId);
-  if (zssConfig) {
-    zssEnvSource = convertToSource(zssConfig);
-  }
-  if (appServerConfig) {
-    appServerEnvSource = convertToSource(appServerConfig);
-  }
+  return yawn;
 }
 
 function parseZoweDotYaml(zoweDotYamlFile) {
@@ -112,26 +103,41 @@ function parseZoweDotYaml(zoweDotYamlFile) {
   return yawn;
 }
 
-let zssConfig;
-let appServerConfig;
-let zssEnvSource = '';
-let appServerEnvSource = '';
+const yawn = loadZoweDotYaml();
 
 exports.getAppServerConfig = function () {
+  if (!yawn) {
+    return;
+  }
+  const haInstanceId = getHaInstanceId();
+  const appServerConfig = getComponentConfig(yawn, 'app-server', haInstanceId);
   return appServerConfig;
 };
 
 exports.getZssConfig = function () {
+  if (!yawn) {
+    return;
+  }
+  const haInstanceId = getHaInstanceId();
+  const zssConfig = getComponentConfig(yawn, 'zss', haInstanceId);
   return zssConfig;
 }
 
-loadConfigs();
-
-if (require.main === module && process.argv.length == 3) {
+if (require.main === module && process.argv.length == 3 && typeof yawn === 'object') {
+  const haInstanceId = getHaInstanceId();
   const component = process.argv[2];
-  if (component === 'zss') {
-    console.log(zssEnvSource);
-  } else if (component === 'app-server') {
-    console.log(appServerEnvSource);
+  const config = getComponentConfig(yawn, component, haInstanceId);
+  if (config) {
+    console.log(convertConfigToEnvSource(config));
   }
 }
+
+/*
+  This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License v2.0 which accompanies
+  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+
+  SPDX-License-Identifier: EPL-2.0
+
+  Copyright Contributors to the Zowe Project.
+*/
