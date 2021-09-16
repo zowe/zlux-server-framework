@@ -184,7 +184,7 @@ class ZssHandler {
         this.logger.debug(`Login rc=`,response.statusCode);
         if (response.statusCode == HTTP_STATUS_PRECONDITION_REQUIRED) {
           sessionState.authenticated = false;
-          this.cleanupSession();
+          this.cleanupSession(sessionState);
           resolve({ success: false, reason: 'Expired Password', cookies: this.deleteClientCookie()});
         }
         let serverCookie, cookieValue;
