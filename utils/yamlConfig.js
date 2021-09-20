@@ -77,6 +77,19 @@ function getComponentConfig(yawn, component, haInstanceId) {
   return omitCommonConfigKeys(config);
 }
 
+function getYamlConfig(yawn, haInstanceId) {
+  const appServerConfig = getComponentConfig(yawn, 'app-server', haInstanceId);
+  const zssConfig = getComponentConfig(yawn, 'zss', haInstanceId);
+  if (zssConfig && appServerConfig) {
+    return mergeUtils.deepAssign(zssConfig, appServerConfig);
+  } else if (appServerConfig) {
+    return appServerConfig;
+  } else if (zssConfig) {
+    return zssConfig;
+  }
+  return undefined;
+}
+
 function loadZoweDotYaml() {
   const instanceDir = getInstanceDir();
   const zoweDotYamlFile = path.join(instanceDir, 'zowe.yaml');
@@ -103,30 +116,20 @@ function parseZoweDotYaml(zoweDotYamlFile) {
   return yawn;
 }
 
-const yawn = loadZoweDotYaml();
 
-exports.getAppServerConfig = function () {
+function getConfig() {
+  const yawn = loadZoweDotYaml();
   if (!yawn) {
     return;
   }
   const haInstanceId = getHaInstanceId();
-  const appServerConfig = getComponentConfig(yawn, 'app-server', haInstanceId);
-  return appServerConfig;
+  return getYamlConfig(yawn, haInstanceId);
 };
 
-exports.getZssConfig = function () {
-  if (!yawn) {
-    return;
-  }
-  const haInstanceId = getHaInstanceId();
-  const zssConfig = getComponentConfig(yawn, 'zss', haInstanceId);
-  return zssConfig;
-}
+exports.getConfig = getConfig;
 
-if (require.main === module && process.argv.length == 3 && typeof yawn === 'object') {
-  const haInstanceId = getHaInstanceId();
-  const component = process.argv[2];
-  const config = getComponentConfig(yawn, component, haInstanceId);
+if (require.main === module) {
+  const config = getConfig();
   if (config) {
     console.log(convertConfigToEnvSource(config));
   }
