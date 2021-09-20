@@ -19,19 +19,19 @@ function encodeKey(key) {
   return key.replace(/[^a-zA-Z0-9]/g, char => '_x' + char.charCodeAt(0).toString(16));
 }
 
-function flattenObject(obj, prefix) {
+function flattenEnvObject(obj, prefix) {
   const result = {};
   const path = prefix;
-  flattenObject2(obj, path, result);
+  flattenEnvObjectInternal(obj, path, result);
   return result;
 
-  function flattenObject2(obj, path, result) {
+  function flattenEnvObjectInternal(obj, path, result) {
     for (const key of Object.keys(obj)) {
       const encodedKey = encodeKey(key);
       const newPath = path ? `${path}_${encodedKey}` : encodedKey;
       const val = obj[key];
       if (typeof val === 'object') {
-        flattenObject2(val, newPath, result);
+        flattenEnvObjectInternal(val, newPath, result);
       } else if (Array.isArray(val)) {
         result[newPath] = val.join(',') + ',';
       } else {
@@ -42,7 +42,7 @@ function flattenObject(obj, prefix) {
 }
 
 function convertConfigToEnvObj(config) {
-  return flattenObject(config, 'ZWED');
+  return flattenEnvObject(config, 'ZWED');
 }
 
 function convertConfigToEnvSource(config) {
