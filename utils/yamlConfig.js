@@ -41,16 +41,16 @@ function flattenEnvObject(obj, prefix) {
   }
 }
 
-function convertConfigToEnvObj(config) {
-  return flattenEnvObject(config, 'ZWED');
+function convertConfigToEnvObj(config, prefix) {
+  return flattenEnvObject(config, prefix);
 }
 
-function convertConfigToEnvSource(config) {
-  const envObj = convertConfigToEnvObj(config);
+function convertConfigToEnvSource(config, prefix) {
+  const envObj = convertConfigToEnvObj(config, prefix);
   return Object.keys(envObj).map(key => `export ${key}="${envObj[key]}"`).join('\n');
 }
 
-function getHaInstanceId() {
+function getCurrentHaInstanceId() {
   return process.env['ZWELS_HA_INSTANCE_ID'];
 }
 
@@ -94,7 +94,7 @@ function getYamlConfig(zoweConfig, haInstanceId) {
   return mergedConfig;
 }
 
-function loadZoweDotYaml() {
+function getDefaultZoweDotYamlFile() {
   const instanceDir = getInstanceDir();
   const zoweDotYamlFile = path.join(instanceDir, 'zowe.yaml');
   const instanceDotEnvFile = path.join(instanceDir, 'instance.env');
@@ -104,6 +104,13 @@ function loadZoweDotYaml() {
   }
   if (!fs.existsSync(zoweDotYamlFile)) {
     // zowe.zoweConfig not found
+    return;
+  }
+  return zoweDotYamlFile;
+}
+
+function loadZoweDotYaml(zoweDotYamlFile) {
+  if (!zoweDotYamlFile) {
     return;
   }
   const zoweConfig = parseZoweDotYaml(zoweDotYamlFile);
@@ -121,21 +128,33 @@ function parseZoweDotYaml(zoweDotYamlFile) {
 }
 
 
-function getConfig() {
-  const zoweConfig = loadZoweDotYaml();
-  if (!zoweConfig) {
+function getConfig(zoweDotYamlFile, haInstanceId) {
+  const zoweConfig = loadZoweDotYaml(zoweDotYamlFile);
+  if (!zoweConfig || !haInstanceId) {
     return;
   }
-  const haInstanceId = getHaInstanceId();
   return getYamlConfig(zoweConfig, haInstanceId);
 };
 
 exports.getConfig = getConfig;
+exports.getDefaultZoweDotYamlFile = getDefaultZoweDotYamlFile;
+exports.getCurrentHaInstanceId = getCurrentHaInstanceId;
 
+// The module can be called directly like this:
+// node path/to/zlux-server-framework/utils/yamlConfig.js <path to zowe.yaml> <HA Instance Id> <Env Prefix>
+//
+// In this case the module converts the config into a set of `export` statements, e.g.
+// export PREFIX_node_https_enableTrace=true
+// ...
 if (require.main === module) {
-  const config = getConfig();
+  const args = process.argv;
+  const argCount = process.argv.length;
+  const zoweDotYamlFile = argCount > 2 ? args[2] : getDefaultZoweDotYamlFile();
+  const haInstanceId = argCount > 3 ? args[3] : getCurrentHaInstanceId();
+  const prefix = argCount > 4 ? args[4] : 'ZWED';
+  const config = getConfig(zoweDotYamlFile, haInstanceId);
   if (config) {
-    console.log(convertConfigToEnvSource(config));
+    console.log(convertConfigToEnvSource(config, prefix));
   }
 }
 
