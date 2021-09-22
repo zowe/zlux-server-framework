@@ -12,7 +12,7 @@
 const fs = require('fs');
 const path = require('path');
 const _ = require('lodash');
-const YAWN = require('yawn-yaml/cjs');
+const YAML = require('yaml');
 const mergeUtils = require('./mergeUtils');
 
 function encodeKey(key) {
@@ -70,16 +70,16 @@ function omitCommonConfigKeys(config) {
   return _.omit(config, commonConfigKeys);
 }
 
-function getComponentConfig(yawn, component, haInstanceId) {
-  const componentLevelConfig = _.get(yawn.json, ['components', component]);
-  const instanceLevelConfig = _.get(yawn.json, ['haInstances', haInstanceId, 'components', component]);
+function getComponentConfig(zoweConfig, component, haInstanceId) {
+  const componentLevelConfig = _.get(zoweConfig, ['components', component]);
+  const instanceLevelConfig = _.get(zoweConfig, ['haInstances', haInstanceId, 'components', component]);
   const config = mergeUtils.deepAssign(componentLevelConfig, instanceLevelConfig ? instanceLevelConfig : {});
   return omitCommonConfigKeys(config);
 }
 
-function getYamlConfig(yawn, haInstanceId) {
-  const appServerConfig = getComponentConfig(yawn, 'app-server', haInstanceId);
-  const zssConfig = getComponentConfig(yawn, 'zss', haInstanceId);
+function getYamlConfig(zoweConfig, haInstanceId) {
+  const appServerConfig = getComponentConfig(zoweConfig, 'app-server', haInstanceId);
+  const zssConfig = getComponentConfig(zoweConfig, 'zss', haInstanceId);
   if (zssConfig && appServerConfig) {
     return mergeUtils.deepAssign(zssConfig, appServerConfig);
   } else if (appServerConfig) {
@@ -99,31 +99,31 @@ function loadZoweDotYaml() {
     return;
   }
   if (!fs.existsSync(zoweDotYamlFile)) {
-    // zowe.yaml not found
+    // zowe.zoweConfig not found
     return;
   }
-  const yawn = parseZoweDotYaml(zoweDotYamlFile);
-  return yawn;
+  const zoweConfig = parseZoweDotYaml(zoweDotYamlFile);
+  return zoweConfig;
 }
 
 function parseZoweDotYaml(zoweDotYamlFile) {
-  let yawn;
+  let zoweConfig;
   try {
     const yamlText = fs.readFileSync(zoweDotYamlFile).toString();
-    yawn = new YAWN(yamlText);
+    zoweConfig = YAML.parse(yamlText);
   } catch (e) {
   }
-  return yawn;
+  return zoweConfig;
 }
 
 
 function getConfig() {
-  const yawn = loadZoweDotYaml();
-  if (!yawn) {
+  const zoweConfig = loadZoweDotYaml();
+  if (!zoweConfig) {
     return;
   }
   const haInstanceId = getHaInstanceId();
-  return getYamlConfig(yawn, haInstanceId);
+  return getYamlConfig(zoweConfig, haInstanceId);
 };
 
 exports.getConfig = getConfig;
