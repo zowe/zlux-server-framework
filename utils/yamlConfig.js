@@ -78,16 +78,20 @@ function getComponentConfig(zoweConfig, component, haInstanceId) {
 }
 
 function getYamlConfig(zoweConfig, haInstanceId) {
-  const appServerConfig = getComponentConfig(zoweConfig, 'app-server', haInstanceId);
-  const zssConfig = getComponentConfig(zoweConfig, 'zss', haInstanceId);
-  if (zssConfig && appServerConfig) {
-    return mergeUtils.deepAssign(zssConfig, appServerConfig);
-  } else if (appServerConfig) {
-    return appServerConfig;
-  } else if (zssConfig) {
-    return zssConfig;
+  let mergedConfig;
+  const componentOrder = ['zss', 'app-server']; // from lower to higher priority
+  for (const comp of componentOrder) {
+    const compConfig = getComponentConfig(zoweConfig, comp, haInstanceId);
+    if (!compConfig) {
+      continue;
+    }
+    if (typeof mergedConfig === 'object') {
+      mergedConfig = mergeUtils.deepAssign(mergedConfig, compConfig);
+    } else {
+      mergedConfig = compConfig;
+    }
   }
-  return undefined;
+  return mergedConfig;
 }
 
 function loadZoweDotYaml() {
