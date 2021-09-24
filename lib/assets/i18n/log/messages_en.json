@@ -305,6 +305,7 @@
   "ZWED0176W":"Failed to load client cert/key pair for Caching Service",
   "ZWED0177W":"Unable to load %s for '%s' into config",
   "ZWED0178W":"Skipping authentication plugin %s because it's not HA compatible",
+  "ZWED0179W":"Unable to retrieve the list of certificate authorities from the keyring=%s owner=%s Error: %s",
 
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
@@ -376,6 +377,5 @@
   "ZWED0154E":"RESERVED: (%s) is not a supported architecture for %s. Skipping (%s)... Supported: %s",
   "ZWED0155E":"RESERVED: (%s) is not a supported endpoint for %s. Skipping (%s)... Supported: %s",
   "ZWED0156E":"RESERVED: Could not register default plugins into app-server",
-  "ZWED0157E":"RESERVED: Could not register default plugin %s into app-server",
-  "ZWED0158E":"Unable to find the certificate list"
+  "ZWED0157E":"RESERVED: Could not register default plugin %s into app-server"
 }
