@@ -77,9 +77,8 @@ function getComponentConfig(zoweConfig, component, haInstanceId) {
   return omitCommonConfigKeys(config);
 }
 
-function getYamlConfig(zoweConfig, haInstanceId) {
+function getYamlConfig(zoweConfig, haInstanceId, componentOrder) {
   let mergedConfig;
-  const componentOrder = ['zss', 'app-server']; // from lower to higher priority
   for (const comp of componentOrder) {
     const compConfig = getComponentConfig(zoweConfig, comp, haInstanceId);
     if (!compConfig) {
@@ -128,12 +127,12 @@ function parseZoweDotYaml(zoweDotYamlFile) {
 }
 
 
-function getConfig(zoweDotYamlFile, haInstanceId) {
+function getConfig(zoweDotYamlFile, haInstanceId, componentOrder) {
   const zoweConfig = loadZoweDotYaml(zoweDotYamlFile);
-  if (!zoweConfig || !haInstanceId) {
+  if (!zoweConfig || !haInstanceId || !Array.isArray(componentOrder)) {
     return;
   }
-  return getYamlConfig(zoweConfig, haInstanceId);
+  return getYamlConfig(zoweConfig, haInstanceId, componentOrder);
 };
 
 exports.getConfig = getConfig;
@@ -141,21 +140,33 @@ exports.getDefaultZoweDotYamlFile = getDefaultZoweDotYamlFile;
 exports.getCurrentHaInstanceId = getCurrentHaInstanceId;
 
 // The module can be called directly like this:
-// node path/to/zlux-server-framework/utils/yamlConfig.js <path to zowe.yaml> <HA Instance Id> <Env Prefix>
+// node path/to/zlux-server-framework/utils/yamlConfig.js --config <path to zowe.yaml> --haInstanceId <HA Instance Id> --prefix <Env Prefix> --components '<comp1 comp2 etc>'
 //
 // In this case the module converts the config into a set of `export` statements, e.g.
 // export PREFIX_node_https_enableTrace=true
 // ...
 if (require.main === module) {
-  const args = process.argv;
-  const argCount = process.argv.length;
-  const zoweDotYamlFile = argCount > 2 ? args[2] : getDefaultZoweDotYamlFile();
-  const haInstanceId = argCount > 3 ? args[3] : getCurrentHaInstanceId();
-  const prefix = argCount > 4 ? args[4] : 'ZWED';
-  const config = getConfig(zoweDotYamlFile, haInstanceId);
+  const zoweDotYamlFile = getCmdLineOption('--config', getDefaultZoweDotYamlFile());
+  const haInstanceId = getCmdLineOption('--haInstanceId', getCurrentHaInstanceId());
+  const prefix = getCmdLineOption('--prefix', 'ZWED');
+  const componentOrder = getCmdLineOption('--components', 'zss app-server').split(' ');
+  const config = getConfig(zoweDotYamlFile, haInstanceId, componentOrder);
   if (config) {
     console.log(convertConfigToEnvSource(config, prefix));
   }
+}
+
+function getCmdLineOption(option, defaultValue) {
+  let value;
+  const args = process.argv;
+  const argCount = process.argv.length;
+  for (let i = 2; i < argCount - 1; i++) {
+    if (args[i] === option) {
+      value = args[i + 1];
+      break;
+    }
+  }
+  return value || defaultValue;
 }
 
 /*
