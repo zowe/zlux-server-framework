@@ -9,6 +9,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Enhancement: Allow timeout parameter to be specified in a callService or callRootService command, such as when needing a long timeout to request an agent response.
 - Enhancement: Removed need for app-server to be a client of itself when using the callService API, by adding the option for requests to this API to be executed internal to app-server. This option is very compatible with pre-existing use of callService but is disabled by default to avoid disruption. You can enable it by setting the server configuration property `node.internalRouting=true`
 - Bugfix: App-server would ignore when `VERIFY_CERTIFICATE=false` was set, and try to verify APIML servers. This would lead to login failures when APIML server was on a different system than App-server. Now, app-server will or will not verify APIML certificates according to `VERIFY_CERTIFICATE` value.
+- Bugfix: app-server could throw an uncaught exception when a proxied server had a socket error
 
 ## 1.24.0
 

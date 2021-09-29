@@ -225,7 +225,7 @@
   "ZWED0037W":"Ending server process due to uncaught exception.",
   "ZWED0038W":"[Path=%s stderr]: %s",
   "ZWED0039W":"Exception at server cleanup function:\n%s",
-  "ZWED0040W":"Callservice: Service call failed. ",
+  "ZWED0040W":"Callservice: Service call to %s:%s%s failed. ",
   "ZWED0041W":"%s Exception caught. Message=%s",
   "ZWED0042W":"Stack trace follows\n%s",
   "ZWED0043W":"%s proxyWS error:%s",
