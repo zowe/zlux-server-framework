@@ -8,7 +8,7 @@
       "type": "external",
       "name": "server-plugins-api",
       "host": "zlux",
-      "port": "8544",
+      "port": "7556",
       "urlPrefix": "/",
       "isHttps": true,
       "version": "1.0.0"
