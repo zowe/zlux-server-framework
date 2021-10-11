@@ -236,6 +236,10 @@ SsoAuthenticator.prototype = {
       this.apimlHandler.cleanupSession(sessionState);
       this.zssHandler.cleanupSession(sessionState);
       cleanupSessionGeneric(sessionState);
+      // TODO: Modify the reason below depending upon the message sent from the zssHandler for the case of expired password
+      if(zss.reason && zss.reason.includes('Expired Password')) {
+        return this._insertHandlerStatus(zss);
+      }
       return this._insertHandlerStatus(!apiml.success ? apiml : zss);
     } else {
       sessionState.authenticated = true;
