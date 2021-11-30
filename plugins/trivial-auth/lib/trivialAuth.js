@@ -9,6 +9,7 @@
 */
 
 const apimLib = require('../../../lib/apiml.js');
+const TOKEN_NAME = 'apimlAuthenticationToken';
 
 function TrivialAuthenticator(pluginDef, pluginConf, serverConf) {
   this.authPluginID = pluginDef.identifier;
