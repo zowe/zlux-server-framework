@@ -80,7 +80,7 @@ class ApimlHandler {
         hostname: this.apimlConf.hostname,
         port: this.apimlConf.gatewayPort,
 //TODO uncertainty about using apicatalog route instead of something part of the gateway itself
-        path: '/api/v1/apicatalog/auth/logout',
+        path: '/apicatalog/api/v1/auth/logout',
         method: 'POST',
         headers: {
           'apimlAuthenticationToken': request.cookies[TOKEN_NAME]
@@ -235,7 +235,7 @@ class ApimlHandler {
   **/
   queryToken(token) {
     return new Promise((resolve, reject) => {
-      const options = this.makeOptions('/api/v1/gateway/auth/query',
+      const options = this.makeOptions('/gateway/api/v1/auth/query',
                                        'GET',
                                        TOKEN_NAME+'='+token);
       
@@ -277,7 +277,7 @@ class ApimlHandler {
         username: request.body.username,
         password: request.body.password
       });
-      const options = this.makeOptions('/api/v1/gateway/auth/login','POST', undefined, data.length);
+      const options = this.makeOptions('/gateway/api/v1/auth/login','POST', undefined, data.length);
 
       const req = https.request(options, (res) => {
         res.on('data', (d) => {});
