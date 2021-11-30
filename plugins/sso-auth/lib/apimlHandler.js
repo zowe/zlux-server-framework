@@ -80,7 +80,7 @@ class ApimlHandler {
         hostname: this.apimlConf.hostname,
         port: this.apimlConf.gatewayPort,
 //TODO uncertainty about using apicatalog route instead of something part of the gateway itself
-        path: '/apicatalog/api/v1/auth/logout',
+        path: '/api/v1/apicatalog/auth/logout',
         method: 'POST',
         headers: {
           'apimlAuthenticationToken': request.cookies[TOKEN_NAME]
