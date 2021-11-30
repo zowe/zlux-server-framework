@@ -55,7 +55,7 @@ TrivialAuthenticator.prototype = {
       return Promise.resolve({ success: true });
     } else if (request.cookies && request.cookies[TOKEN_NAME]) {
       try{
-        sessionState.username = apimLib.getUserId(request.cookies[TOKEN_NAME]);
+        sessionState.username = apiml.getUserId(request.cookies[TOKEN_NAME]);
       } catch (e) {
         return Promise.resolve({ success: false });
       }
