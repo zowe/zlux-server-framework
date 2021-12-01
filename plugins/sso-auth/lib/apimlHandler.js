@@ -235,7 +235,7 @@ class ApimlHandler {
   **/
   queryToken(token) {
     return new Promise((resolve, reject) => {
-      const options = this.makeOptions('/gateway/api/v1/auth/query',
+      const options = this.makeOptions('/api/v1/gateway/auth/query',
                                        'GET',
                                        TOKEN_NAME+'='+token);
       
@@ -277,7 +277,7 @@ class ApimlHandler {
         username: request.body.username,
         password: request.body.password
       });
-      const options = this.makeOptions('/gateway/api/v1/auth/login','POST', undefined, data.length);
+      const options = this.makeOptions('/api/v1/gateway/auth/login','POST', undefined, data.length);
 
       const req = https.request(options, (res) => {
         res.on('data', (d) => {});
