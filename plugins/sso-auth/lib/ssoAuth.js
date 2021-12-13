@@ -57,10 +57,8 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
 
-  const tokenName = process.env['PKCS11_TOKEN_NAME'];
-  const zssCanHandleToken = !tokenName || tokenName=='' ? false : true;
-  //Sso here meaning just authenticate to apiml, and handle jwt
-  this.usingSso = this.usingApiml && zssCanHandleToken;
+  //Sso here meaning just authenticate to apiml
+  this.usingSso = this.usingApiml;
 
   this.pluginConf = pluginConf;
   this.instanceID = serverConf.instanceID;
