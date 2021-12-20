@@ -8,6 +8,9 @@
   Copyright Contributors to the Zowe Project.
 */
 
+const apiml = require('../../../lib/apiml.js');
+const TOKEN_NAME = 'apimlAuthenticationToken';
+
 function TrivialAuthenticator(pluginDef, pluginConf, serverConf) {
   this.authPluginID = pluginDef.identifier;
   this.capabilities = {
@@ -50,6 +53,14 @@ TrivialAuthenticator.prototype = {
       sessionState.username = request.body.username;
       sessionState.authenticated = true;
       return Promise.resolve({ success: true });
+    } else if (request.cookies && request.cookies[TOKEN_NAME]) {
+      try{
+        sessionState.username = apiml.getUserId(request.cookies[TOKEN_NAME]);
+      } catch (e) {
+        return Promise.resolve({ success: false });
+      }
+      sessionState.authenticated = true;
+      return Promise.resolve({ success: true })
     } else {
       return Promise.resolve({ success: false });
     }

@@ -39,7 +39,7 @@
   "dependencies": {
     "@rocketsoftware/express-ws": "^5.0.0",
     "accept-language-parser": "~1.5.0",
-    "axios": "~0.21.1",
+    "axios": "~0.21.2",
     "bluebird": "~3.5.1",
     "body-parser": "~1.18.3",
     "cookie-parser": "~1.4.3",
@@ -52,6 +52,7 @@
     "graceful-fs": "~4.1.15",
     "ipaddr.js": "~1.8.0",
     "js-yaml": "~3.13.1",
+    "lodash": "~4.17.21",
     "mkdirp": "~0.5.1",
     "ncp": "~2.0.0",
     "node-forge": "^0.10.0",
@@ -59,8 +60,9 @@
     "require-from-string": "~2.0.2",
     "rimraf": "~2.6.3",
     "semver": "~5.5.1",
-    "swagger-parser": "~6.0.5",
+    "swagger-parser": "~10.0.3",
     "ws": "^6.2.2",
+    "yaml": "~1.10.2",
     "yauzl": "~2.10.0"
   },
   "devDependencies": {
