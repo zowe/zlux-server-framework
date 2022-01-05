@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.27.0
+
+- Bugfix: Avoid retrying APIML login if initial attempt fails for any reason
+
 ## 1.25.0
 
 - Enhancement: Improved callRootService when targeting agents such as ZSS to issue the request direct to the destination rather than using an additional loopback request to the app-server first. This should improve performance, reduce the need for the app-server being a client of itself, and allow for more request options when calling the agent.
