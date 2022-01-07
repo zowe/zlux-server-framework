@@ -87,7 +87,7 @@ class ApimlHandler {
         },
         agent: this.httpsAgent
       }
-
+      this.logger.debug(`Sending logout request for ${sessionState.username} to path=${options.path}`);
       const req = https.request(options, (res) => {
         let data = [];
         res.on('data', (d) => {data.push(d)});
@@ -240,6 +240,7 @@ class ApimlHandler {
                                        TOKEN_NAME+'='+token);
       
       let data = [];
+      this.logger.debug(`Sending query token request to path=${options.path}`);
       const req = https.request(options, (res) => {
         res.on('data', (chunk) => data.push(chunk));
         res.on('end', () => {
@@ -277,8 +278,9 @@ class ApimlHandler {
         username: request.body.username,
         password: request.body.password
       });
-      const options = this.makeOptions('/gateway/api/v1/auth/login','POST', undefined, data.length);
 
+      const options = this.makeOptions('/gateway/api/v1/auth/login','POST', undefined, data.length);
+      this.logger.debug(`Sending login request for ${request.body.username} to path=${options.path}`);
       const req = https.request(options, (res) => {
         res.on('data', (d) => {});
         res.on('end', () => {

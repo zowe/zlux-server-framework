@@ -8,7 +8,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const https = require('https');
 const fs = require('fs');
 const Promise = require('bluebird');
 const ipaddr = require('ipaddr.js');
@@ -90,7 +89,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canGenerateHaSessionId": this.usingSso,
   };
 
-  this.logger.info(`SSO ${this.usingSso ? 'enabled' : 'disabled'}`);
+  this.logger.info(`SSO=${this.usingSso ? 'enabled' : 'disabled'}, APIML=${this.usingApiml}, ZSS=${this.usingZss}`);
 }
 
 SsoAuthenticator.prototype = {
