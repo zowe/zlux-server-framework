@@ -8,7 +8,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const https = require('https');
 const fs = require('fs');
 const Promise = require('bluebird');
 const ipaddr = require('ipaddr.js');
@@ -57,10 +56,8 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
 
-  const tokenName = process.env['PKCS11_TOKEN_NAME'];
-  const zssCanHandleToken = !tokenName || tokenName=='' ? false : true;
-  //Sso here meaning just authenticate to apiml, and handle jwt
-  this.usingSso = this.usingApiml && zssCanHandleToken;
+  //Sso here meaning just authenticate to apiml
+  this.usingSso = this.usingApiml;
 
   this.pluginConf = pluginConf;
   this.instanceID = serverConf.instanceID;
@@ -92,7 +89,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
     "canGenerateHaSessionId": this.usingSso,
   };
 
-  this.logger.info(`SSO ${this.usingSso ? 'enabled' : 'disabled'}`);
+  this.logger.info(`SSO=${this.usingSso ? 'enabled' : 'disabled'}, APIML=${this.usingApiml}, ZSS=${this.usingZss}`);
 }
 
 SsoAuthenticator.prototype = {
