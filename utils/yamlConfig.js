@@ -51,11 +51,7 @@ function convertConfigToEnvSource(config, prefix) {
 }
 
 function getCurrentHaInstanceId() {
-  return process.env['ZWELS_HA_INSTANCE_ID'];
-}
-
-function getInstanceDir() {
-  return process.env['INSTANCE_DIR'] || '~/.zowe';
+  return process.env['ZWE_haInstance_id'];
 }
 
 function omitCommonConfigKeys(config) {
@@ -94,15 +90,13 @@ function getYamlConfig(zoweConfig, haInstanceId, componentOrder) {
 }
 
 function getDefaultZoweDotYamlFile() {
-  const instanceDir = getInstanceDir();
-  const zoweDotYamlFile = path.join(instanceDir, 'zowe.yaml');
-  const instanceDotEnvFile = path.join(instanceDir, 'instance.env');
-  if (fs.existsSync(instanceDotEnvFile)) {
-    // instance.env is higher priority than zowe.yaml
+  const zoweDotYamlFile = process.env['ZWE_CLI_PARAMETER_CONFIG'];
+  if (!zoweDotYamlFile) {
+    // env var not set
     return;
   }
   if (!fs.existsSync(zoweDotYamlFile)) {
-    // zowe.zoweConfig not found
+    // zowe.yaml config not found
     return;
   }
   return zoweDotYamlFile;
