@@ -44,7 +44,7 @@
     "body-parser": "~1.18.3",
     "cookie-parser": "~1.4.3",
     "diffie-hellman": "^5.0.3",
-    "eureka-js-client": "~4.4.1",
+    "eureka-js-client": "git+https://github.com:RocketSoftware/eureka-js-client.git",
     "express": "~4.16.3",
     "express-session": "~1.15.6",
     "express-static-gzip": "~1.1.3",
