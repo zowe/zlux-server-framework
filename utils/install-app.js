@@ -15,6 +15,8 @@ const packagingUtils = require('./packaging-utils');
 const serverUtils = require('../lib/util');
 const jsonUtils = require('../lib/jsonUtils');
 const rmrf = require('rimraf');
+const yamlConfig = require('./yamlConfig');
+
 
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
 //TO DO - Sean - bootstrap logger
@@ -67,13 +69,15 @@ if(calledViaCLI){
     pluginsDir = serverUtils.normalizePath(userInput.pluginsDir); 
   } else {
     userInput.zluxConfig = serverUtils.normalizePath(userInput.zluxConfig);
-    const zluxConfig = jsonUtils.parseJSONWithComments(userInput.zluxConfig);
-    pluginsDir = serverUtils.normalizePath(
-      zluxConfig.pluginsDir,
-      process.cwd());
-    if (!path.isAbsolute(pluginsDir)){
-      //zluxconfig paths relative to whereever that file is
-      path.normalize(userInput.zluxConfig,pluginsDir);
+    const zluxConfig = yamlConfig.getConfig(userInput.zluxConfig, undefined, ['app-server', 'zss']);
+    if (zluxConfig && typeof zluxConfig.pluginsDir === 'string') {
+      pluginsDir = serverUtils.normalizePath(
+        zluxConfig.pluginsDir,
+        process.cwd());
+      if (!path.isAbsolute(pluginsDir)){
+        //zluxconfig paths relative to whereever that file is
+        path.normalize(userInput.zluxConfig,pluginsDir);
+      }
     }
   }
   if (isFile(pluginsDir)) {
