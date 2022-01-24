@@ -3,10 +3,13 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.28.0
+
+- Bugfix: keyring_js did not worked properly for finding CAs due to using an older version in package.json than needed for the listKeyring function
+
 ## 1.27.0
 
 - Bugfix: Added small check on agent network configuration to avoid throwing an exception if the agent configuration included JWT information, but not network information
-- Bugfix: keyring_js did not worked properly for finding CAs due to using an older version in package.json than needed for the listKeyring function
 
 ## 1.25.0
 
