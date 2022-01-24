@@ -6,6 +6,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 1.27.0
 
 - Bugfix: Added small check on agent network configuration to avoid throwing an exception if the agent configuration included JWT information, but not network information
+- Bugfix: keyring_js did not worked properly for finding CAs due to using an older version in package.json than needed for the listKeyring function
 
 ## 1.25.0
 
