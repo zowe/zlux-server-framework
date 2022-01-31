@@ -55,7 +55,7 @@
     "lodash": "~4.17.21",
     "mkdirp": "~0.5.1",
     "ncp": "~2.0.0",
-    "node-forge": "^0.10.0",
+    "node-forge": "~1.2.0",
     "normalize-url": "~7.0.0",
     "require-from-string": "~2.0.2",
     "rimraf": "~2.6.3",
@@ -73,7 +73,7 @@
     "@types/qs": "6.9.3",
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
-    "mocha": "~7.2.0",
+    "mocha": "~8.4.0",
     "typescript": "2.7.1"
   },
   "optionalDependencies": {
