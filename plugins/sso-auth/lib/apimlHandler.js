@@ -154,7 +154,7 @@ class ApimlHandler {
         });
       });
     } else if (request.cookies && request.cookies[TOKEN_NAME]) {
-      return this.authenticateViaCookie(request, sessionState, true);
+      return this.authenticateViaCookie(request, sessionState);
     } else {
       return Promise.resolve({success: false});
     }
