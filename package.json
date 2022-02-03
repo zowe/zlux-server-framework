@@ -38,7 +38,7 @@
   },
   "dependencies": {
     "@rocketsoftware/express-ws": "^5.0.0",
-    "@rocketsoftware/eureka-js-client": "~4.5.1",
+    "@rocketsoftware/eureka-js-client": "~4.5.3",
     "accept-language-parser": "~1.5.0",
     "axios": "~0.21.2",
     "bluebird": "~3.5.1",
