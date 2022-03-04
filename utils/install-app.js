@@ -147,8 +147,8 @@ function copyRecognizers(appDir, appId, appVers) {
   let configRecognizers;
   let configLocation;
 
-  if (process.env.INSTANCE_DIR) {
-    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  if (process.env.ZWED_instanceDir) {
+    configLocation = path.join(process.env.ZWED_instanceDir, "ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
@@ -221,8 +221,8 @@ function copyActions(appDir, appId, appVers) {
     logger.debug("Could not find actions in '" + (path.join(appDir, "config/actions")) + "'");
   }
 
-  if (process.env.INSTANCE_DIR) {
-    configLocation = path.join(process.env.INSTANCE_DIR, "workspace/app-server/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+  if (process.env.ZWED_instanceDir) {
+    configLocation = path.join(process.env.ZWED_instanceDir, "ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
