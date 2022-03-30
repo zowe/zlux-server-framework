@@ -87,7 +87,7 @@ class ApimlHandler {
         },
         agent: this.httpsAgent
       }
-
+      this.logger.debug(`Sending logout request for ${sessionState.username} to path=${options.path}`);
       const req = https.request(options, (res) => {
         let data = [];
         res.on('data', (d) => {data.push(d)});
@@ -147,16 +147,10 @@ class ApimlHandler {
     if (request.body) {
       this.logger.debug(`Authenticate with body`);
       return new Promise((resolve, reject) => {
-        this.doLogin(request, sessionState).then(result=> {
-          if (result.success === true) {
-            resolve(result);
-          } else {
-            this.authenticateViaCookie(request, sessionState).then(result=> resolve(result))
-              .catch(e => reject(e));
-          }
+        this.doLogin(request, sessionState, false).then(result=> {
+          resolve(result);
         }).catch(e=> {
-          this.authenticateViaCookie(request, sessionState).then(result=> resolve(result))
-            .catch(e => reject(e));
+          Promise.resolve({success: false});
         });
       });
     } else if (request.cookies && request.cookies[TOKEN_NAME]) {
@@ -180,7 +174,7 @@ class ApimlHandler {
           expiration = expirationDate.getTime() - now.getTime();
         }
         if (expiration < 1) {
-          this.doLogin(request, sessionState).then(result=> resolve(result))
+          this.doLogin(request, sessionState, true).then(result=> resolve(result))
             .catch(e => reject(e));
         } else {
           this.setState(request.cookies[TOKEN_NAME],
@@ -188,9 +182,8 @@ class ApimlHandler {
           resolve({success: true, username: sessionState.username, expms: expiration});
         }
       }).catch(e=> {
-        this.logger.debug('APIML query failed, trying login.');
-        this.doLogin(request, sessionState).then(result=> resolve(result))
-          .catch(e => reject(e));
+        this.logger.debug('APIML query failed.');
+        reject(e);
       });
     });
   }
@@ -240,6 +233,7 @@ class ApimlHandler {
                                        TOKEN_NAME+'='+token);
       
       let data = [];
+      this.logger.debug(`Sending query token request to path=${options.path}`);
       const req = https.request(options, (res) => {
         res.on('data', (chunk) => data.push(chunk));
         res.on('end', () => {
@@ -270,15 +264,16 @@ class ApimlHandler {
     });
   }
 
-  doLogin(request, sessionState) {
+  doLogin(request, sessionState, useCookie) {
     return new Promise((resolve, reject) => {
       const gatewayUrl = this.gatewayUrl;
       const data = JSON.stringify({
-        username: request.body.username,
-        password: request.body.password
+        username: useCookie ? undefined: request.body.username,
+        password: useCookie ? undefined: request.body.password
       });
-      const options = this.makeOptions('/gateway/api/v1/auth/login','POST', undefined, data.length);
 
+      const options = this.makeOptions('/gateway/api/v1/auth/login','POST', undefined, data.length);
+      this.logger.debug(`Sending login request for ${request.body.username} to path=${options.path}`);
       const req = https.request(options, (res) => {
         res.on('data', (d) => {});
         res.on('end', () => {
