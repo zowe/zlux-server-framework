@@ -6,6 +6,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 1.28.0
 
 - Bugfix: keyring_js did not worked properly for finding CAs due to using an older version in package.json than needed for the listKeyring function
+- Bugfix: Prevent loop upon EACCES error encountered when doing a TCP port bind
+- Bugfix: Avoid retrying APIML login if initial attempt fails for any reason
 
 ## 1.27.0
 
