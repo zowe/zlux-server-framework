@@ -11,19 +11,22 @@
 const Promise = require('bluebird');
 const ipaddr = require('ipaddr.js');
 const url = require('url');
+const zluxUtil = require('../../../lib/util.js');
 const makeProfileNameForRequest = require('./safprofile').makeProfileNameForRequest;
 const DEFAULT_CLASS = "ZOWE";
 const ZSS_SESSION_TIMEOUT_HEADER = "session-expires-seconds";
 const DEFAULT_EXPIRATION_MS = 3600000 //hour;
 const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
-const COOKIE_NAME = 'jedHTTPSession';
-const COOKIE_NAME_LENGTH = COOKIE_NAME.length;
+const COOKIE_NAME_BASE = 'jedHTTPSession.';
 
 class ZssHandler {
   constructor(pluginDef, pluginConf, serverConf, context) {
     this.logger = context.logger;
     this.instanceID = serverConf.instanceID;
     this.sessionExpirationMS = DEFAULT_EXPIRATION_MS; //ahead of time assumption of unconfigurable zss session length
+    const zoweInstanceId = process.env['ZOWE_INSTANCE'];
+    const zssPort = serverConf.agent.https && serverConf.agent.https.port ? serverConf.agent.https.port : serverConf.agent.http.port;
+    this.zssCookieName = zluxUtil.isHaMode() ? COOKIE_NAME_BASE + zoweInstanceId : COOKIE_NAME_BASE + zssPort;
     this.authorized = Promise.coroutine(function *authorized(request, sessionState, 
                                                              options) {
       const result = { authenticated: false, authorized: false };
@@ -105,7 +108,7 @@ class ZssHandler {
       delete sessionState.zssUsername;
       let options = {
         method: 'GET',
-        headers: {'cookie': `${COOKIE_NAME}=${request.cookies[COOKIE_NAME]}`}
+        headers: {'cookie': `${this.zssCookieName}=${request.cookies[this.zssCookieName]}`}
       };
       this.logger.debug(`Sending logout request for ${sessionState.username}`);
       request.zluxData.webApp.callRootService("logout", options).then((response) => {
@@ -148,7 +151,7 @@ class ZssHandler {
 
   deleteClientCookie() {
     return [
-      {name:COOKIE_NAME,
+      {name:this.zssCookieName,
        value:'non-token',
        options: {httpOnly: true,
                  secure: true,
@@ -169,7 +172,7 @@ class ZssHandler {
     return new Promise((resolve, reject) => {
       let clientCookie;
       if (request.cookies) {
-        clientCookie = request.cookies[COOKIE_NAME];
+        clientCookie = request.cookies[this.zssCookieName];
       }
       if (isRefresh && !clientCookie) {
         resolve({success: false, error: {message: 'No cookie given for refresh or check'}});
@@ -177,7 +180,7 @@ class ZssHandler {
       }
       let options = isRefresh ? {
         method: 'GET',
-        headers: {'cookie': `${COOKIE_NAME}=${clientCookie}`}
+        headers: {'cookie': `${this.zssCookieName}=${clientCookie}`}
       } : {
         method: 'POST',
         body: request.body
@@ -194,10 +197,11 @@ class ZssHandler {
         if (typeof response.headers['set-cookie'] === 'object') {
           for (const cookie of response.headers['set-cookie']) {
             const content = cookie.split(';')[0];
-            let index = content.indexOf(COOKIE_NAME);
+            console.log('cookie=',cookie);
+            let index = content.indexOf(this.zssCookieName);
             if (index >= 0) {
               serverCookie = content;
-              cookieValue = content.substring(index+1+COOKIE_NAME_LENGTH);
+              cookieValue = content.substring(index+1+this.zssCookieName.length);
             }
           }
         }
@@ -213,7 +217,7 @@ class ZssHandler {
             expiresMs = expiresSec == -1 ? expiresSec : Number(expiresSec)*1000;
           }
           resolve({ success: true, username: sessionState.username, expms: expiresMs,
-                    cookies: [{name:COOKIE_NAME, value:cookieValue, options: {httpOnly: true, secure: true, sameSite: true, encode: String}}]});
+                    cookies: [{name:this.zssCookieName, value:cookieValue, options: {httpOnly: true, secure: true, sameSite: true, encode: String}}]});
         } else {
           let res = { success: false, error: {message: `ZSS ${response.statusCode} ${response.statusMessage}`,
                                               body: response.body}};
@@ -231,13 +235,13 @@ class ZssHandler {
   }
   
   setCookieFromRequest(req, sessionState) {
-    if (req.cookies && req.cookies[COOKIE_NAME]) {
-      sessionState.zssCookies = `${COOKIE_NAME}=${req.cookies[COOKIE_NAME]}`;
+    if (req.cookies && req.cookies[this.zssCookieName]) {
+      sessionState.zssCookies = `${this.zssCookieName}=${req.cookies[this.zssCookieName]}`;
     }
   }
 
   addProxyAuthorizations(req1, req2Options, sessionState) {
-    if (req1.cookies && req1.cookies[COOKIE_NAME]) {
+    if (req1.cookies && req1.cookies[this.zssCookieName]) {
       req2Options.headers['cookie'] = req1.headers['cookie'];
     }
   }

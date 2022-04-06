@@ -402,7 +402,7 @@ function testEnv() {
                node_https_certificateAuthorities:"${KEYSTORE_CERTIFICATE_AUTHORITY},${EXTERNAL_ROOT_CA}",
                agent_jwt_fallback:"$SSO_FALLBACK_TO_NATIVE_AUTH",
                productDir:"$ROOT_DIR/components/app-server/share/zlux-app-server/defaults",
-               node_https_port:"$ZOWE_ZLUX_SERVER_HTTPS_PORT",
+               node_https_port:"$ZWED_SERVER_HTTPS_PORT",
                node_https__x2dnegative:"-1",
                logLevels__x5fzsf____auth:"1",
                logLevels_org____zowe____terminal____tn3270_x2e_x2a:"5"

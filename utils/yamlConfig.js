@@ -51,11 +51,7 @@ function convertConfigToEnvSource(config, prefix) {
 }
 
 function getCurrentHaInstanceId() {
-  return process.env['ZWELS_HA_INSTANCE_ID'];
-}
-
-function getInstanceDir() {
-  return process.env['INSTANCE_DIR'] || '~/.zowe';
+  return process.env['ZWE_haInstance_id'];
 }
 
 function omitCommonConfigKeys(config) {
@@ -70,17 +66,20 @@ function omitCommonConfigKeys(config) {
   return _.omit(config, commonConfigKeys);
 }
 
-function getComponentConfig(zoweConfig, component, haInstanceId) {
+function getComponentConfig(zoweConfig, component, haInstanceIdOrUndefined) {
   const componentLevelConfig = _.get(zoweConfig, ['components', component]);
-  const instanceLevelConfig = _.get(zoweConfig, ['haInstances', haInstanceId, 'components', component]);
+  let instanceLevelConfig;
+  if (haInstanceIdOrUndefined) {
+    instanceLevelConfig = _.get(zoweConfig, ['haInstances', haInstanceIdOrUndefined, 'components', component]);
+  }
   const config = mergeUtils.deepAssign(componentLevelConfig, instanceLevelConfig ? instanceLevelConfig : {});
   return omitCommonConfigKeys(config);
 }
 
-function getYamlConfig(zoweConfig, haInstanceId, componentOrder) {
+function getYamlConfig(zoweConfig, haInstanceIdOrUndefined, componentOrder) {
   let mergedConfig;
   for (const comp of componentOrder) {
-    const compConfig = getComponentConfig(zoweConfig, comp, haInstanceId);
+    const compConfig = getComponentConfig(zoweConfig, comp, haInstanceIdOrUndefined);
     if (!compConfig) {
       continue;
     }
@@ -94,15 +93,13 @@ function getYamlConfig(zoweConfig, haInstanceId, componentOrder) {
 }
 
 function getDefaultZoweDotYamlFile() {
-  const instanceDir = getInstanceDir();
-  const zoweDotYamlFile = path.join(instanceDir, 'zowe.yaml');
-  const instanceDotEnvFile = path.join(instanceDir, 'instance.env');
-  if (fs.existsSync(instanceDotEnvFile)) {
-    // instance.env is higher priority than zowe.yaml
+  const zoweDotYamlFile = process.env['ZWE_CLI_PARAMETER_CONFIG'];
+  if (!zoweDotYamlFile) {
+    // env var not set
     return;
   }
   if (!fs.existsSync(zoweDotYamlFile)) {
-    // zowe.zoweConfig not found
+    // zowe.yaml config not found
     return;
   }
   return zoweDotYamlFile;
@@ -127,12 +124,12 @@ function parseZoweDotYaml(zoweDotYamlFile) {
 }
 
 
-function getConfig(zoweDotYamlFile, haInstanceId, componentOrder) {
+function getConfig(zoweDotYamlFile, haInstanceIdOrUndefined, componentOrder) {
   const zoweConfig = loadZoweDotYaml(zoweDotYamlFile);
-  if (!zoweConfig || !haInstanceId || !Array.isArray(componentOrder)) {
+  if (!zoweConfig || !Array.isArray(componentOrder)) {
     return;
   }
-  return getYamlConfig(zoweConfig, haInstanceId, componentOrder);
+  return getYamlConfig(zoweConfig, haInstanceIdOrUndefined, componentOrder);
 };
 
 exports.getConfig = getConfig;
