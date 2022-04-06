@@ -1,7 +1,10 @@
 {
   "identifier": "org.zowe.zlux",
-  "apiVersion": "1.0.0",
-  "pluginVersion": "1.0.0",
+  "apiVersion": "2.0.0",
+  "pluginVersion": "1.0.1",
+  "license": "EPL-2.0",
+  "author": "Zowe",
+  "homepage": "https://github.com/zowe/zlux-server-framework",
   "pluginType": "application",
   "dataServices": [
     {

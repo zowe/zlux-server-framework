@@ -1,8 +1,11 @@
 {
   "identifier": "org.zowe.terminal.proxy",
   "baseURI": "terminalproxy",
-  "apiVersion": "1.0.0",
+  "apiVersion": "2.0.0",
   "pluginVersion": "0.0.0-zlux.version.replacement",
+  "license": "EPL-2.0",
+  "author": "Zowe",
+  "homepage": "https://github.com/zowe/zlux-server-framework",
   "pluginType": "application",
   "configurationData": {
     "resources": {
