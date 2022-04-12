@@ -64,7 +64,7 @@ jobs:
       - name: '[Prep 2] Setup Node'
         uses: actions/setup-node@v2
         with:
-          node-version: 14
+          node-version: 16
 
       - name: '[Prep 3] Setup jFrog CLI'
         uses: jfrog/setup-jfrog-cli@v2
@@ -99,4 +99,3 @@ jobs:
           
       - name: '[Prep 7] deploy'
         uses: zowe-actions/zlux-builds/core/deploy@v2.x/main
-        

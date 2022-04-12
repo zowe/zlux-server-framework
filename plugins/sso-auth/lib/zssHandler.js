@@ -86,6 +86,7 @@ class ZssHandler {
           this.setCookieFromRequest(request, sessionState);
           return result;
         }
+        this.logger.debug(`Sending isAuthorized request for ${sessionState.username}`);
         const httpResponse = yield this._callAgent(request.zluxData, 
                                                    sessionState.username,  resourceName);
         this._processAgentResponse(httpResponse, result, sessionState.username);
@@ -109,6 +110,7 @@ class ZssHandler {
         method: 'GET',
         headers: {'cookie': `${this.zssCookieName}=${request.cookies[this.zssCookieName]}`}
       };
+      this.logger.debug(`Sending logout request for ${sessionState.username}`);
       request.zluxData.webApp.callRootService("logout", options).then((response) => {
         //did logout or already logged out
         if (response.statusCode === 200 || response.statusCode === 401) {
@@ -183,6 +185,7 @@ class ZssHandler {
         method: 'POST',
         body: request.body
       };
+      this.logger.debug(`Sending login request for ${request.body && request.body.username ? request.body.username : sessionState.username}`);
       request.zluxData.webApp.callRootService("login", options).then((response) => {
         this.logger.debug(`Login rc=`,response.statusCode);
         if (response.statusCode == HTTP_STATUS_PRECONDITION_REQUIRED) {
@@ -249,6 +252,7 @@ class ZssHandler {
         method: 'POST',
         body: request.body
       };
+      this.logger.debug(`Sending password request for ${sessionState.username}`);
       request.zluxData.webApp.callRootService("password", options).then((response) => {
         if (response.statusCode === 200) {
           resolve({ success: true , response: JSON.parse(response.body)['status'] });
@@ -288,6 +292,7 @@ class ZssHandler {
     const path = `${resourceName}/READ`;
     //console.log('trying path ', path);
     //console.log(new Error("stack trace before calling root serivce"))
+    this.logger.debug(`Sending saf-auth request`);
     return zluxData.webApp.callRootService("saf-auth", path);
   }
   

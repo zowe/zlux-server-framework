@@ -3,6 +3,25 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.0.0
+
+- Breaking change: The list of properties sent back from the /server/environment has changed to reflect the different environment values present in Zowe v2
+- Breaking change: When paired with the Zowe server infrastructure, the app-server will now automatically register and de-register plugins at startup depending on each plugin's component enabled status.
+- Breaking change: Adjusted the server to respect ZSS's new cookie format in which the port or HA instance ID is a suffix of the ZSS cookie. This means the server may not work properly when paired with a v1 ZSS, and works best with v2 ZSS.
+- Enhancement: Added support for reading zowe.yaml directly, as opposed to server.json.
+- Enhancement: The server can now support checks on the existence and version of APIML if a plugin states a dependency on APIML in the "requirements.components" section of its plugin definition.
+- Enhancement: The list of parameters for server configuration are now documented in json-schema for validation, you can find this in [the zlux repository](https://github.com/zowe/zlux/tree/v2.x/staging/schemas)
+
+## 1.28.0
+
+- Bugfix: keyring_js did not worked properly for finding CAs due to using an older version in package.json than needed for the listKeyring function
+- Bugfix: Prevent loop upon EACCES error encountered when doing a TCP port bind
+- Bugfix: Avoid retrying APIML login if initial attempt fails for any reason
+
+## 1.27.0
+
+- Bugfix: Added small check on agent network configuration to avoid throwing an exception if the agent configuration included JWT information, but not network information
+
 ## 1.25.0
 
 - Enhancement: Improved callRootService when targeting agents such as ZSS to issue the request direct to the destination rather than using an additional loopback request to the app-server first. This should improve performance, reduce the need for the app-server being a client of itself, and allow for more request options when calling the agent.
