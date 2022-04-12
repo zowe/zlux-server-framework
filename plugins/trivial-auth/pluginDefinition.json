@@ -2,8 +2,11 @@
   "identifier": "org.zowe.zlux.auth.trivial",
   "pluginType": "nodeAuthentication",
   "authenticationCategory": "fallback",
-  "apiVersion": "1.0.0",
+  "apiVersion": "2.0.0",
   "pluginVersion": "0.9.0",
+  "license": "EPL-2.0",
+  "author": "Zowe",
+  "homepage": "https://github.com/zowe/zlux-server-framework",
   "filename": "trivialAuth.js",
   "authenticationInstaller": "trivialAuthInstaller"
 }
