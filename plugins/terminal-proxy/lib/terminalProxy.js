@@ -154,11 +154,13 @@ const binToB64 =[0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4
                  0x77,0x78,0x79,0x7A,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x2B,0x2F];
 
 function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, handlers) {
+  console.log("Inside TerminalWebsocketProxy");
   websocket.on('error', (error) => {
     this.logger.warn("ZWED0129W", error); //this.logger.warn("websocket error", error);
     this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'websocket error occurred');
   });
   websocket.on('close',(code,reason)=>{this.handleWebsocketClosed(code,reason);});
+  console.log("After  websocket.on1");
 
   this.handlers = handlers;
   this.host;
@@ -180,6 +182,7 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
     this.hostDataKey = messageConfig.hostDataKey;
     this.clientTypeKey = messageConfig.clientTypeKey;
     this.clientDataKey = messageConfig.clientDataKey;
+    console.log("Before  websocket.on2 ");
 
     websocket.on('message',(msg)=>{this.handleWebsocketMessage(msg);});
     this.configured = true;
@@ -198,6 +201,7 @@ TerminalWebsocketProxy.prototype.identifierString = function() {
 };
 
 TerminalWebsocketProxy.prototype.handleWebsocketMessage = function(msg) {
+  console.log("Inside  handleWebsocketMessage");
   if (this.configured !== true && this.ws.readyState < 2) { //if ws is still open
     this.closeConnection(this.ws, WEBSOCKET_REASON_TERMPROXY_GOING_AWAY, 'WS open when expected to be closed');
     return;
@@ -240,6 +244,8 @@ TerminalWebsocketProxy.prototype.closeConnection = function(ws, code, message) {
 };
 
 TerminalWebsocketProxy.prototype.handleWebsocketClosed = function(code, reason) {
+  console.log("Inside  handleWebsocketClosed");
+
   if (this.hostSocket) {
     if (this.hostConnected) {
       this.decrementCounter();
@@ -254,6 +260,7 @@ TerminalWebsocketProxy.prototype.handleWebsocketClosed = function(code, reason) 
 };
 
 TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message, websocket) {
+  console.log("Inside  handleTerminalClientMessage");
   let jsonObject;
   try {
     jsonObject = JSON.parse(message);
@@ -271,6 +278,7 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
         try {
           let result = this.handlers[i].handleClientMessage(jsonObject, this);
           if (result && result.response) {
+            console.log("Inside  wsSend2");
             this.wsSend(websocket,JSON.stringify(result.response));
             if (!result.continue) {
               return;
@@ -381,6 +389,8 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
       else if (jsonObject.t === 'IP_REQ') {
         /*This ability is for allowing the client to know what its IP is so that it can 
           tell terminal servers what its true IP is.*/
+        console.log("Inside  wsSend3");
+
         this.wsSend(websocket,JSON.stringify({
           "t": "IP_RES",
           "data": this.clientIP
@@ -397,6 +407,8 @@ TerminalWebsocketProxy.prototype.netSend = function(buffer) {
 };
 
 TerminalWebsocketProxy.prototype.wsSend = function(websocket,string) {
+  console.log("Inside  wsSend");
+
   this.logger.debug("ZWED0276I", this.identifierString(), string.length); //this.logger.debug(this.identifierString()+' Websocket sending client message. Length='+string.length);
   this.logger.trace("ZWED0137I", this.identifierString(), string); //this.logger.log(this.identifierString()+' Content to be sent to client=\n'+string);
   websocket.send(string);
@@ -479,6 +491,7 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
     if (replies.length > 0){
       replies.forEach(function(reply) {
         var stringReply = JSON.stringify(reply);
+        console.log("Inside  wsSend1");
         t.wsSend(ws,stringReply);
       });
     }
