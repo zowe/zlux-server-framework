@@ -747,6 +747,8 @@ let scanAndImportHandlers = function(logger) {
 };
 
 exports.tn3270WebsocketRouter = function(context) {
+  console.log("exports.tn3270WebsocketRouter");
+
   /* 
     a handler is an external component for interpreting messages of types or in ways not covered in this code alone
     a handler is given the data and returns  a JSON response which includes whether to continue or not
@@ -761,6 +763,7 @@ exports.tn3270WebsocketRouter = function(context) {
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
     }
+    console.log("exports.tn3270WebsocketRouter");
 
     let router = express.Router();
     /* This was a hack for when the router.ws object, which should exist, did not exist.
@@ -783,12 +786,13 @@ exports.tn3270WebsocketRouter = function(context) {
   });
 };
 exports.tn5250WebsocketRouter = function(context) {
+  console.log("exports.tn5250WebsocketRouter");
   let handlers = scanAndImportHandlers(context.logger);
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
     }
-
+    console.log("exports.vtWebsocketRouter");
     let router = express.Router();
     /*
     if (!router.ws) {
@@ -807,9 +811,11 @@ exports.tn5250WebsocketRouter = function(context) {
   });
 };
 exports.vtWebsocketRouter = function(context) {
+  console.log("exports.vtWebsocketRouter");
   let handlers = scanAndImportHandlers(context.logger);
   ssh.setLogger(context.logger);
   return new Promise(function(resolve, reject) {
+    console.log("exports.vtWebsocketRouter");
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
     }
