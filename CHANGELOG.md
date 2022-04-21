@@ -8,6 +8,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Breaking change: The list of properties sent back from the /server/environment has changed to reflect the different environment values present in Zowe v2
 - Breaking change: When paired with the Zowe server infrastructure, the app-server will now automatically register and de-register plugins at startup depending on each plugin's component enabled status.
 - Breaking change: Adjusted the server to respect ZSS's new cookie format in which the port or HA instance ID is a suffix of the ZSS cookie. This means the server may not work properly when paired with a v1 ZSS, and works best with v2 ZSS.
+- Breaking change: The default RBAC profile names now start with ZLUX.1 rather than ZLUX.0, because they follow the zowe configuration parameter zowe.rbacProfileIdentifier
+- Known Issue: The /server/config API can not currently be used to write configuration, only read. This API will be enhanced in a future release to reflect the changes between the configuration structure seen in 'server.json' and the one seen in v2
 - Enhancement: Added support for reading zowe.yaml directly, as opposed to server.json.
 - Enhancement: The server can now support checks on the existence and version of APIML if a plugin states a dependency on APIML in the "requirements.components" section of its plugin definition.
 - Enhancement: The list of parameters for server configuration are now documented in json-schema for validation, you can find this in [the zlux repository](https://github.com/zowe/zlux/tree/v2.x/staging/schemas)
