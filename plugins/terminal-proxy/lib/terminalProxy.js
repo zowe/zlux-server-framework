@@ -690,7 +690,7 @@ let scanAndImportHandlers = function(logger) {
     let filenames;
     let len;
     try {
-      let handlerDir = pathModule.join(process.env.INSTANCE_DIR,'workspace','app-server','org.zowe.terminal.proxy','handlers');
+      let handlerDir = pathModule.join(process.env.ZWE_zowe_workspaceDirectory,'app-server','org.zowe.terminal.proxy','handlers');
       filenames = fs.readdirSync(handlerDir);
       len = filenames.length;
       for (let i = 0; i < len; i++) {
