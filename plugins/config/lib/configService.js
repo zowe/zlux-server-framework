@@ -21,6 +21,9 @@ const Promise = require('bluebird');
 const bodyParser = require('body-parser');
 const obfuscator = require ('../../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
 
+// otel tracing
+const api = require('@opentelemetry/api');
+
 const htmlObfuscator = new obfuscator.HtmlObfuscator();
 
 //Buffer comes from node global.
@@ -2411,6 +2414,16 @@ function ConfigService(context) {
   
   let router = express.Router();
   router.use((request,response,next)=> {
+    const currentSpan = api.trace.getSpan(api.context.active());
+    console.log(`traceid: ${currentSpan.spanContext().traceId}`);
+    
+    const tracer = api.trace.getTracer('jack-manual-test');
+    const span = tracer.startSpan('ConfigService.middleware1', {
+      kind: 1, // server
+      attributes: { middleware: '1' },
+    });
+    span.addEvent('invoking ConfigService.middleware1');
+
     let authData = {username:request.username};
     
     accessLogger.debug('ZWED0257I', request.path, request.query.name); //accessLogger.debug('Configuration service requested. Path='+request.path+'. Name Query='+request.query.name);
@@ -2455,6 +2468,9 @@ function ConfigService(context) {
       return;
     }
     request.directories = directories;
+
+    span.end();
+
     next();
   });
   
@@ -2493,6 +2509,16 @@ function ConfigService(context) {
   context.addBodyParseMiddleware(router);
   
   router.get('/:pluginID/:scope/:resource*',function(request, response) {
+    const currentSpan = api.trace.getSpan(api.context.active());
+    console.log(`traceid: ${currentSpan.spanContext().traceId}`);
+
+    const tracer = api.trace.getTracer('jack-manual-test');
+    const span = tracer.startSpan('ConfigService.get', {
+      kind: 1, // server
+      attributes: { route: '/:pluginID/:scope/:resource*' },
+    });
+    span.addEvent('invoking ConfigService.get');
+
     let scope = request.params.scope;
     switch (scope) {
     case 'plugin':
@@ -2526,8 +2552,20 @@ function ConfigService(context) {
       return;
     }
     determineResource(null,parts,0,request,response);
+
+    span.end();
   });
   router.all('/:pluginID/:scope/:resource*',function(request, response) {
+    const currentSpan = api.trace.getSpan(api.context.active());
+    console.log(`traceid: ${currentSpan.spanContext().traceId}`);
+
+    const tracer = api.trace.getTracer('jack-manual-test');
+    const span = tracer.startSpan('ConfigService.all', {
+      kind: 1, // server
+      attributes: { route: '/:pluginID/:scope/:resource*' },
+    });
+    span.addEvent('invoking ConfigService.all');
+
     let scope = request.params.scope;
     switch (scope) {
     case 'site':
@@ -2555,6 +2593,8 @@ function ConfigService(context) {
       return;
     }
     determineResource(null,parts,0,request,response);
+
+    span.end();
   });
   
 

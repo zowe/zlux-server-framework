@@ -37,6 +37,8 @@
     "test:storage": "mocha --timeout 10000 ./test/storage/*.js"
   },
   "dependencies": {
+    "@opentelemetry/api": "^1.1.0",
+    "@opentelemetry/sdk-node": "^0.28.0",
     "@rocketsoftware/eureka-js-client": "~4.5.4",
     "@rocketsoftware/express-ws": "^5.0.0",
     "accept-language-parser": "~1.5.0",
