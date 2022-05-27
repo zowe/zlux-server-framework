@@ -37,14 +37,14 @@
     "test:storage": "mocha --timeout 10000 ./test/storage/*.js"
   },
   "dependencies": {
+    "@rocketsoftware/eureka-js-client": "~4.5.4",
     "@rocketsoftware/express-ws": "^5.0.0",
     "accept-language-parser": "~1.5.0",
-    "axios": "~0.21.2",
+    "axios": "~0.22.0",
     "bluebird": "~3.5.1",
     "body-parser": "~1.18.3",
     "cookie-parser": "~1.4.3",
     "diffie-hellman": "^5.0.3",
-    "eureka-js-client": "~4.4.1",
     "express": "~4.16.3",
     "express-session": "~1.15.6",
     "express-static-gzip": "~1.1.3",
@@ -55,7 +55,7 @@
     "lodash": "~4.17.21",
     "mkdirp": "~0.5.1",
     "ncp": "~2.0.0",
-    "node-forge": "^0.10.0",
+    "node-forge": "^1.3.1",
     "normalize-url": "~7.0.0",
     "require-from-string": "~2.0.2",
     "rimraf": "~2.6.3",
@@ -73,10 +73,10 @@
     "@types/qs": "6.9.3",
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
-    "mocha": "~7.2.0",
+    "mocha": "~8.4.0",
     "typescript": "2.7.1"
   },
   "optionalDependencies": {
-    "keyring_js": "~1.0.0"
+    "keyring_js": "~1.1.0"
   }
 }
