@@ -25,8 +25,7 @@ class ZssHandler {
     this.instanceID = serverConf.instanceID;
     this.sessionExpirationMS = DEFAULT_EXPIRATION_MS; //ahead of time assumption of unconfigurable zss session length
     const zoweInstanceId = serverConf.cookieIdentifier;
-    const zssPort = serverConf.agent.https && serverConf.agent.https.port ? serverConf.agent.https.port : serverConf.agent.http.port;
-    this.zssCookieName = zluxUtil.isHaMode() ? COOKIE_NAME_BASE + zoweInstanceId : COOKIE_NAME_BASE + zssPort;
+    this.zssCookieName = COOKIE_NAME_BASE + zoweInstanceId;
     this.authorized = Promise.coroutine(function *authorized(request, sessionState, 
                                                              options) {
       const result = { authenticated: false, authorized: false };
@@ -197,7 +196,6 @@ class ZssHandler {
         if (typeof response.headers['set-cookie'] === 'object') {
           for (const cookie of response.headers['set-cookie']) {
             const content = cookie.split(';')[0];
-            console.log('cookie=',cookie);
             let index = content.indexOf(this.zssCookieName);
             if (index >= 0) {
               serverCookie = content;

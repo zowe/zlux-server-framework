@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.3.0
+
+- Bugfix: sso-auth would reject zss cookie if it was using the zowe.cookieIdentifier suffix rather than its port. Now, both zss and app-server use zowe.cookieIdentifier always.
+
 ## 2.0.0
 
 - Breaking change: The list of properties sent back from the /server/environment has changed to reflect the different environment values present in Zowe v2
