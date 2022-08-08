@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 1.28.1
+
+- Bugfix: call() on an external service would be missing the full URL, causing invalid response or hang
+
 ## 1.28.0
 
 - Bugfix: Pass through tlsOptions object when making a proxy from an 'external'-type service, and allow the services to individually control tls verification strictness of their own proxy.
