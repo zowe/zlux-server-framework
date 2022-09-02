@@ -272,7 +272,7 @@ paths:
             Unalloc error:
               "error: ds unalloc dsn={dataset} dd=ddname, rc=rc sysRC=rc, sysRSN=rsn"
     delete:
-      summary: Updates contents of dataset
+      summary: Delete a dataset or member
       tags:
         - Dataset
       parameters:
