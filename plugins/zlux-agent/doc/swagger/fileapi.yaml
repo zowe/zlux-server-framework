@@ -197,18 +197,18 @@ paths:
                 type: string
                 enum: [PS, PO]
               blksz:
-                type: string
+                type: number
               lrecl:
-                description: Desired record length as a number string
-                type: string
+                description: Desired record length
+                type: number
               volser:
                 type: string
               recfm:
                 type: string
                 enum: [A, B, F, U, V]
               blkln:
-                description: The average data block length as a number string
-                type: string
+                description: The average data block length
+                type: number
               ndisp:
                 type: string
                 default: CATLG
@@ -229,12 +229,12 @@ paths:
                 type: string
                 enum: [CYL, TRK]
               dir:
-                type: string
+                type: number
               prime:
-                type: string
+                type: number
                 description: Desired primary space quantity
               secnd:
-                type: string
+                type: number
                 description: Desired secondary space quantity
               avgr:
                 type: string
