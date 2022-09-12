@@ -213,9 +213,6 @@ paths:
                 type: string
                 default: CATLG
                 enum: [KEEP, CATLG]
-              unit:
-                description: Used to tell the system to place the data set on a specific device or group. Not needed when using SMS, use strcls instead.
-                type: string
               strcls:
                 description: Desired SMS storage class
                 type: string
