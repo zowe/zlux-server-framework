@@ -3,10 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
-## 2.4.0
+## 2.3.0
 
-- Proxies (zss, external services, and those made by router services) now default to the same HTTPS/TLS settings as the app-esrver.
-
+- Bugfix: Proxies (zss, external services, and those made by router services) now default to the same HTTPS/TLS settings as the app-esrver.
 
 ## 2.0.0
 
