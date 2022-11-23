@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.6.0
+
+- Enhancement: Avoid going directly to the Desktop when the gateway is active, by redirecting to the gateway equivalent homepage when the homepage is accessed.
+
 ## 2.4.0
 
 - Proxies (zss, external services, and those made by router services) now default to the same HTTPS/TLS settings as the app-esrver.
