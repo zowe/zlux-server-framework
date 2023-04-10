@@ -6,6 +6,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 2.8.0
 
 - Enhancement: Support zowe.verifyCertificates=NONSTRICT (#468)
+- Enhancement: Allow dataservices to pass CAs into the call() function (#462)
 
 ## 2.3.0
 
