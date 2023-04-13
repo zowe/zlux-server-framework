@@ -56,18 +56,7 @@ class ApimlHandler {
     this.logger = context.logger;    
     this.apimlConf = serverConf.node.mediationLayer.server;    
     this.gatewayUrl = `https://${this.apimlConf.hostname}:${this.apimlConf.gatewayPort}`;
-
-    if ((serverConf.node.https.certificateAuthorities === undefined) || (serverConf.node.allowInvalidTLSProxy===true)) {
-      this.logger.warn("This server is not configured with certificate authorities, so it will not validate certificates with APIML");
-      this.httpsAgent = new https.Agent({
-        rejectUnauthorized: false
-      });
-    } else {
-      this.httpsAgent = new https.Agent({
-        rejectUnauthorized: true,
-        ca: context.tlsOptions.ca
-      });
-    }
+    this.httpsAgent = new https.Agent(context.tlsOptions);
   }
 
   logout(request, sessionState) {
