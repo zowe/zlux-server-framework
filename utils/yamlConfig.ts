@@ -34,17 +34,40 @@ export function getDefaultZoweDotYamlFile() {
   return zoweDotYamlFile;
 }
 
+// formats either /my/zowe.yaml or FILE(/my/zowe.yaml):FILE(/my/defaults.yaml)
+function getJsonForYamls(configYamls: string) {
+  let configs = [];
+  let yamls = configYamls.split('FILE(');
+  yamls.forEach((yaml:string)=> {
+    if (yaml.length>0) {
+      if (yaml.endsWith(')')) {
+        yaml = yaml.substring(0, yaml.length-1);
+      } else if (yaml.endsWith('):')) {
+        yaml = yaml.substring(0, yaml.length-2);
+      }
+
+      // console.log('parsing zowe yaml file.');
+      let yamlText = fs.readFileSync(yaml).toString();
+      // console.log("Loaded file as=\n",yamlText);
+      yamlText = yamlText.replace(/std.getenv(.*)/g, (match)=> {return 'process.env['+match.substring(11,match.length-1)+']';});
+      yamlText = yamlText.replace(/os\.platform/g, 'os.platform()');
+      //    yamlText = yamlText.replaceAll(/\${{\s.*\s}}/g, (match)=> {return match.substring(3, match.length-2);}); 
+      configs.push(YAML.parse(yamlText));
+    }
+  });
+
+  let finalConfig = {};
+  for (let i = configs.length; i >= 0; i--) {
+    let config = configs[i];
+    finalConfig = mergeUtils.deepAssign(finalConfig, config);
+  }
+  return finalConfig;
+}
+
 
 //may throw yaml parse or fs error
-export function parseZoweDotYaml(zoweDotYamlFile, haInstanceIdOrUndefined?: string) {
-  let config;
-  // console.log('parsing zowe yaml file.');
-  let yamlText = fs.readFileSync(zoweDotYamlFile).toString();
-  // console.log("Loaded file as=\n",yamlText);
-  yamlText = yamlText.replace(/std.getenv(.*)/g, (match)=> {return 'process.env['+match.substring(11,match.length-1)+']';});
-  yamlText = yamlText.replace(/os\.platform/g, 'os.platform()');
-  //    yamlText = yamlText.replaceAll(/\${{\s.*\s}}/g, (match)=> {return match.substring(3, match.length-2);}); 
-  config = YAML.parse(yamlText);
+export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?: string) {
+  let config = getJsonForYamls(zoweYamlPaths);
   // console.log("Parsed as=\n",config);
   if (haInstanceIdOrUndefined) {
     let instanceLevelConfig;

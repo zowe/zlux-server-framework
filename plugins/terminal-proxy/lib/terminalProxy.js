@@ -682,7 +682,7 @@ function createSecurityObjects(tlsOptions) {
 }
 
 var handlerModules = null;
-let scanAndImportHandlers = function(logger) {
+let scanAndImportHandlers = function(logger, serverConfig) {
   if (handlerModules == null) {
     handlerModules = [];
     let handlers = {}; //key: filename, value: path
@@ -690,7 +690,7 @@ let scanAndImportHandlers = function(logger) {
     let filenames;
     let len;
     try {
-      let handlerDir = pathModule.join(process.env.ZWE_zowe_workspaceDirectory,'app-server','org.zowe.terminal.proxy','handlers');
+      let handlerDir = pathModule.join(serverConfig.zowe.workspaceDirectory,'app-server','org.zowe.terminal.proxy','handlers');
       filenames = fs.readdirSync(handlerDir);
       len = filenames.length;
       for (let i = 0; i < len; i++) {
@@ -743,7 +743,7 @@ exports.tn3270WebsocketRouter = function(context) {
 
     handlers can come from /lib for now.
   */
-  let handlers = scanAndImportHandlers(context.logger);
+  let handlers = scanAndImportHandlers(context.logger, context.pluginContext.server.config.all);
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
