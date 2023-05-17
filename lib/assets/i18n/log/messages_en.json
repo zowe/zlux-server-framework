@@ -13,7 +13,7 @@
   "ZWED0030I":"NOT USED",
   "ZWED0031I":"Server is ready at %s, Plugins successfully loaded: %s% (%s/%s)",
   "ZWED0032I":"NOT USED",
-  "ZWED0033I":"The http port given to the APIML is: %s\nThe https port given to the APIML is: %s\nThe zlux-apiml config are: %s",
+  "ZWED0033I":"The port given to the APIML is: %s\nThe zlux-apiml config are: %s",
   "ZWED0034I":"NOT USED",
   "ZWED0035I":"NOT USED",
   "ZWED0036I":"Plugin %s will serve static files from %s",
