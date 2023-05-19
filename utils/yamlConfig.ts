@@ -57,7 +57,7 @@ function getJsonForYamls(configYamls: string) {
   });
 
   let finalConfig = {};
-  for (let i = configs.length; i >= 0; i--) {
+  for (let i = configs.length-1; i >= 0; i--) {
     let config = configs[i];
     finalConfig = mergeUtils.deepAssign(finalConfig, config);
   }
