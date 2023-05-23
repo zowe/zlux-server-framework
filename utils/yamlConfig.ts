@@ -97,7 +97,7 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
   let templateFound: boolean = false;
   let result = property;
   let topObjKeys = Object.keys(topObj);
-  let evalGlobalString = '';
+  let evalGlobalString = `var os = require('os'); `;
   topObjKeys.forEach((key)=> {
     evalGlobalString+=`var ${key} = topObj.${key}; `
   });
@@ -162,6 +162,16 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
         }
       } else {
         result+=parts[i];
+      }
+    }
+    if (templateFound) {
+      let asNumber = Number(result);
+      if (!Number.isNaN(asNumber)) {
+        result = asNumber;
+      } else if (result === 'false') {
+        result = false;
+      } else if (result === 'true') {
+        result = true;
       }
     }
     /*

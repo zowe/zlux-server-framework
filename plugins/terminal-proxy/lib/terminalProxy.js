@@ -743,7 +743,7 @@ exports.tn3270WebsocketRouter = function(context) {
 
     handlers can come from /lib for now.
   */
-  let handlers = scanAndImportHandlers(context.logger, context.pluginContext.server.config.all);
+  let handlers = scanAndImportHandlers(context.logger, context.plugin.server.config.all);
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
