@@ -1,7 +1,7 @@
 {
   "0":"Main Server Resource File",
   "ZWED0020I":"Registering at %s",
-  "ZWED0021I":"Eureka Client Registered from %s. Available at %s",
+  "ZWED0021I":"Eureka Client Registered from %s.",
   "ZWED0022I":"RESERVED: Fork worker %s",
   "ZWED0023I":"RESERVED: Restart worker %s",
   "ZWED0024I":"RESERVED: Keys=%s",
