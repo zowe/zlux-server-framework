@@ -49,6 +49,8 @@ function getJsonForYamls(configYamls: string) {
       // console.log('parsing zowe yaml file.');
       let yamlText = fs.readFileSync(yaml).toString();
       // console.log("Loaded file as=\n",yamlText);
+      
+      //this gives us a little compatibility between quickjs functions and nodejs functions 
       yamlText = yamlText.replace(/std.getenv(.*)/g, (match)=> {return 'process.env['+match.substring(11,match.length-1)+']';});
       yamlText = yamlText.replace(/os\.platform/g, 'os.platform()');
       //    yamlText = yamlText.replaceAll(/\${{\s.*\s}}/g, (match)=> {return match.substring(3, match.length-2);}); 
@@ -93,6 +95,17 @@ export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?:
   return config;
 }
 
+/*
+  This function recurses down the zowe config object.
+  At each level, if there's a string, it inspects the string to see if it is a template within (as in, ${{ }})
+  If there's one or more templates in the string, each template is resolved by a sandboxed eval which is given
+  The 'zowe' and 'components' object, plus 'process' and 'os'.
+  If the template cant be resolved, such as when there's a template that references another template that isnt resolved yet,
+  Then the template will be resolved to the string ${{ __ZOWE_UNRESOLVED_num_original }} where num is the attempt count
+  And original is just the original template.
+  The code will attempt to resolve each template a maximum of 5 times, such that the resolver will loop over the config 5 times
+  And allowing templates that are 5 references deep. If the template never resolves, it is replaced with undefined.
+*/
 function resolveTemplates(property: any, topObj: any): {property: any, templates: boolean} {
   let templateFound: boolean = false;
   let result = property;
