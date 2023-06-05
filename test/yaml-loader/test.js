@@ -36,7 +36,7 @@ console.log(`\n---Eval leak test, components should be undefined:`);
 try {
   console.log(components);
 } catch (e) {
-  console.log('coponents is undefined.')
+  console.log('components is undefined.')
 }
 console.log(`\n---Eval leak test, zowe should be undefined:`);
 try {
