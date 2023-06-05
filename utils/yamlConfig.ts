@@ -103,19 +103,6 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
   });
 
   if (typeof property == 'string') {
-    /*
-    let nextSearch = "${{ "
-    let previousIndex = 0;
-    let index = property.indexOf(nextSearch, 0);
-    while (index != -1) {
-      if (nextSearch == "${{ ") {
-        nextSearch = " }}";
-      } else {
-        nextSearch = "${{ ";
-      }
-    }
-    */
-    //'a/${{ one }}/b/${{ two }}'.split("${{ ")
     //Array(3) [ "a/", "one }}/b/", "two }}" ]
     
     let parts = property.split("${{ ");
@@ -174,36 +161,6 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
         result = true;
       }
     }
-    /*
-    if (property.startsWith("${{ ") && property.endsWith(" }}")) {
-      templateFound = true;
-      let count = 0;
-      var trimmed = property.substring(4, property.length-3).trim();
-      if (trimmed.startsWith("__ZOWE_UNRESOLVED_")) {
-        count = Number(property.charAt(18));
-        trimmed = property.substring(19);
-      }
-      try {
-        result = eval(`
-                      'use strict';
-                      topObj.${trimmed};
-                      `);
-      } catch (e) {
-        result = undefined;
-        //template likely resolved to undefined, continue.
-      }
-      if (!result) {
-        count++;
-        if (count >= RESOLVE_ATTEMPTS_MAX) {
-          console.log("Template "+trimmed+" could not be resolved, setting as undefined.");
-          result = undefined;
-        } else {
-
-          result = "${{ __ZOWE_UNRESOLVED_1"+trimmed+" }}";
-        }
-      } 
-      }
-      */
   } else if (typeof property == 'object') {
     if (Array.isArray(property)) {
       // console.log('iterate');
