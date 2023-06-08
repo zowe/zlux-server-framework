@@ -142,7 +142,7 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
           partParts[0] = undefined;
           //template likely resolved to undefined, continue.
         }
-        if (!partParts[0]) {
+        if (partParts[0]===undefined) {
           count++;
           if (count >= RESOLVE_ATTEMPTS_MAX) {
             console.log("Template "+trimmed+" could not be resolved, setting as undefined.");
@@ -155,7 +155,7 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
         //dont mix objects and strings or you'll get useless stuff. one or the other.
         if (typeof partParts[0] == 'object') {
           result = partParts[0];
-        } else if (partParts[0]) {
+        } else if (partParts[0]!==undefined) {
           result += partParts.join('');
         } else {
           result = undefined;
