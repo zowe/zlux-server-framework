@@ -19,7 +19,11 @@ function deepAssign(target, source) {
   } 
   Object.keys(source).forEach(function (key) {
     if (typeof source[key] !== 'object' || !target[key]) {
-      retVal[key] = source[key];
+      if (typeof target == 'string') {
+        retVal = source;
+      } else {
+        retVal[key] = source[key];
+      }
     } else {
       retVal[key] = deepAssign(target[key], source[key]);
     }
