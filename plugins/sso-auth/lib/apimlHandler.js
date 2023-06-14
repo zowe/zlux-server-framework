@@ -139,7 +139,7 @@ class ApimlHandler {
         this.doLogin(request, sessionState, false).then(result=> {
           resolve(result);
         }).catch(e=> {
-          Promise.resolve({success: false});
+          resolve({success: false}); // return the object directly
         });
       });
     } else if (request.cookies && request.cookies[TOKEN_NAME]) {

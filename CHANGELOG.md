@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.9.0
+
+- Enhancement: zowe.certificates.pem is no longer needed when using keyrings (#448)
+
 ## 2.8.0
 
 - Enhancement: Support zowe.verifyCertificates=NONSTRICT (#468)
