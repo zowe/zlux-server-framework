@@ -73,7 +73,7 @@
     "@types/qs": "6.9.3",
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
-    "mocha": "~8.4.0",
+    "mocha": "~10.2.0",
     "typescript": "2.7.1"
   },
   "optionalDependencies": {
