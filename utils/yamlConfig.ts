@@ -15,6 +15,8 @@ import * as _ from 'lodash';
 import * as YAML from 'yaml';
 import * as mergeUtils from './mergeUtils';
 
+let debugLog:boolean = false;
+
 const RESOLVE_ATTEMPTS_MAX=5;
 
 export function getCurrentHaInstanceId() {
@@ -48,7 +50,7 @@ function getJsonForYamls(configYamls: string) {
 
       // console.log('parsing zowe yaml file.');
       let yamlText = fs.readFileSync(yaml).toString();
-      // console.log("Loaded file as=\n",yamlText);
+      if (debugLog===true) {console.log("Loaded file as=\n",yamlText);}
       
       //this gives us a little compatibility between quickjs functions and nodejs functions 
       yamlText = yamlText.replace(/std.getenv(.*)/g, (match)=> {return 'process.env['+match.substring(11,match.length-1)+']';});
@@ -68,9 +70,10 @@ function getJsonForYamls(configYamls: string) {
 
 
 //may throw yaml parse or fs error
-export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?: string) {
+export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?: string, debug?:boolean) {
+  debugLog=debug;
   let config = getJsonForYamls(zoweYamlPaths);
-  // console.log("Parsed as=\n",config);
+  if (debugLog===true){ console.log("Parsed as=\n",config); }
   if (haInstanceIdOrUndefined) {
     let instanceLevelConfig;
     if (haInstanceIdOrUndefined) {
@@ -78,7 +81,7 @@ export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?:
     }
     const mergedConfig = mergeUtils.deepAssign(config, instanceLevelConfig ? instanceLevelConfig : {});
     config = mergedConfig;
-    // console.log("Merged HA instance as=\n",config);
+    if (debugLog===true) {console.log("Merged HA instance as=\n",config)};
   }
 
   let resolveTries = 0;
@@ -145,7 +148,9 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
         if (partParts[0]===undefined) {
           count++;
           if (count >= RESOLVE_ATTEMPTS_MAX) {
-            console.log("Template "+trimmed+" could not be resolved, setting as undefined.");
+            if (debugLog === true) {
+              console.log("Template "+trimmed+" could not be resolved, setting as undefined.");
+            }
             partParts[0] = undefined;
           } else {
             partParts[0] = "${{ __ZOWE_UNRESOLVED_"+count+trimmed+" }}";
@@ -180,7 +185,7 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
       result = property;
       for (let i = 0; i < property.length; i++) {
         let item = resolveTemplates(property[i], topObj);
-        // console.log(`resolved ${property[i]} as ${item.property}`); 
+        if (debugLog===true){ console.log(`resolved ${property[i]} as ${item.property}`); }
         property[i] = item.property;
         templateFound = templateFound || item.templates;
       }
