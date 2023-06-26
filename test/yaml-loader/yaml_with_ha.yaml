@@ -1,0 +1,25 @@
+zowe:
+  externalPort: 7554
+components:
+  gateway:
+    port: 7554
+    enabled: true
+  app-server:
+    node:
+      mediationLayer:
+        enabled: true
+        server:
+          gatewayPort: 7554
+    instanceDir: ../
+    logLevels:
+      _zsf.*: 5
+haInstances:
+  ha1:
+    components:
+      discovery:
+        port: 7553
+        enabled: true
+      app-server:
+        logLevels:
+          _zsf.*: 2
+          tn3270: 5
