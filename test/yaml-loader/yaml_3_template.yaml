@@ -1,0 +1,15 @@
+zowe:
+  externalPort: ${{ components.gateway.port }}
+components:
+  gateway:
+    port: 7554
+    enabled: true
+  app-server:
+    node:
+      mediationLayer:
+        enabled: true
+        server:
+          gatewayPort: ${{ components.gateway.port }}
+    instanceDir: ../
+    logLevels:
+      _zsf.*: 5

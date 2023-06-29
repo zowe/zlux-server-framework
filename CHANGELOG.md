@@ -5,7 +5,16 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 2.10.0
 
-- Enhancement: Avoid going directly to the Desktop when the gateway is active, by redirecting to the gateway equivalent homepage when the homepage is accessed.
+- Enhancement: Avoid going directly to the Desktop when the gateway is active, by redirecting to the gateway equivalent homepage when the homepage is accessed. (#449)
+
+## 2.9.0
+
+- Enhancement: zowe.certificates.pem is no longer needed when using keyrings (#448)
+
+## 2.8.0
+
+- Enhancement: Support zowe.verifyCertificates=NONSTRICT (#468)
+- Enhancement: Allow dataservices to pass CAs into the call() function (#462)
 
 ## 2.3.0
 
