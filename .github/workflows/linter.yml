@@ -27,7 +27,7 @@ jobs:
       - name: Lint Code Base
         uses: super-linter/super-linter@v5
         env:
-          VALIDATE_ALL_CODEBASE: false
+          VALIDATE_ALL_CODEBASE: true
           VALIDATE_JAVASCRIPT_ES: true
           DEFAULT_BRANCH: v2.x/staging
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
