@@ -28,6 +28,6 @@ jobs:
         uses: super-linter/super-linter@v5
         env:
           VALIDATE_ALL_CODEBASE: false
-          DEFAULT_BRANCH: master
+          DEFAULT_BRANCH: v2.x/staging
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     
