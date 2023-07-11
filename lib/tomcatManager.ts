@@ -1,4 +1,4 @@
-
+ 
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
@@ -275,7 +275,7 @@ export class TomcatManager implements JavaServerManager {
 
   }
 
-  public stop(): Promise<any> {
+  public stop(): Promise<void> {
     log.info(`ZWED0092I`, this.id); //log.info(`Tomcat Manager ID=${this.id} stopping`);
     TomcatManager.isWindows ? this.stopForWindows() : this.stopForUnix();
     return new Promise((resolve, reject) => {

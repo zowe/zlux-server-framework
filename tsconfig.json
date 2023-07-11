@@ -1,11 +1,12 @@
 {
   "compileOnSave": true,
   "include": [
-    "lib/*.ts"
+    "lib/*.ts",
+    "utils/*.ts",
+    "utils/yamlConfig.ts"
   ],
   "exclude": ["lib/*.js"],
   "compilerOptions": {
-    "outDir": "./lib",
     "sourceMap": true,
     "moduleResolution": "node",
     "target": "es5",
