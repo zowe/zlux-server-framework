@@ -127,13 +127,13 @@ class ApimlHandler {
   }
 
   /**
-     Authenticate in 1 of 2 ways: is body present? Use body to try to get new cookie.
+     Authenticate in 1 of 2 ways: is body present and has data? Use body to try to get new cookie.
      If it fails, is cookie present? Try that.
      If no body, try cookie.
      Return a success or failure, which sso-auth will handle
    */
   authenticate(request, sessionState) {
-    if (request.body) {
+    if (request.body && (Object.keys(request.body).length != 0)) {
       this.logger.debug(`Authenticate with body`);
       return new Promise((resolve, reject) => {
         this.doLogin(request, sessionState, false).then(result=> {
