@@ -1,0 +1,17 @@
+zowe:
+  externalPort: 7554
+  workspaceDirectory: "/home/me"
+components:
+  gateway:
+    port: ${{ zowe.externalPort }}
+    enabled: true
+  app-server:
+    pluginsDir: ${{ zowe.workspaceDirectory }}/app-server/plugins/
+    node:
+      mediationLayer:
+        enabled: true
+        server:
+          gatewayPort: 7554
+    instanceDir: ../
+    logLevels:
+      _zsf.*: 5

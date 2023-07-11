@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.10.0
+
+- Enhancement: Avoid going directly to the Desktop when the gateway is active, by redirecting to the gateway equivalent homepage when the homepage is accessed. The redirect behavior can be prevented if desired by using the query parameter `?zwed-no-redirect=1` in your URL. (#449)
+
 ## 2.9.0
 
 - Enhancement: zowe.certificates.pem is no longer needed when using keyrings (#448)

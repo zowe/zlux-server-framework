@@ -29,9 +29,10 @@ export class JavaManager {
   private portPos: number = 0;
   private servers: Array<any> = new Array<any>();
   private static supportedTypes: Array<string> = [WAR_SERVICE_TYPE_NAME, JAR_SERVICE_TYPE_NAME];
-  constructor(private config: JavaConfig, private instanceDir: Path, private zluxUrl: string) {
+  constructor(private config: JavaConfig, private defaultJavaHome: string, private instanceDir: Path, private zluxUrl: string) {
     //process at this time, so that startAll() is ready to go
     this.config = config;
+    this.defaultJavaHome = defaultJavaHome;
     this.processConfig();//validates & extracts... may throw
   }
 
@@ -315,8 +316,7 @@ export class JavaManager {
     if (config.runtimes) {
       return; //TODO what more validation should we do here
     } else {
-      //find from path
-      let JAVA_HOME = process.env.ZOWE_JAVA_HOME ? process.env.ZOWE_JAVA_HOME : process.env.JAVA_HOME;
+      let JAVA_HOME = this.defaultJavaHome;
       if (!JAVA_HOME) {
         throw new Error(`ZWED0044E - Java runtimes not specified, and no JAVA_HOME set`);
       }
