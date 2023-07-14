@@ -330,16 +330,20 @@ paths:
               Member membername could not be deleted
             DYNALLOC failure:
               DYNALLOC failed with RC = rc, DYN RC = rc, RSN = rsn, dsn={dataset}, (site)
-
   '/datasetCopy/{dataset}':
     post:
       summary: Copy a dataset and paste as a new one
       tags:
         - Dataset
       parameters:
+        - name: dataset
+          in: path
+          description: Source dataset name
+          required: true
+          type: string
         - name: newDataset
           in: query
-          description: Name of the new dataset created after copy operation
+          description: Target dataset name
           required: true
           type: string
       produces:
