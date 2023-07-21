@@ -185,12 +185,16 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
       result = property;
       for (let i = 0; i < property.length; i++) {
         let item = resolveTemplates(property[i], topObj);
-        if (debugLog===true){ console.log(`resolved ${property[i]} as ${item.property}`); }
+        if (debugLog===true && (item.property != property[i])) {
+          console.log(`resolved ${JSON.stringify(property[i])} as ${JSON.stringify(item.property,null,2)}`);
+        }
         property[i] = item.property;
         templateFound = templateFound || item.templates;
       }
-    } else {
-      // console.log('decend');
+    } else if (property) {
+      if (debugLog === true) {
+        console.log('decend on '+JSON.stringify(property).substring(0,40));
+      }
       result = property;
       const keys: string[] = Object.keys(property);    
       keys.forEach((key:string)=> {
