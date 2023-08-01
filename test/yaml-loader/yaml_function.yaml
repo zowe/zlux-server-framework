@@ -1,0 +1,24 @@
+zowe:
+  externalPort: 7554
+  workspaceDirectory: "/home/me"
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://user/ringname"
+      alias: "my alias"
+components:
+  gateway:
+    port: ${{ zowe.externalPort }}
+    enabled: true
+  app-server:
+    pluginsDir: ${{ zowe.workspaceDirectory }}/app-server/plugins/
+    node:
+      https:
+        keys: ${{ function a(){ if (zowe.certificate.keystore.type == 'JCERACFKS') { return [ zowe.certificate.keystore.file+'&'+zowe.certificate.keystore.alias ] } else { return null } }; a() }}
+      mediationLayer:
+        enabled: true
+        server:
+          gatewayPort: 7554
+    instanceDir: ../
+    logLevels:
+      _zsf.*: 5
