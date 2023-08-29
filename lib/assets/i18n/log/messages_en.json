@@ -378,5 +378,6 @@
   "ZWED0155E":"RESERVED: (%s) is not a supported endpoint for %s. Skipping (%s)... Supported: %s",
   "ZWED0156E":"RESERVED: Could not register default plugins into app-server",
   "ZWED0157E":"RESERVED: Could not register default plugin %s into app-server",
-  "ZWED0158E":"Could not listen on address %s:%s. Insufficient permissions to perform port bind."
+  "ZWED0158E":"Could not listen on address %s:%s. Insufficient permissions to perform port bind.",
+  "ZWED0159E":"Could not read zowe manifest, version unknown"
 }
