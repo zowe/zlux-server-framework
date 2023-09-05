@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.11.0
+
+- Enhancement: The title and description of the app server within the api catalog has been updated to be more complete, accurate, and useful.
+
 ## 2.10.0
 - This action making a CHANGELOG note via special syntax from the GitHub PR commit message, like it could automatically update CHANGELOG.md with the message. First job checks if PR body has changelog note or not if it's not there then it asked them to add it and second job is to check if changelog note has been added in changelog.md file or not. (#496)
 
