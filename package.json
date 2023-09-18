@@ -59,7 +59,7 @@
     "normalize-url": "~7.0.0",
     "require-from-string": "~2.0.2",
     "rimraf": "~2.6.3",
-    "semver": "~5.7.2",
+    "semver": "~5.5.1",
     "swagger-parser": "~10.0.3",
     "ws": "^6.2.2",
     "yaml": "~1.10.2",
