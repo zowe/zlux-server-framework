@@ -8,7 +8,6 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Enhancement: The title and description of the app server within the api catalog has been updated to be more complete, accurate, and useful.
 
 ## 2.10.0
- 
 
 - Enhancement: Avoid going directly to the Desktop when the gateway is active, by redirecting to the gateway equivalent homepage when the homepage is accessed. The redirect behavior can be prevented if desired by using the query parameter `?zwed-no-redirect=1` in your URL. (#449)
 - Bugfix: Proxy when encountering an error, now errors out with 500 Internal Server Error (#487)
