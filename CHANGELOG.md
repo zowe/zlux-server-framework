@@ -2,6 +2,10 @@
 
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
+    
+## 2.13.0
+- Added support for using zowe.network and components.app-server.zowe.network to set listener IP and TLS version properties. (#511)
+
 
 ## 2.12.0
 
