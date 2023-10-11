@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.12.0
+
+- Enhancement: Auth plugins that are not requested by any dataservice found at startup are no longer loaded by the server.
+
 ## 2.11.0
 
 - Enhancement: The title and description of the app server within the api catalog has been updated to be more complete, accurate, and useful.
