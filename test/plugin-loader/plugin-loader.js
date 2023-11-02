@@ -8,9 +8,9 @@
   
   Copyright Contributors to the Zowe Project.
 */
-const assert = require('assert')
-const path = require('path')
-const PluginLoader = require('../../lib/plugin-loader')
+import assert from 'assert';
+import path from 'path';
+import PluginLoader from '../../lib/plugin-loader';
 const makePlugin = PluginLoader.makePlugin
   
 const PLUGIN_PATH = path.join(process.cwd(), "test/plugin-loader");

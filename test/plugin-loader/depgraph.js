@@ -1,17 +1,17 @@
-
 /*
-  This program and the accompanying materials are
-  made available under the terms of the Eclipse Public License v2.0 which accompanies
-  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
-  
-  SPDX-License-Identifier: EPL-2.0
-  
-  Copyright Contributors to the Zowe Project.
-*/
-const assert = require('assert')
-const Depgraph = require('../../lib/depgraph')
-const depTestData = require('./depgraph-test-data')
-const pd = "..\..\..\\zlux-app-server\\deploy\\product"
+ * This program and the accompanying materials are made available under the terms of the
+ * Eclipse Public License v2.0 which accompanies this distribution, and is available at
+ * https://www.eclipse.org/legal/epl-v20.html
+ *
+ * SPDX-License-Identifier: EPL-2.0
+ *
+ * Copyright Contributors to the Zowe Project.
+ */
+
+import { strict as assert } from 'assert';
+import Depgraph from '../../lib/depgraph';
+import type { depTestData } from './depgraph-test-data';
+//const pd = "..\..\..\\zlux-app-server\\deploy\\product"
   
 describe('degpraph', function() {
   it('should correctly install plugins with valid deps', function() {
@@ -38,7 +38,7 @@ describe('degpraph', function() {
   it('should fail on a circular dependency', function() {
     assert.throws(() => {
       const dg = new Depgraph(depTestData.cycle);
-      const p = dg.processImports();
+      dg.processImports();
     }); 
   });
 });

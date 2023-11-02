@@ -8,10 +8,10 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const chai = require('chai');
+import chai from 'chai';
 const expect = chai.expect;
-const apimlStorage = require('../../lib/apimlStorage');
-const fs = require('fs');
+import { apimlStorage } from '../../lib/apimlStorage';
+import fs from 'fs';
 
 describe('APIML Storage', function () {
   let storage = null;

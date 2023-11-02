@@ -9,10 +9,10 @@
 */
 
 
-const WebSocket = require('ws');
-const https = require('https');
-const axios = require('axios');
-const argParser = require('../../../utils/argumentParser');
+import WebSocket from 'ws';
+import https from 'https';
+import axios from 'axios';
+import argParser from '../../../utils/argumentParser';
 const args = [
   new argParser.CLIArgument('host', 'h', argParser.constants.ARG_TYPE_VALUE),
   new argParser.CLIArgument('port', 'o', argParser.constants.ARG_TYPE_VALUE),

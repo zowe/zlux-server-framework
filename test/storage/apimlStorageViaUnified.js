@@ -8,12 +8,12 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const chai = require('chai');
-const expect = chai.expect;
-const pluginStorage = require('../../lib/pluginStorage');
-const apimlStorage = require('../../lib/apimlStorage');
-const fs = require('fs');
-const utilLog = require('../../lib/util').loggers.utilLogger;
+import { expect } from 'chai';
+//import * as chai from 'chai';
+import { pluginStorage } from '../../lib/pluginStorage';
+import { apimlStorage } from '../../lib/apimlStorage';
+import fs from 'fs';
+import { loggers } from '../../lib/util';
 
 describe('APIML Storage via Unified interface', function () {
   let storage = null;
@@ -37,6 +37,7 @@ describe('APIML Storage via Unified interface', function () {
         }
       };
       apimlStorage.configure(settings);
+      const utilLog = loggers.utilLogger;
       storage = pluginStorage.PluginStorageFactory(pluginId, utilLog);
     } else {
       console.log(`Required environment variables not found. Set these env vars to run tests:`);

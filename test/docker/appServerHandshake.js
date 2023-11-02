@@ -2,14 +2,14 @@
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
   this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
-  
+
   SPDX-License-Identifier: EPL-2.0
-  
+
   Copyright Contributors to the Zowe Project.
 */
 
-const https = require('https');
-const argParser = require('../../utils/argumentParser');
+import * as https from 'https';
+import argParser from '../../utils/argumentParser';
 const args = [
   new argParser.CLIArgument('host', 'h', argParser.constants.ARG_TYPE_VALUE),
   new argParser.CLIArgument('port', 'o', argParser.constants.ARG_TYPE_VALUE),
