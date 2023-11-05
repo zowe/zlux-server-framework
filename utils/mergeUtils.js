@@ -11,7 +11,7 @@
 function deepAssign(target, source) {
   var retVal = {}
   if (Array.isArray(target)) {
-	  retVal = target;
+    retVal = target;
   } else if (typeof target === 'object' && target) {
     Object.keys(target).forEach(function (key) {
       retVal[key] = target[key];

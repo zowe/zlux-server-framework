@@ -74,7 +74,7 @@ function CLIArgument(longName, shortName, type) {
   return {
     getMatch: getMatch
   };
-};
+}
 exports.CLIArgument = CLIArgument;
 
 /*
@@ -96,7 +96,7 @@ function resolveJson(argumentsObj, matchObj) {
     returnVal = {};
   }
   let currentLevel = returnVal;
-  let currentIndex = -1;
+//  let currentIndex = -1;
   const partLen = matchParts.length-1;
   try {
     for (let i = 0; i < partLen; i++) {
@@ -134,6 +134,7 @@ function resolveJson(argumentsObj, matchObj) {
 
 function ArgumentParser(validArgs, argArray) {
   var validArguments = validArgs;
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   var args = argArray;
 
   var parse = function(args) {
@@ -284,8 +285,8 @@ function stringToValue(stringVal, csvAsArray) {
 }
 exports.stringToValue = stringToValue;
 
-
 function testEnv() {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
   let input0 = {ABC:"1",
                ABC_123: "2",
                ABC__123: "3",
@@ -392,7 +393,7 @@ function testEnv() {
                _______aBC_______123_______: "122",
                 __0__abc__1__def: "123"
                };
-
+/* eslint-disable-next-line no-unused-vars */
   let input = {
 
                node_mediationLayer_server_gatewayPort:"$GATEWAY_PORT",

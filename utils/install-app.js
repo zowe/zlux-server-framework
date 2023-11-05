@@ -8,13 +8,13 @@
  Copyright Contributors to the Zowe Project.
 */
 
-const fs = require('graceful-fs');
-const Promise = require('bluebird');
-const path = require('path');
-const packagingUtils = require('./packaging-utils');
-const serverUtils = require('../lib/util');
-const jsonUtils = require('../lib/jsonUtils');
-const rmrf = require('rimraf');
+import * as fs from 'graceful-fs';
+//const Promise = require('bluebird');
+import * as path from 'path';
+import { packagingUtils } from './packaging-utils';
+import * as serverUtils from '../lib/util';
+import * as jsonUtils from '../lib/jsonUtils';
+//import * as rmrf from 'rimraf';
 
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
 //TO DO - Sean - bootstrap logger
@@ -28,13 +28,13 @@ try { // Attempt to get a log message for a language a user may have specified
 }
 logger._messages = messages;
 
-const argParser = require('./argumentParser');
+import * as argParser from './argumentParser';
 //const usage = 'Usage: --inputApp | -i INPUTAPP --pluginsDir | -p PLUGINSDIR '
 //      + '--zluxConfig | -c ZLUXCONFIGPATH [--verbose | -v]';
 
 //TODO if plugins get extracted read-only, then how would we go about doing upgrades? read-write for now!
 const FILE_WRITE_MODE = 0o660;
-const DIR_WRITE_MODE = 0o770;
+//const DIR_WRITE_MODE = 0o770;
 
 const OPTION_ARGS = [
   new argParser.CLIArgument('inputApp', 'i', argParser.constants.ARG_TYPE_VALUE),
@@ -96,9 +96,9 @@ function isFile(path) {
   return false;
 }
 
-function cleanup() {
-  logger.warn(`ZWED0147W`); //logger.warn(`Cleanup not yet implemented`);
-}
+//function cleanup() {
+//  logger.warn(`ZWED0147W`); //logger.warn(`Cleanup not yet implemented`);
+//}
 
 function addToServer(appDir, installDir) {
   try {
@@ -177,6 +177,7 @@ function copyRecognizers(appDir, appId, appVers) {
           configRecognizers = JSON.parse(fs.readFileSync(filepathConfig)).recognizers;
           const configRecognizersKeys = Object.keys(configRecognizers);
           for (const configKey of configRecognizersKeys) { // Traverse config recognizers
+            // eslint-disable-next-line no-undef
             for (const key of recognizerKeys) { // Traverse plugin recognizers
               if (configRecognizers[configKey].key && recognizers[key].key && configRecognizers[configKey].key == recognizers[key].key) { // TODO: Need to implement real keys for Recognizers
                 configRecognizers[configKey] = recognizers[key]; // Choose the recognizers originating from plugin
@@ -244,7 +245,8 @@ function copyActions(appDir, appId, appVers) {
 
 if(calledViaCLI){
   if (!isFile(userInput.inputApp)) {
-    const pluginDefinition = packagingUtils.validatePluginInDirectory(userInput.inputApp);
+//    const pluginDefinition =
+    packagingUtils.validatePluginInDirectory(userInput.inputApp);
     addToServer(userInput.inputApp);  
   } else {
     packagingUtils.endWithMessage(`App given was not a directory. Not yet implemented: Package extraction`);

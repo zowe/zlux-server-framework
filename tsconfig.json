@@ -8,8 +8,9 @@
   "exclude": ["lib/*.js"],
   "compilerOptions": {
     "sourceMap": true,
+    "module": "ES6",
     "moduleResolution": "node",
-    "target": "es5",
+    "target": "ES6",
     "types": [
       "node",
       "express"

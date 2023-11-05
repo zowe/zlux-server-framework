@@ -8,9 +8,9 @@
   
   Copyright Contributors to the Zowe Project.
 */
-const assert = require('assert')
-const zluxUtil = require('../../lib/util.js')
-const pd = "..\..\..\\zlux-app-server\\deploy\\product"
+import assert from 'assert';
+import zluxUtil from '../../lib/util.js';
+//const pd = "../../../zlux-app-server/deploy/product";
   
 global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_zsf.network", 5);
 
