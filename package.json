@@ -35,7 +35,7 @@
     "build": "tsc",
     "start": "tsc --watch",
     "test:storage": "mocha --timeout 10000 ./test/storage/*.js",
-    "lint": "eslint --ext .js ."
+    "lint": "eslint --ext .js,.mjs ."
   },
   "dependencies": {
     "@rocketsoftware/eureka-js-client": "~4.5.6",
