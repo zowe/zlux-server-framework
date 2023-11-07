@@ -12,7 +12,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as _ from 'lodash';
 import * as YAML from 'yaml';
-import * as mergeUtils from './mergeUtils.mjs';
+import * as mergeUtils from './mergeUtils';
 
 let debugLog:boolean = false;
 
