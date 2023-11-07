@@ -2,9 +2,9 @@
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
   this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
-
+  
   SPDX-License-Identifier: EPL-2.0
-
+  
   Copyright Contributors to the Zowe Project.
 */
 
@@ -12,6 +12,7 @@ import path from 'path';
 import Promise from 'bluebird';
 import fs from 'graceful-fs';
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
+// eslint-disable-next-line import/no-unresolved
 import { logging } from '../../zlux-shared/src/logging/logger.js';
 const coreLogger = new logging.Logger();
 //simple program, no need for logger names to be displayed
