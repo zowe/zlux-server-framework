@@ -1,11 +1,11 @@
 /*
- This program and the accompanying materials are
- made available under the terms of the Eclipse Public License v2.0 which accompanies
- this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
- 
- SPDX-License-Identifier: EPL-2.0
- 
- Copyright Contributors to the Zowe Project.
+  This program and the accompanying materials are
+  made available under the terms of the Eclipse Public License v2.0 which accompanies
+  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+  
+  SPDX-License-Identifier: EPL-2.0
+  
+  Copyright Contributors to the Zowe Project.
 */
 
 const path = require('path');
@@ -16,8 +16,8 @@ const logging = require('../../zlux-shared/src/logging/logger.js');
 const coreLogger = new logging.Logger();
 //simple program, no need for logger names to be displayed
 coreLogger.addDestination(coreLogger.makeDefaultDestination(true,false,false));
-
-let logger;
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+let logger; // no implementation found
 
 exports.coreLogger = coreLogger;
 exports.setComponentLogger = function(componentLogger) {
@@ -29,7 +29,7 @@ function mkdirp(dir, options) {
     if (dir == '.') {
       resolve();
     } else {
-      fs.stat(dir, (err, stats)=> {
+      fs.stat(dir, (err)=> {
         if (!err) {
           //exists
           resolve();
@@ -43,6 +43,7 @@ function mkdirp(dir, options) {
                 resolve();
               }
             });
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
           }).catch((err)=> {
             reject();
           });
@@ -75,7 +76,7 @@ function validatePluginInDirectory(inputDir) {
     endWithMessage(`Couldn't read pluginDefinition.json within ${inputDir}, e=${e}`);
   }
   return pluginDefinition;
-};
+}
 exports.validatePluginInDirectory = validatePluginInDirectory;
 
 function endWithMessage(message) {

@@ -37,7 +37,7 @@ exports.webAppOptions = {
       pluginMap: {},
       ng2: {}
     },
-    newPluginHandler: (pluginDef) => {},
+    newPluginHandler: () => {},
     auth: { 
       doLogin() {},
       getStatus() {},

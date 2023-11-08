@@ -1,4 +1,3 @@
-
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
@@ -15,22 +14,22 @@ agent connectivity is without a handshake at this time, but
 when this changes, tests should exist here to test handshake
 */
 
-const assert = require('assert')
-const path = require('path');
-const http = require('http');
-const https = require('https');
-const chai = require('chai');
-const chaiHttp = require('chai-http');
+require('assert');
+//import path from 'path';
+import http from 'http';
+import https from 'https';
+import chai from 'chai';
+import chaiHttp from 'chai-http';
 chai.use(chaiHttp);
-const should = chai.should();
-const PluginLoader = require('../../lib/plugin-loader')
-const makePlugin = PluginLoader.makePlugin
-const makeWebApp = require('../../lib/webapp').makeWebApp;
-const config = require('./config');
-const express = require('express');
-const fs = require('fs');
-const util = require('../../lib/util');
-const Promise = require('bluebird');
+//const should = chai.should();
+//import PluginLoader from '../../lib/plugin-loader';
+//const makePlugin = PluginLoader.makePlugin
+import { makeWebApp } from '../../lib/webapp';
+import config from './config';
+import express from 'express';
+import fs from 'fs';
+import util from '../../lib/util';
+import Promise from 'bluebird';
 
 let webAppOptions = config.webAppOptions;
 
@@ -58,7 +57,7 @@ function makeFakeAgent(options) {
 
     
     agent.listen(port, "localhost");
-    agent.on('listening', _ => resolve(agent));
+    agent.on('listening', () => resolve(agent));
     agent.on('error', e => reject(e));
   });
 }
@@ -79,12 +78,12 @@ describe('Agent', function() {
         webApp = makeWebApp(webAppOptions);
         server = http.createServer(webApp.expressApp)
 
-        server.on('listening', _ => makeFakeAgent(webAppOptions.serverConfig.agent).then(result=>{
+        server.on('listening', () => makeFakeAgent(webAppOptions.serverConfig.agent).then(result => {
           agent = result;
           done()
         }).catch(e=>done(e)));
         server.on('error', e => done(e));
-        let x = server.listen(webAppOptions.httpPort, "localhost")
+        server.listen(webAppOptions.httpPort, "localhost")
       } catch (e) {
         console.log(e)
         done(e);
@@ -117,12 +116,12 @@ describe('Agent', function() {
         webApp = makeWebApp(webAppOptions);
         server = http.createServer(webApp.expressApp)
 
-        server.on('listening', _ => makeFakeAgent(webAppOptions.serverConfig.agent).then(result=>{
+        server.on('listening', () => makeFakeAgent(webAppOptions.serverConfig.agent).then(result=>{
           agent = result;
           done()
         }).catch(e=>done(e)));
         server.on('error', e => done(e));
-        let x = server.listen(webAppOptions.httpPort, "localhost")
+        server.listen(webAppOptions.httpPort, "localhost")
       } catch (e) {
         console.log(e)
         done(e);
@@ -154,12 +153,12 @@ describe('Agent', function() {
         webApp = makeWebApp(webAppOptions);
         server = http.createServer(webApp.expressApp)
 
-        server.on('listening', _ => makeFakeAgent(webAppOptions.serverConfig.agent).then(result=>{
+        server.on('listening', () => makeFakeAgent(webAppOptions.serverConfig.agent).then(result=>{
           agent = result;
           done()
         }).catch(e=>done(e)));        
         server.on('error', e => done(e));
-        let x = server.listen(webAppOptions.httpPort, "localhost")
+        server.listen(webAppOptions.httpPort, "localhost")
       } catch (e) {
         console.log(e)
         done(e);
@@ -178,9 +177,11 @@ describe('Agent', function() {
 
   })
   afterEach(function(done) {
-    server.close(_=>{
-      agent.close(result=>{done()});
+  server.close(() => {
+    agent.close(() => {
+      done();
     });
-  })
-  
+  });
+});
+
 })

@@ -1,4 +1,3 @@
-
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
@@ -10,7 +9,7 @@
 */
 
 import * as fs from 'fs';
-import * as path from 'path';
+// import * as path from 'path';
 import * as _ from 'lodash';
 import * as YAML from 'yaml';
 import * as mergeUtils from './mergeUtils';
@@ -38,8 +37,8 @@ export function getDefaultZoweDotYamlFile() {
 
 // formats either /my/zowe.yaml or FILE(/my/zowe.yaml):FILE(/my/defaults.yaml)
 function getJsonForYamls(configYamls: string) {
-  let configs = [];
-  let yamls = configYamls.split('FILE(');
+  const configs = [];
+  const yamls = configYamls.split('FILE(');
   yamls.forEach((yaml:string)=> {
     if (yaml.length>0) {
       if (yaml.endsWith(')')) {
@@ -62,7 +61,7 @@ function getJsonForYamls(configYamls: string) {
 
   let finalConfig = {};
   for (let i = configs.length-1; i >= 0; i--) {
-    let config = configs[i];
+    const config = configs[i];
     finalConfig = mergeUtils.deepAssign(finalConfig, config);
   }
   return finalConfig;
@@ -81,12 +80,12 @@ export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?:
     }
     const mergedConfig = mergeUtils.deepAssign(config, instanceLevelConfig ? instanceLevelConfig : {});
     config = mergedConfig;
-    if (debugLog===true) {console.log("Merged HA instance as=\n",config)};
+    if (debugLog===true) {console.log("Merged HA instance as=\n",config)}
   }
 
   let resolveTries = 0;
   while (resolveTries < RESOLVE_ATTEMPTS_MAX) {
-    let resolveResult = resolveTemplates(config, config);
+    const resolveResult = resolveTemplates(config, config);
     config = resolveResult.property;
     if (resolveResult.templates) {
       resolveTries++;
@@ -112,7 +111,7 @@ export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?:
 function resolveTemplates(property: any, topObj: any): {property: any, templates: boolean} {
   let templateFound: boolean = false;
   let result = property;
-  let topObjKeys = Object.keys(topObj);
+  const topObjKeys = Object.keys(topObj);
   let evalGlobalString = `var os = require('os'); `;
   topObjKeys.forEach((key)=> {
     evalGlobalString+=`var ${key} = topObj.${key}; `
@@ -121,14 +120,14 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
   if (typeof property == 'string') {
     //Array(3) [ "a/", "one }}/b/", "two }}" ]
     
-    let parts = property.split("${{ ");
+    const parts = property.split("${{ ");
     result = '';
     for (let i = 0; i < parts.length; i++) {
-      let partParts = parts[i].split(' }}');
+      const partParts = parts[i].split(' }}');
       if (partParts.length > 1) {
         templateFound = true;
         let count = 0;
-        var trimmed = partParts[0];
+        const trimmed = partParts[0];
         if (trimmed.startsWith("__ZOWE_UNRESOLVED_")) {
           count = Number(partParts[0].charAt(18));
           trimmed = partParts[0].substring(19);
@@ -170,7 +169,7 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
       }
     }
     if (templateFound) {
-      let asNumber = Number(result);
+      const asNumber = Number(result);
       if (!Number.isNaN(asNumber)) {
         result = asNumber;
       } else if (result === 'false') {
@@ -184,7 +183,7 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
       // console.log('iterate');
       result = property;
       for (let i = 0; i < property.length; i++) {
-        let item = resolveTemplates(property[i], topObj);
+        const item = resolveTemplates(property[i], topObj);
         if (debugLog===true && (item.property != property[i])) {
           console.log(`resolved ${JSON.stringify(property[i])} as ${JSON.stringify(item.property,null,2)}`);
         }
@@ -199,8 +198,8 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
       const keys: string[] = Object.keys(property);    
       keys.forEach((key:string)=> {
         // console.log('key='+key);
-        let value = property[key];
-        let update = resolveTemplates(value, topObj);
+        const value = property[key];
+        const update = resolveTemplates(value, topObj);
         property[key] = update.property;
         templateFound = templateFound || update.templates;
       });
