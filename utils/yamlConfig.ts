@@ -127,11 +127,12 @@ function resolveTemplates(property: any, topObj: any): {property: any, templates
       if (partParts.length > 1) {
         templateFound = true;
         let count = 0;
-        const trimmed = partParts[0];
+        let trimmed = partParts[0];
         if (trimmed.startsWith("__ZOWE_UNRESOLVED_")) {
           count = Number(partParts[0].charAt(18));
           trimmed = partParts[0].substring(19);
         }
+
 //        console.log('trimmed='+trimmed);
 
         try {
