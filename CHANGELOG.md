@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 2.12.0
 
+- Enhancement: added test-linter.yml to catch all linting issues whenever PR is open and fixed all existing linting issues.
 - Enhancement: Auth plugins that are not requested by any dataservice found at startup are no longer loaded by the server.
 
 ## 2.11.0
