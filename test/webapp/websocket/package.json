@@ -6,7 +6,7 @@
   "author": "",
   "license": "EPL-2.0",
   "dependencies": {
-    "axios": "^0.21.2",
+    "axios": "^1.6.0",
     "bufferutil": "^4.0.1",
     "utf-8-validate": "^5.0.2",
     "ws": "^7.4.6"
