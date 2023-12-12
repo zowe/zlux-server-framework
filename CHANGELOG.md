@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 2.14.0
 - Bugfix: App-server would not correctly detect when it was running in a high-availability configuration environment.
+- Bugfix: App-server could not load when multiple discovery servers were present and the app-server was unable to reach the first one specified. Now, the app-server will iterate through the list of servers until an accessible one is reached.
     
 ## 2.13.0
 - Added support for using zowe.network and components.app-server.zowe.network to set listener IP and TLS properties including max and min version, ciphers, and ECDH curves. (#511)
