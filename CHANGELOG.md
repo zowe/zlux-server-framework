@@ -4,9 +4,10 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.14.0
-- Bugfix: App-server would not correctly detect when it was running in a high-availability configuration environment.
-- Bugfix: App-server could not load when multiple discovery servers were present and the app-server was unable to reach the first one specified. Now, the app-server will iterate through the list of servers until an accessible one is reached.
-    
+- Bugfix: App-server could not load when multiple discovery servers were present and the app-server was unable to reach the first one specified. Now, the app-server will iterate through the list of servers until an accessible one is reached. (#522)
+- Bugfix: App-server would not correctly detect when it was running in a high-availability configuration environment. (#521)
+- Bugfix: A call to GET /plugins would trigger an authorization check regardless of if rbac was set on or off (#523)
+
 ## 2.13.0
 - Added support for using zowe.network and components.app-server.zowe.network to set listener IP and TLS properties including max and min version, ciphers, and ECDH curves. (#511)
 - Enhanced cipher customization to allow for ciphers to be specified in IANA format in addition to the existing OpenSSL format. (#511)
