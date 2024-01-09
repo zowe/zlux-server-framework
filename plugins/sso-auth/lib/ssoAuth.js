@@ -18,7 +18,7 @@ const apimlHandlerFactory = require('./apimlHandler');
 function doesApimlExist(serverConf) {
   return ((serverConf.node.mediationLayer !== undefined)
     && (serverConf.node.mediationLayer.server !== undefined)
-    && (serverConf.node.mediationLayer.server.hostname !== undefined)
+    && (serverConf.node.mediationLayer.server.gatewayHostname !== undefined)
     && (serverConf.node.mediationLayer.server.gatewayPort !== undefined)
     && (serverConf.node.mediationLayer.server.port !== undefined)
     && (serverConf.node.mediationLayer.enabled == true))
