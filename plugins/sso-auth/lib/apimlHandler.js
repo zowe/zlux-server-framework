@@ -66,7 +66,7 @@ class ApimlHandler {
       }
       const gatewayUrl = this.gatewayUrl;
       const options = {
-        hostname: this.apimlConf.gatwayHostname,
+        hostname: this.apimlConf.gatewayHostname,
         port: this.apimlConf.gatewayPort,
 //TODO uncertainty about using apicatalog route instead of something part of the gateway itself
         path: '/apicatalog/api/v1/auth/logout',
