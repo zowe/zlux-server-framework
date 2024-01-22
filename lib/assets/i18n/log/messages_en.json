@@ -372,7 +372,7 @@
   "ZWED0147E":"SAF keyring data was not found for \"%s\"",
   "ZWED0148E":"Exception thrown when reading SAF keyring, e=",
   "ZWED0149E":"SAF keyring reference missing userId \"%s\", keyringName \"%s\", or label \"%s\"",
-  "ZWED0150E":"Cannot load SAF keyring due to missing keyring_js library",
+  "ZWED0150E":"Cannot load SAF keyring due to missing keyring_js or zcrypto library",
   "ZWED0151E":"RESERVED: Env var %s not found",
   "ZWED0152E":"Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.",
   "ZWED0153E":"RESERVED: (%s) is not a supported platform for %s. Skipping (%s)... Supported: %s",
