@@ -55,7 +55,7 @@ class ApimlHandler {
   constructor(pluginDef, pluginConf, serverConf, context) {
     this.logger = context.logger;    
     this.apimlConf = serverConf.node.mediationLayer.server;    
-    this.gatewayUrl = `https://${this.apimlConf.hostname}:${this.apimlConf.gatewayPort}`;
+    this.gatewayUrl = `https://${this.apimlConf.gatewayHostname}:${this.apimlConf.gatewayPort}`;
     this.httpsAgent = new https.Agent(context.tlsOptions);
   }
 
@@ -66,7 +66,7 @@ class ApimlHandler {
       }
       const gatewayUrl = this.gatewayUrl;
       const options = {
-        hostname: this.apimlConf.hostname,
+        hostname: this.apimlConf.gatewayHostname,
         port: this.apimlConf.gatewayPort,
 //TODO uncertainty about using apicatalog route instead of something part of the gateway itself
         path: '/apicatalog/api/v1/auth/logout',
@@ -194,7 +194,7 @@ class ApimlHandler {
     }
     
     return {
-      hostname: this.apimlConf.hostname,
+      hostname: this.apimlConf.gatewayHostname,
       port: this.apimlConf.gatewayPort,
       path: path,
       method: method,
