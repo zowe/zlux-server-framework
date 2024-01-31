@@ -56,7 +56,7 @@ interface KeyValuePair {
 interface ApimlResponse {
   statusCode: number;
   json?: any;
-  headers: AxiosHeaders;
+  headers: any;
 }
 
 export type ApimlStorageErrorCode =
@@ -162,7 +162,7 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
       headers: req.headers,
     });
     const apimlResponse: ApimlResponse = {
-      headers: response.headers as RawAxiosRequestHeaders,
+      headers: response.headers,
       statusCode: response.status,
       json: response.data
     };
