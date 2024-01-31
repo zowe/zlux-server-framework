@@ -10,8 +10,8 @@
 
 import * as https from 'https';
 import * as http from 'http';
-import axios, { AxiosResponseHeaders } from 'axios';
-import { AxiosInstance } from 'axios';
+import axios, { AxiosHeaders, RawAxiosRequestHeaders } from 'axios';
+import { AxiosInstance, } from 'axios';
 
 let apimlClient: AxiosInstance;
 
@@ -56,7 +56,7 @@ interface KeyValuePair {
 interface ApimlResponse {
   statusCode: number;
   json?: any;
-  headers: AxiosResponseHeaders;
+  headers: AxiosHeaders;
 }
 
 export type ApimlStorageErrorCode =
@@ -162,7 +162,7 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
       headers: req.headers,
     });
     const apimlResponse: ApimlResponse = {
-      headers: response.headers,
+      headers: response.headers as RawAxiosRequestHeaders,
       statusCode: response.status,
       json: response.data
     };
