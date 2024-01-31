@@ -10,10 +10,10 @@
 
 import * as https from 'https';
 import * as http from 'http';
-import axios, { AxiosHeaders } from 'axios';
+import axios, { AxiosResponseHeaders } from 'axios';
 import { AxiosInstance } from 'axios';
 
-let apimlClient: AxiosResponseHeaders;
+let apimlClient: AxiosInstance;
 
 export function configure(settings: ApimlStorageSettings) {
   apimlClient = axios.create({
@@ -56,7 +56,7 @@ interface KeyValuePair {
 interface ApimlResponse {
   statusCode: number;
   json?: any;
-  headers: AxiosHeaders;
+  headers: AxiosResponseHeaders;
 }
 
 export type ApimlStorageErrorCode =
