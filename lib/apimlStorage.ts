@@ -11,7 +11,7 @@
 import * as https from 'https';
 import * as http from 'http';
 import axios from 'axios';
-import { AxiosInstance, } from 'axios';
+import { AxiosInstance } from 'axios';
 
 let apimlClient: AxiosInstance;
 
