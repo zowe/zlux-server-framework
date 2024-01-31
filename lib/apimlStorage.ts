@@ -10,7 +10,7 @@
 
 import * as https from 'https';
 import * as http from 'http';
-import axios, { AxiosHeaders, RawAxiosRequestHeaders } from 'axios';
+import axios from 'axios';
 import { AxiosInstance, } from 'axios';
 
 let apimlClient: AxiosInstance;
