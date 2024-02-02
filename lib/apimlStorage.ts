@@ -162,7 +162,7 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
       headers: req.headers,
     });
     const apimlResponse: ApimlResponse = {
-      headers: response.headers,
+      headers: response.headers as http.IncomingHttpHeaders,
       statusCode: response.status,
       json: response.data
     };
