@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.15.0
+- Bugfix: App-server could not run in HTTP mode for AT-TLS setup because it was not able to merge HTTPS and HTTP addresses. (#984)
+
 ## 2.14.0
 - Bugfix: App-server could not load when multiple discovery servers were present and the app-server was unable to reach the first one specified. Now, the app-server will iterate through the list of servers until an accessible one is reached. (#522)
 - Bugfix: App-server would not correctly detect when it was running in a high-availability configuration environment. (#521)
