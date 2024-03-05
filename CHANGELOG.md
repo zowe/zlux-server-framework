@@ -4,7 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.16.0
-- Enhancement: Added support for JCECCARACFKS via addition of the zcrypto library.
+- Enhancement: Added support for JCECCARACFKS via addition of the zcrypto library. (#529)
 
 ## 2.15.0
 - Bugfix: App-server could not run in HTTP mode for AT-TLS setup because it was not able to merge HTTPS and HTTP addresses. (#984)
