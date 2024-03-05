@@ -80,7 +80,7 @@
   "optionalDependencies": {
     "fsevents": "~2.3.2",
     "keyring_js": "~1.1.0",
-    "@1000turquoisepogs/zcrypto": "~1.5.0-rc3"
+    "@1000turquoisepogs/zcrypto": "~1.5.0-rc4"
   }
 }
 
