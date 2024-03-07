@@ -29,23 +29,11 @@ function mkdirp(dir, options) {
     if (dir == '.') {
       resolve();
     } else {
-      fs.stat(dir, (err, stats)=> {
-        if (!err) {
-          //exists
-          resolve();
+      fs.mkdir(dir, Object.assign(options, {recursive: true}), (err)=> {
+        if (err) {
+          reject();
         } else {
-          let parentDir = path.dirname(dir);
-          mkdirp(parentDir).then(()=> {
-            fs.mkdir(dir,options,(err)=> {
-              if (err) {
-                reject();
-              } else {
-                resolve();
-              }
-            });
-          }).catch((err)=> {
-            reject();
-          });
+          resolve();
         }
       });
     }
