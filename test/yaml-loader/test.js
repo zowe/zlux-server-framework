@@ -1,3 +1,4 @@
+
 const yamlConfig = require('../../utils/yamlConfig');
 
 const HA_ID = 'ha1';

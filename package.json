@@ -34,7 +34,8 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc --watch",
-    "test:storage": "mocha --timeout 10000 ./test/storage/*.js"
+    "test:storage": "mocha --timeout 10000 ./test/storage/*.js",
+    "lint": "eslint ."
   },
   "dependencies": {
     "@rocketsoftware/eureka-js-client": "~4.5.6",
@@ -72,8 +73,11 @@
     "@types/mime": "3.0.1",
     "@types/node": "~14.0.0",
     "@types/qs": "6.9.3",
+    "@typescript-eslint/eslint-plugin": "^6.10.0",
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
+    "eslint-plugin-header": "^3.1.1",
+    "eslint-plugin-import": "^2.29.0",
     "mocha": "~10.2.0",
     "typescript": "~5.0.0"
   },

@@ -1,4 +1,3 @@
-
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
@@ -8,13 +7,14 @@
   
   Copyright Contributors to the Zowe Project.
 */
-const assert = require('assert')
+
+// const assert = require('assert')
 const path = require('path');
 const http = require('http');
 const chai = require('chai');
 const chaiHttp = require('chai-http');
 chai.use(chaiHttp);
-const should = chai.should();
+// const should = chai.should();
 const PluginLoader = require('../../lib/plugin-loader')
 const makePlugin = PluginLoader.makePlugin
 const makeWebApp = require('../../lib/webapp').makeWebApp;
@@ -75,10 +75,11 @@ describe('WebApp', function() {
       try {       
         server = http.createServer(webApp.expressApp)
        // console.log("server", server)
-        let x = server.listen(webAppOptions.httpPort, "localhost")
+        // let x = 
+        server.listen(webAppOptions.httpPort, "localhost")
         //console.log("x", x)
         //console.log("server.address()", server.address())
-        server.on('listening', _ => done());
+        server.on('listening', () => done());
         server.on('error', e => done(e));
       } catch (e) {
         console.log(e)
