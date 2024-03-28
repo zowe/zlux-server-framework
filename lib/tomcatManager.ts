@@ -284,7 +284,7 @@ export class TomcatManager implements JavaServerManager {
           reject(error);
         } else {
           log.info(`ZWED0093I`, this.id); //log.info(`Tomcat Manager ID=${this.id} cleanup successful`);
-          resolve();
+          resolve(this.id);
         }
       })
     });
