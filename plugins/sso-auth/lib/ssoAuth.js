@@ -65,7 +65,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.logger = context.logger;
   this.categories = ['saf'];
   if (this.usingApiml) {
-    this.apimlHandler = apimlHandlerFactory(pluginDef, pluginConf, serverConf, context);
+    this.apimlHandler = apimlHandlerFactory(pluginDef, pluginConf, serverConf, context, zoweConf);
     this.categories.push('apiml');
   }
 
@@ -325,6 +325,6 @@ SsoAuthenticator.prototype = {
   }
 };
 
-module.exports = function (pluginDef, pluginConf, serverConf, context) {
-  return Promise.resolve(new SsoAuthenticator(pluginDef, pluginConf, serverConf, context));
+module.exports = function (pluginDef, pluginConf, serverConf, context, zoweConf) {
+  return Promise.resolve(new SsoAuthenticator(pluginDef, pluginConf, serverConf, context, zoweConf));
 }
