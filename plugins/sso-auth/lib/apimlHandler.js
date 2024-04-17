@@ -60,7 +60,7 @@ class ApimlHandler {
     this.apimlConf = componentConf.node.mediationLayer.server;    
     this.gatewayUrl = `https://${this.apimlConf.gatewayHostname}:${this.apimlConf.gatewayPort}`;
     this.isHttps = zluxUtil.isClientAttls(zoweConf);
-    if (isHttps) {
+    if (this.isHttps) {
       this.httpsAgent = new https.Agent(context.tlsOptions);
       this.httpModule = https;
     } else {
