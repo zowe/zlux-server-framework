@@ -52,7 +52,7 @@ function cleanupSessionGeneric(sessionState) {
   delete sessionState.sessionExpTime;
 }
 
-function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
+function SsoAuthenticator(pluginDef, pluginConf, serverConf, context, zoweConf) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
 
