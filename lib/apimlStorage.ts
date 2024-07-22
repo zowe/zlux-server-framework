@@ -16,10 +16,17 @@ import { AxiosInstance } from 'axios';
 let apimlClient: AxiosInstance;
 
 export function configure(settings: ApimlStorageSettings) {
-  apimlClient = axios.create({
-    baseURL: `https://${settings.host}:${settings.port}`,
-    httpsAgent: new https.Agent(settings.tlsOptions)
-  });
+  if (settings.isHttps) {
+    apimlClient = axios.create({
+      baseURL: `https://${settings.host}:${settings.port}`,
+      httpsAgent: new https.Agent(settings.tlsOptions)
+    });
+  } else {
+    apimlClient = axios.create({
+      baseURL: `https://${settings.host}:${settings.port}`,
+      httpAgent: new http.Agent()
+    });
+  }
 }
 
 export function isConfigured(): boolean {
@@ -30,6 +37,7 @@ export interface ApimlStorageSettings {
   host: string;
   port: number;
   tlsOptions: https.AgentOptions;
+  isHttps?: boolean;
 }
 
 
