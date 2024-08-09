@@ -18,7 +18,7 @@ const apimlHandlerFactory = require('./apimlHandler');
 function doesApimlExist(serverConf) {
   return ((serverConf.node.mediationLayer !== undefined)
     && (serverConf.node.mediationLayer.server !== undefined)
-    && (serverConf.node.mediationLayer.server.hostname !== undefined)
+    && (serverConf.node.mediationLayer.server.gatewayHostname !== undefined)
     && (serverConf.node.mediationLayer.server.gatewayPort !== undefined)
     && (serverConf.node.mediationLayer.server.port !== undefined)
     && (serverConf.node.mediationLayer.enabled == true))
@@ -52,7 +52,7 @@ function cleanupSessionGeneric(sessionState) {
   delete sessionState.sessionExpTime;
 }
 
-function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
+function SsoAuthenticator(pluginDef, pluginConf, serverConf, context, zoweConf) {
   this.usingApiml = doesApimlExist(serverConf);
   this.usingZss = doesZssExist(serverConf);
 
@@ -65,7 +65,7 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context) {
   this.logger = context.logger;
   this.categories = ['saf'];
   if (this.usingApiml) {
-    this.apimlHandler = apimlHandlerFactory(pluginDef, pluginConf, serverConf, context);
+    this.apimlHandler = apimlHandlerFactory(pluginDef, pluginConf, serverConf, context, zoweConf);
     this.categories.push('apiml');
   }
 
@@ -325,6 +325,6 @@ SsoAuthenticator.prototype = {
   }
 };
 
-module.exports = function (pluginDef, pluginConf, serverConf, context) {
-  return Promise.resolve(new SsoAuthenticator(pluginDef, pluginConf, serverConf, context));
+module.exports = function (pluginDef, pluginConf, serverConf, context, zoweConf) {
+  return Promise.resolve(new SsoAuthenticator(pluginDef, pluginConf, serverConf, context, zoweConf));
 }

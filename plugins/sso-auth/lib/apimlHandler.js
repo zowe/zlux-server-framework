@@ -10,7 +10,10 @@
 
 const Promise = require('bluebird');
 const https = require('https');
+const http = require('http');
 const fs = require('fs');
+const zluxUtil = require('../../../lib/util');
+
 
 /*495 minutes default session length for zosmf
  * TODO: This is the session length of a zosmf session according to their documentation.
@@ -52,11 +55,19 @@ function readUtf8FilesToArray(fileArray) {
 
 
 class ApimlHandler {
-  constructor(pluginDef, pluginConf, serverConf, context) {
+  constructor(pluginDef, pluginConf, componentConf, context, zoweConf) {
     this.logger = context.logger;    
-    this.apimlConf = serverConf.node.mediationLayer.server;    
-    this.gatewayUrl = `https://${this.apimlConf.hostname}:${this.apimlConf.gatewayPort}`;
-    this.httpsAgent = new https.Agent(context.tlsOptions);
+    this.apimlConf = componentConf.node.mediationLayer.server;    
+    this.gatewayUrl = `https://${this.apimlConf.gatewayHostname}:${this.apimlConf.gatewayPort}`;
+    this.isHttps = !zluxUtil.isClientAttls(zoweConf);
+    if (this.isHttps) {
+      this.httpsAgent = new https.Agent(context.tlsOptions);
+      this.httpModule = https;
+    } else {
+      this.httpAgent = new http.Agent();
+      this.httpModule = http;
+    }
+    
   }
 
   logout(request, sessionState) {
@@ -66,7 +77,7 @@ class ApimlHandler {
       }
       const gatewayUrl = this.gatewayUrl;
       const options = {
-        hostname: this.apimlConf.hostname,
+        hostname: this.apimlConf.gatewayHostname,
         port: this.apimlConf.gatewayPort,
 //TODO uncertainty about using apicatalog route instead of something part of the gateway itself
         path: '/apicatalog/api/v1/auth/logout',
@@ -77,7 +88,7 @@ class ApimlHandler {
         agent: this.httpsAgent
       }
       this.logger.debug(`Sending logout request for ${sessionState.username} to path=${options.path}`);
-      const req = https.request(options, (res) => {
+      const req = this.httpModule.request(options, (res) => {
         let data = [];
         res.on('data', (d) => {data.push(d)});
         res.on('end', () => {
@@ -194,7 +205,7 @@ class ApimlHandler {
     }
     
     return {
-      hostname: this.apimlConf.hostname,
+      hostname: this.apimlConf.gatewayHostname,
       port: this.apimlConf.gatewayPort,
       path: path,
       method: method,
@@ -223,7 +234,7 @@ class ApimlHandler {
       
       let data = [];
       this.logger.debug(`Sending query token request to path=${options.path}`);
-      const req = https.request(options, (res) => {
+      const req = this.httpModule.request(options, (res) => {
         res.on('data', (chunk) => data.push(chunk));
         res.on('end', () => {
           this.logger.debug(`Query rc=`,res.statusCode);
@@ -263,7 +274,7 @@ class ApimlHandler {
 
       const options = this.makeOptions('/gateway/api/v1/auth/login','POST', undefined, data.length);
       this.logger.debug(`Sending login request for ${request.body.username} to path=${options.path}`);
-      const req = https.request(options, (res) => {
+      const req = this.httpModule.request(options, (res) => {
         res.on('data', (d) => {});
         res.on('end', () => {
           this.logger.debug(`Login rc=`,res.statusCode);
@@ -400,6 +411,6 @@ class ApimlHandler {
   }
 }
 
-module.exports = function(pluginDef, pluginConf, serverConf, context) {
-  return new ApimlHandler(pluginDef, pluginConf, serverConf, context);
+module.exports = function(pluginDef, pluginConf, componentConf, context, zoweConf) {
+  return new ApimlHandler(pluginDef, pluginConf, componentConf, context, zoweConf);
 }
