@@ -307,6 +307,7 @@
   "ZWED0177W":"Unable to load %s for '%s' into config",
   "ZWED0178W":"Skipping authentication plugin %s because it's not HA compatible",
   "ZWED0179W":"Unable to retrieve the list of certificate authorities from the keyring=%s owner=%s Error: %s",
+  "ZWED0180W":"Failed to query discovery server (%s:%s) for agent access: %s",
 
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",

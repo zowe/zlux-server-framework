@@ -21,12 +21,10 @@ unpack the wars ahead of time, so the symbolic links are the unpacked dirs
 import { Path, TomcatConfig, TomcatShutdown, TomcatHttps, JavaServerManager, AppServerInfo } from './javaTypes';
 import * as fs from 'graceful-fs';
 import * as path from 'path';
-import * as mkdirp from 'mkdirp';
 import * as child_process from 'child_process';
 //import * as xml2js from 'xml2js';
 import * as yauzl from 'yauzl';
 import * as utils from './util';
-import * as rimraf from 'rimraf';
 
 const log = utils.loggers.langManager;
 const spawn = child_process.spawn;
@@ -63,7 +61,7 @@ export class TomcatManager implements JavaServerManager {
 
   private makeRoot():Promise<void> {
     return new Promise((resolve,reject)=> {
-      mkdirp(this.appdir, {mode: DIR_WRITE_MODE}, (err)=> {
+      fs.mkdir(this.appdir, {recursive: true, mode: DIR_WRITE_MODE}, (err)=> {
         if (err) {
           reject(err);
         } else {
@@ -279,7 +277,7 @@ export class TomcatManager implements JavaServerManager {
     log.info(`ZWED0092I`, this.id); //log.info(`Tomcat Manager ID=${this.id} stopping`);
     TomcatManager.isWindows ? this.stopForWindows() : this.stopForUnix();
     return new Promise((resolve, reject) => {
-      rimraf(this.appdir, (error)=> {
+      fs.rm(this.appdir, { recursive: true, force: true }, (error)=> {
         if (error) {
           reject(error);
         } else {
@@ -368,7 +366,7 @@ export class TomcatManager implements JavaServerManager {
           zipfile.on("entry", function(entry) {
             if (entry.fileName.endsWith('/')) {
               //directory
-              mkdirp(path.join(destPath,entry.fileName), {mode: DIR_WRITE_MODE}, (err)=> {
+              fs.mkdir(path.join(destPath,entry.fileName), {recursive: true, mode: DIR_WRITE_MODE}, (err)=> {
                 if (err) {
                   error = err;                  
                   zipfile.close();
@@ -380,7 +378,7 @@ export class TomcatManager implements JavaServerManager {
               zipfile.readEntry(); //TODO is it correct to skip this?
             } else {
               //file
-              mkdirp(path.join(destPath,path.dirname(entry.fileName)), {mode: DIR_WRITE_MODE}, (err)=> {
+              fs.mkdir(path.join(destPath,path.dirname(entry.fileName)), {recursive: true, mode: DIR_WRITE_MODE}, (err)=> {
                 if (err) {
                   error = err;
                   zipfile.close();

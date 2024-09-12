@@ -14,7 +14,6 @@ const path = require('path');
 const packagingUtils = require('./packaging-utils');
 const serverUtils = require('../lib/util');
 const jsonUtils = require('../lib/jsonUtils');
-const rmrf = require('rimraf');
 
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
 //TO DO - Sean - bootstrap logger
