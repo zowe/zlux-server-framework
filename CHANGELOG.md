@@ -1,7 +1,11 @@
 # Zlux Server Framework Changelog
 
-All notable changes to the Zlux Server Framework package will be documented in this file..
+All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
+
+## 3.0.0
+- Enhancement: Add ability for server to dynamically load plugin web content based on `entryPoint` specification in the
+`pluginDefinition.json`
 
 ## 2.17.0
 - Enhancement: Added function `isClientAttls(zoweConfig)` within `libs/util.js`. Whenever a plugin makes a network request, it should always use this to determine if a normally HTTPS request should instead be made as HTTP due to AT-TLS handling the TLS when enabled. (#544)
