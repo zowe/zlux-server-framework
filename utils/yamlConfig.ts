@@ -11,7 +11,6 @@
 
 import * as fs from 'fs';
 import * as path from 'path';
-import * as _ from 'lodash';
 import * as YAML from 'yaml';
 import * as mergeUtils from './mergeUtils';
 
@@ -72,12 +71,12 @@ function getJsonForYamls(configYamls: string) {
 //may throw yaml parse or fs error
 export function parseZoweDotYaml(zoweYamlPaths:string, haInstanceIdOrUndefined?: string, debug?:boolean) {
   debugLog=debug;
-  let config = getJsonForYamls(zoweYamlPaths);
+  let config:any = getJsonForYamls(zoweYamlPaths);
   if (debugLog===true){ console.log("Parsed as=\n",config); }
   if (haInstanceIdOrUndefined) {
     let instanceLevelConfig;
-    if (haInstanceIdOrUndefined) {
-      instanceLevelConfig = _.get(config, ['haInstances', haInstanceIdOrUndefined]);
+    if (haInstanceIdOrUndefined && config.haInstances) {
+      instanceLevelConfig = config.haInstances[haInstanceIdOrUndefined];
     }
     const mergedConfig = mergeUtils.deepAssign(config, instanceLevelConfig ? instanceLevelConfig : {});
     config = mergedConfig;
