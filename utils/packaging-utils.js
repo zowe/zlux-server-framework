@@ -11,11 +11,13 @@
 const path = require('path');
 const Promise = require('bluebird');
 const fs = require('graceful-fs');
-//assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
-const logging = require('../../zlux-shared/src/logging/logger.js');
-const coreLogger = new logging.Logger();
-//simple program, no need for logger names to be displayed
-coreLogger.addDestination(coreLogger.makeDefaultDestination(true,false,false));
+let coreLogger = global.COM_RS_COMMON_LOGGER;
+if (!global.COM_RS_COMMON_LOGGER) { //app-server creates logger prior to this running, so don't create twice.
+  const logging = require('../../zlux-shared/src/logging/logger.js');
+  coreLogger = new logging.Logger();
+  //simple program, no need for logger names to be displayed
+  coreLogger.addDestination(coreLogger.makeDefaultDestination(true,false,false));
+}
 
 let logger;
 
