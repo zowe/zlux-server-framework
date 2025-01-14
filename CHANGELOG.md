@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.18.1
+- Fix: Server would not work when API Gateway token name was customized (#574)
+
 ## 2.17.0
 - Enhancement: Added function `isClientAttls(zoweConfig)` within `libs/util.js`. Whenever a plugin makes a network request, it should always use this to determine if a normally HTTPS request should instead be made as HTTP due to AT-TLS handling the TLS when enabled. (#544)
 - Bugfix: Fixed function `isServerAttls(zoweConfig)` within `libs/util.js`, which was preventing using AT-TLS with app-server. (#544)

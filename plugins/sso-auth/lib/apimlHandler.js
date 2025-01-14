@@ -20,8 +20,6 @@ const zluxUtil = require('../../../lib/util');
  * However, it is not clear if that is configurable or if APIML may use a different value under other circumstances
  */
 const DEFAULT_EXPIRATION_MS = 29700000;
-const TOKEN_NAME = 'apimlAuthenticationToken';
-const TOKEN_LENGTH = TOKEN_NAME.length;
 
 function readUtf8FilesToArray(fileArray) {
   var contentArray = [];
@@ -56,8 +54,9 @@ function readUtf8FilesToArray(fileArray) {
 
 class ApimlHandler {
   constructor(pluginDef, pluginConf, componentConf, context, zoweConf) {
-    this.logger = context.logger;    
-    this.apimlConf = componentConf.node.mediationLayer.server;    
+    this.logger = context.logger;
+    this.apimlConf = componentConf.node.mediationLayer.server;
+    this.tokenName = this.apimlConf.cookieName;
     this.gatewayUrl = `https://${this.apimlConf.gatewayHostname}:${this.apimlConf.gatewayPort}`;
     this.isHttps = !zluxUtil.isClientAttls(zoweConf);
     if (this.isHttps) {
@@ -72,7 +71,7 @@ class ApimlHandler {
 
   logout(request, sessionState) {
     return new Promise((resolve, reject) => {
-      if (!(request.cookies && request.cookies[TOKEN_NAME])) {
+      if (!(request.cookies && request.cookies[this.tokenName])) {
         return resolve({success: true});
       }
       const gatewayUrl = this.gatewayUrl;
@@ -83,7 +82,7 @@ class ApimlHandler {
         path: '/apicatalog/api/v1/auth/logout',
         method: 'POST',
         headers: {
-          'apimlAuthenticationToken': request.cookies[TOKEN_NAME]
+          'apimlAuthenticationToken': request.cookies[this.tokenName]
         },
         agent: this.httpsAgent
       }
@@ -94,7 +93,7 @@ class ApimlHandler {
         res.on('end', () => {
           let apimlCookie;
           if (res.statusCode >= 200 && res.statusCode < 300) {
-            resolve({ success: true, cookies: [{name:TOKEN_NAME,
+            resolve({ success: true, cookies: [{name:this.tokenName,
                                                 value:'non-token',
                                                 options: {httpOnly: true,
                                                           secure: true,
@@ -153,7 +152,7 @@ class ApimlHandler {
           resolve({success: false}); // return the object directly
         });
       });
-    } else if (request.cookies && request.cookies[TOKEN_NAME]) {
+    } else if (request.cookies && request.cookies[this.tokenName]) {
       return this.authenticateViaCookie(request, sessionState);
     } else {
       return Promise.resolve({success: false});
@@ -162,8 +161,8 @@ class ApimlHandler {
 
   authenticateViaCookie(request, sessionState) {
     return new Promise((resolve, reject)=> {
-      this.logger.debug(`Authenticate with cookie`,TOKEN_NAME);
-      this.queryToken(request.cookies[TOKEN_NAME]).then(data=> {
+      this.logger.debug(`Authenticate with cookie`,this.tokenName);
+      this.queryToken(request.cookies[this.tokenName]).then(data=> {
         let expiration;
         const expirationDate = new Date(data.expiration);
         const creationDate = new Date(data.creation);
@@ -177,7 +176,7 @@ class ApimlHandler {
           this.doLogin(request, sessionState, true).then(result=> resolve(result))
             .catch(e => reject(e));
         } else {
-          this.setState(request.cookies[TOKEN_NAME],
+          this.setState(request.cookies[this.tokenName],
                         data.userId, sessionState);
           resolve({success: true, username: sessionState.username, expms: expiration});
         }
@@ -230,7 +229,7 @@ class ApimlHandler {
     return new Promise((resolve, reject) => {
       const options = this.makeOptions('/gateway/api/v1/auth/query',
                                        'GET',
-                                       TOKEN_NAME+'='+token);
+                                       this.tokenName+'='+token);
       
       let data = [];
       this.logger.debug(`Sending query token request to path=${options.path}`);
@@ -283,9 +282,9 @@ class ApimlHandler {
             if (typeof res.headers['set-cookie'] === 'object') {
               for (const cookie of res.headers['set-cookie']) {
                 const content = cookie.split(';')[0];
-                let index = content.indexOf(TOKEN_NAME);
+                let index = content.indexOf(this.tokenName);
                 if (index >= 0) {
-                  token = content.substring(index+1+TOKEN_LENGTH);
+                  token = content.substring(index+1+this.tokenName.length);
                 }
               }
             }
@@ -305,7 +304,7 @@ class ApimlHandler {
               if (expiration > 0) {
                 this.setState(token, data.userId, sessionState);
                 resolve({ success: true, username: sessionState.username, expms: expiration,
-                          cookies: [{name:TOKEN_NAME, value:token, options: {httpOnly: true, secure: true}}]});
+                          cookies: [{name:this.tokenName, value:token, options: {httpOnly: true, secure: true}}]});
               } else {
                 resolve({ success: false, reason: 'Unknown'});
               }
@@ -371,7 +370,7 @@ class ApimlHandler {
   authorized(request, sessionState) {
     if (sessionState.authenticated) {
       request.username = sessionState.username;
-      request.ssoToken = request.cookies[TOKEN_NAME];
+      request.ssoToken = request.cookies[this.tokenName];
       return Promise.resolve({ authenticated: true, authorized: true });
     } else {
       return Promise.resolve({ authenticated: false, authorized: false });
@@ -382,7 +381,7 @@ class ApimlHandler {
     if (!sessionState.apimlToken) {
       return;
     }
-//    req2Options.headers[TOKEN_NAME] = sessionState.apimlToken;
+//    req2Options.headers[this.tokenName] = sessionState.apimlToken;
     if (this.usingSso) {
       req2Options.headers['Authorization'] = 'Bearer '+sessionState.apimlToken;
     }
@@ -390,7 +389,7 @@ class ApimlHandler {
 
   restoreSessionState(request, sessionState) {
     return new Promise((resolve, _reject) => {
-      const token = request.cookies[TOKEN_NAME];
+      const token = request.cookies[this.tokenName];
       if (!token) {
         sessionState.authenticated = false;
         resolve({success: false});
