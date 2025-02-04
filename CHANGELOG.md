@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.1.0
+- Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#580)
+
 ## 3.0.0
 - Enhancement: Add ability for server to dynamically load plugin web content based on `entryPoint` specification in the
 `pluginDefinition.json`
