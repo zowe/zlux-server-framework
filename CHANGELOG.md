@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.18.1
+- Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#581)
 - Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#589)
 
 ## 2.17.0
