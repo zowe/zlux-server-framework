@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 2.18.1
 - Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#581)
+- Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#589)
 
 ## 2.17.0
 - Enhancement: Added function `isClientAttls(zoweConfig)` within `libs/util.js`. Whenever a plugin makes a network request, it should always use this to determine if a normally HTTPS request should instead be made as HTTP due to AT-TLS handling the TLS when enabled. (#544)
