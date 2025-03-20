@@ -3,6 +3,8 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+- Enhancement: When not using a SAF keyring, the app-server can now use PKCS12 keystores so that the PEM option for Zowe certificates no longer needs to be specified. (??)
+
 ## 3.5.0
 - Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#669)](https://github.com/zowe/zlux-server-framework/pull/669) 
 - Enhancement: The app-server can now use separate certificates for inbound server TLS and outbound client TLS connections. When `zowe.certificate.keystore.clientCertificateAlias` (keyring) or both `zowe.certificate.pem.clientCertificate` and `zowe.certificate.pem.clientKey` (PEM) are defined, those are used for all outbound client connections while the main certificate is used only for serving HTTPS. When not defined, behavior is unchanged. [(#674)](https://github.com/zowe/zlux-server-framework/pull/674)
@@ -28,6 +30,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Enhancement: Added utility certificateChecker.js which can use NodeJS to determine if a keystore of PKCS12, PEM, or SAF keyring is valid for use in Zowe (#597)
 - Bugfix: Reduce minimum memory consumption. A bug in the library "axios" caused abnormally high memory utilization every startup, and has been removed. The app-servers functionality has not been altered from this change. ([#600](https://github.com/zowe/zlux-server-framework/pull/600))
 - Bugfix: When eureka registration experienced a network failure, troubleshooting information was not available. The property `components.app-server.node.mediationLayer.traceTls` now exists for troubleshooting TLS issues. (#592)
+
 
 ## 3.1.0
 - Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#580)
