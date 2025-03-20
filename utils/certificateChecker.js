@@ -9,7 +9,6 @@ try {
   bootstrapLogger.warn('Could not load zcrypto library, SAF keyrings will be unavailable');
 }
 const forge = require('node-forge');
-const pki = forge.pki;
 
 const argParser = require('./argumentParser');
 
@@ -48,6 +47,7 @@ if (userInput.type == 'JCERACFKS' && !userInput.alias) {
 
 let cert;
 if (userInput.type == 'JCERACFKS') {
+  logger.debug('Checking keyring');
   if (userInput.certificate.startsWith('safkeyring://')) {
     let ring = userInput.certificate.substring(13);
     if (ring.startsWith('//')) {
@@ -58,35 +58,39 @@ if (userInput.type == 'JCERACFKS') {
     let ringname = parts[1];
     let keyringData = keyring_js.getPemEncodedData(username, ringname, userInput.alias).certificate;
 
-    cert = pki.certificateFromPem(keyringData);
+    cert = forge.pki.certificateFromPem(keyringData);
   } else {
     logger.error('Invalid certificate name');
     process.exit(-1);
   }
 } else if (userInput.type.startsWith('JCE')) {
-  logger.error('Cannot validate certificate, type not supported for verification');
+  logger.info('Will not validate certificate of type='+userInput.type);
   process.exit(0);
 } else if (userInput.type == 'PEM') {
-  logger.info('Checking PEM');
+  logger.debug('Checking PEM');
   let pem = fs.readFileSync(userInput.certificate, 'utf8');
-  cert = pki.certificateFromPem(pem);
+  cert = forge.pki.certificateFromPem(pem);
 } else if (userInput.type == 'PKCS12') {
-  logger.info('Checking PKCS12');
+  logger.debug('Checking PKCS12 for alias '+userInput.alias);
   const p12Content = fs.readFileSync(userInput.certificate, 'binary');
   const p12Asn1 = forge.asn1.fromDer(p12Content);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, process.env.ZWE_zowe_certificate_keystore_password);
-  p12.safeContents.forEach(safeContent => {
-    safeContent.safeBags.forEach(content => {
-      if (content.type === forge.pki.oids.certBag) { // this can be a certificate OR a CA
-        if (content.attributes.friendlyName == userInput.alias) {
-          const certificate = content.cert;
-          cert = forge.pki.certificateToPem(certificate);
+  for (let i = 0; i < p12.safeContents.length; i++) {
+    let safeContent = p12.safeContents[i];
+    for (let j = 0; j < safeContent.safeBags.length; j++) {
+      let bag = safeContent.safeBags[j];
+      if (bag.type === forge.pki.oids.certBag) { // this can be a certificate OR a CA
+        logger.debug('found a cert '+bag.attributes.friendlyName);
+        if (bag.attributes.friendlyName == userInput.alias) {
+          logger.debug('found an alias match');
+          cert = bag.cert;
+          break;
         }
       }        
-    });
-  })
+    }
+  }
 } else {
-  logger.error('Cannot validate certificate, type not supported for verification');
+  logger.info('Will not validate certificate of type='+userInput.type);
   process.exit(0);
 }
 
