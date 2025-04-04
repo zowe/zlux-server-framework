@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 3.2.0
 - Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#588)
+- Bugfix: Reduce minimum memory consumption. A bug in the library "axios" caused abnormally high memory utilization every startup, and has been removed. The app-servers functionality has not been altered from this change. ([#600](https://github.com/zowe/zlux-server-framework/pull/600))
 - Bugfix: When eureka registration experienced a network failure, troubleshooting information was not available. The property `components.app-server.node.mediationLayer.traceTls` now exists for troubleshooting TLS issues. (#592)
 
 ## 3.1.0

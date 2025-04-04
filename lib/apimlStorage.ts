@@ -10,22 +10,19 @@
 
 import * as https from 'https';
 import * as http from 'http';
-import axios from 'axios';
-import { AxiosInstance } from 'axios';
+import { Client, Dispatcher } from 'undici';
 
-let apimlClient: AxiosInstance;
+let apimlClient: Client;
 
 export function configure(settings: ApimlStorageSettings) {
   if (settings.isHttps) {
-    apimlClient = axios.create({
-      baseURL: `https://${settings.host}:${settings.port}`,
-      httpsAgent: new https.Agent(settings.tlsOptions)
-    });
+
+    //per documentation, client first arg "shoould only include protocol, hostname, and port"
+    apimlClient = new Client(`https://${settings.host}:${settings.port}`, {
+                              connect: settings.tlsOptions
+                             });
   } else {
-    apimlClient = axios.create({
-      baseURL: `https://${settings.host}:${settings.port}`,
-      httpAgent: new http.Agent()
-    });
+    apimlClient = new Client(`https://${settings.host}:${settings.port}`);
   }
 }
 
@@ -163,34 +160,45 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
     throw new ApimlStorageError('APIML_STORAGE_NOT_CONFIGURED');
   }
   try {
-    const response = await apimlClient.request({
+    const response: Dispatcher.ResponseData = await apimlClient.request({
+      path: req.path,
       method: req.method,
-      url: req.path,
-      data: req.body,
+      body: req.body,
       headers: req.headers,
+      throwOnError: true
     });
+    const json = await response.body.json();
+
     const apimlResponse: ApimlResponse = {
       headers: response.headers as http.IncomingHttpHeaders,
-      statusCode: response.status,
-      json: response.data
+      statusCode: response.statusCode,
+      json: json
     };
     return apimlResponse;
   } catch (e) {
-    if (e.response) {
-      const response = e.response;
+    let headers = e.headers;
+    let statusCode = e.statusCode;
+    let json = e.body;
+    if (typeof e.body == 'string') {
+      try {
+        json = JSON.parse(e.body)
+      } catch (e) {
+
+      }
+    }
+    if (json && headers && statusCode) {
       const apimlResponse: ApimlResponse = {
-        headers: response.headers,
-        statusCode: response.status,
-        json: response.data
+        headers, statusCode, json
       };
       const err = checkHttpResponse(apimlResponse);
       if (err) {
         throw err;
       }
       return apimlResponse;
-    } else if (e.request) {
-      throw new ApimlStorageError('APIML_STORAGE_CONNECTION_ERROR', e);
     } else {
+      if (!e.message) {
+        e.message = e.code;
+      }
       throw new ApimlStorageError('APIML_STORAGE_UNKNOWN_ERROR', e);
     }
   }
