@@ -11,16 +11,6 @@
 const fs = require('fs');
 const os = require('os');
 let keyring_js;
-try {
-  if (os.platform() == 'os390') {
-    keyring_js = require('keyring_js');
-  }
-} catch (e) {
-  bootstrapLogger.warn('Could not load zcrypto library, SAF keyrings will be unavailable');
-}
-const forge = require('node-forge');
-
-const argParser = require('./argumentParser');
 
 if (!global.COM_RS_COMMON_LOGGER) {
   const loggerFile = require('../../zlux-shared/src/logging/logger.js');
@@ -28,6 +18,17 @@ if (!global.COM_RS_COMMON_LOGGER) {
   global.COM_RS_COMMON_LOGGER.addDestination(global.COM_RS_COMMON_LOGGER.makeDefaultDestination(true,true,true,true,true));
 }
 const logger = global.COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.verify");
+
+try {
+  if (os.platform() == 'os390') {
+    keyring_js = require('keyring_js');
+  }
+} catch (e) {
+  logger.warn('Could not load zcrypto library, SAF keyrings will be unavailable');
+}
+const forge = require('node-forge');
+
+const argParser = require('./argumentParser');
 
 
 
