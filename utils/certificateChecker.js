@@ -105,8 +105,13 @@ if (userInput.type == 'JCERACFKS') {
   process.exit(0);
 }
 
+if (!cert) {
+  logger.info('Certificate unhandled, certificate checks skipped.');
+  process.exit(0);
+}
 
-if (userInput.eku) {
+
+if (cert != undefined && userInput.eku) {
   let EKU = cert.getExtension('extKeyUsage');
   if (EKU) {
     if (EKU.serverAuth != true) {
