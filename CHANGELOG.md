@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.3.30
+- Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog (???)
+
+
 ## 3.2.0
 - Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#588)
 - Enhancement: Added utility certificateChecker.js which can use NodeJS to determine if a keystore of PKCS12, PEM, or SAF keyring is valid for use in Zowe (#597)
@@ -15,6 +19,12 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 3.0.0
 - Enhancement: Add ability for server to dynamically load plugin web content based on `entryPoint` specification in the
 `pluginDefinition.json`
+
+## 2.18.1
+- Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#581)
+- Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#589)
+- Bugfix: When eureka registration experienced a network failure, troubleshooting information was not available. The property `components.app-server.node.mediationLayer.traceTls` now exists for troubleshooting TLS issues. (#591)
+>>>>>>> Stashed changes
 
 ## 2.17.0
 - Enhancement: Added function `isClientAttls(zoweConfig)` within `libs/util.js`. Whenever a plugin makes a network request, it should always use this to determine if a normally HTTPS request should instead be made as HTTP due to AT-TLS handling the TLS when enabled. (#544)
