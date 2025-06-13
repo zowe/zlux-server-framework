@@ -4,7 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.18.2
-- Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog (???)
+- Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#609](https://github.com/zowe/zlux-server-framework/pull/609))
 
 ## 2.18.1
 - Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#581)
