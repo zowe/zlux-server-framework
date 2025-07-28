@@ -59,17 +59,28 @@ if (userInput.type == 'JCERACFKS' && !userInput.alias) {
 let cert;
 if (userInput.type == 'JCERACFKS') {
   logger.debug('Checking keyring');
-  if (userInput.certificate.startsWith('safkeyring://')) {
-    let ring = userInput.certificate.substring(13);
-    if (ring.startsWith('//')) {
-      ring = ring.substring(2);
+  if (userInput.certificate.startsWith('safkeyring')) {
+    let markerIndex = userInput.certificate.indexOf('://');
+    if (markerIndex == -1) {
+      logger.severe('Invalid certificate name');
+      process.exit(-1);
+    } else {
+      let userAndRingname = userInput.certificate.substring(markerIndex+3);
+      if (userAndRingname.startsWith('//')) { //get rid of safkeyring:////
+        userAndRingname = userAndRingname.substring(2);
+      }
+      let splitIndex = userAndRingname.indexOf('/');
+      if (splitIndex == -1) {
+        logger.severe('Invalid certificate name');
+        process.exit(-1);
+      } else {
+        let username = userAndRingname.substring(0, splitIndex);
+        let ringname = userAndRingname.substring(splitIndex+1);
+        let keyringData = keyring_js.getPemEncodedData(username, ringname, userInput.alias).certificate;
+    
+        cert = forge.pki.certificateFromPem(keyringData);        
+      }  
     }
-    let parts = ring.split('/');
-    let username = parts[0];
-    let ringname = parts[1];
-    let keyringData = keyring_js.getPemEncodedData(username, ringname, userInput.alias).certificate;
-
-    cert = forge.pki.certificateFromPem(keyringData);
   } else {
     logger.severe('Invalid certificate name');
     process.exit(-1);
