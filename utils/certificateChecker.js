@@ -62,7 +62,7 @@ if (userInput.type == 'JCERACFKS') {
   if (userInput.certificate.startsWith('safkeyring')) {
     let markerIndex = userInput.certificate.indexOf('://');
     if (markerIndex == -1) {
-      logger.severe('Invalid certificate name');
+      logger.severe('Invalid certificate name "'+userInput.certificate+'"');
       process.exit(-1);
     } else {
       let userAndRingname = userInput.certificate.substring(markerIndex+3);
@@ -70,8 +70,8 @@ if (userInput.type == 'JCERACFKS') {
         userAndRingname = userAndRingname.substring(2);
       }
       let splitIndex = userAndRingname.indexOf('/');
-      if (splitIndex == -1) {
-        logger.severe('Invalid certificate name');
+      if (splitIndex == -1 || splitIndex == 0) {
+        logger.severe('Invalid certificate name "'+userInput.certificate+'"');
         process.exit(-1);
       } else {
         let username = userAndRingname.substring(0, splitIndex);
@@ -82,7 +82,7 @@ if (userInput.type == 'JCERACFKS') {
       }  
     }
   } else {
-    logger.severe('Invalid certificate name');
+    logger.severe('Invalid certificate name "'+userInput.certificate+'"');
     process.exit(-1);
   }
 } else if (userInput.type.startsWith('JCE')) {
