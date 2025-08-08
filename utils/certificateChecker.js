@@ -43,15 +43,15 @@ const argumentParser = argParser.createParser(CERT_ARGS);
 const userInput = argumentParser.parse(commandArgs);
 
 if (!userInput.certificate) {
-  logger.error('ZWED5018E - Missing one or more parameters required to run.\nCertificate file was '+userInput.config);
+  logger.severe('ZWED5018E - Missing one or more parameters required to run.\nCertificate file was '+userInput.config);
   process.exit(-1);
 }
 if (!userInput.certificate) {
-  logger.error('ZWED5018E - Missing one or more parameters required to run.\nCertificate type was '+userInput.type);
+  logger.severe('ZWED5018E - Missing one or more parameters required to run.\nCertificate type was '+userInput.type);
   process.exit(-1);
 }
 if (userInput.type == 'JCERACFKS' && !userInput.alias) {
-  logger.error('ZWED5018E - Missing one or more parameters required to run.\nCertificate alias was '+userInput.alias);
+  logger.severe('ZWED5018E - Missing one or more parameters required to run.\nCertificate alias was '+userInput.alias);
   process.exit(-1);
 }
 
@@ -59,19 +59,30 @@ if (userInput.type == 'JCERACFKS' && !userInput.alias) {
 let cert;
 if (userInput.type == 'JCERACFKS') {
   logger.debug('Checking keyring');
-  if (userInput.certificate.startsWith('safkeyring://')) {
-    let ring = userInput.certificate.substring(13);
-    if (ring.startsWith('//')) {
-      ring = ring.substring(2);
+  if (userInput.certificate.startsWith('safkeyring')) {
+    let markerIndex = userInput.certificate.indexOf('://');
+    if (markerIndex == -1) {
+      logger.severe('Invalid certificate name "'+userInput.certificate+'"');
+      process.exit(-1);
+    } else {
+      let userAndRingname = userInput.certificate.substring(markerIndex+3);
+      if (userAndRingname.startsWith('//')) { //get rid of safkeyring:////
+        userAndRingname = userAndRingname.substring(2);
+      }
+      let splitIndex = userAndRingname.indexOf('/');
+      if (splitIndex == -1 || splitIndex == 0) {
+        logger.severe('Invalid certificate name "'+userInput.certificate+'"');
+        process.exit(-1);
+      } else {
+        let username = userAndRingname.substring(0, splitIndex);
+        let ringname = userAndRingname.substring(splitIndex+1);
+        let keyringData = keyring_js.getPemEncodedData(username, ringname, userInput.alias).certificate;
+    
+        cert = forge.pki.certificateFromPem(keyringData);        
+      }  
     }
-    let parts = ring.split('/');
-    let username = parts[0];
-    let ringname = parts[1];
-    let keyringData = keyring_js.getPemEncodedData(username, ringname, userInput.alias).certificate;
-
-    cert = forge.pki.certificateFromPem(keyringData);
   } else {
-    logger.error('Invalid certificate name');
+    logger.severe('Invalid certificate name "'+userInput.certificate+'"');
     process.exit(-1);
   }
 } else if (userInput.type.startsWith('JCE')) {
@@ -115,14 +126,14 @@ if (cert != undefined && userInput.eku) {
   let EKU = cert.getExtension('extKeyUsage');
   if (EKU) {
     if (EKU.serverAuth != true) {
-      logger.error('Error: Certificate EKU missing Server Auth 1.3.6.1.5.5.7.3.1 attribute.');
-      logger.error('See https://docs.zowe.org/stable/user-guide/configure-certificates#extended-key-usage');
-      logger.error('Create a new certificate that meets the EKU requirements of Zowe before using Zowe.');
+      logger.severe('Error: Certificate EKU missing Server Auth 1.3.6.1.5.5.7.3.1 attribute.');
+      logger.severe('See https://docs.zowe.org/stable/user-guide/configure-certificates#extended-key-usage');
+      logger.severe('Create a new certificate that meets the EKU requirements of Zowe before using Zowe.');
       process.exit(-1);
     } else if (EKU.clientAuth != true) {
-      logger.error('Error: Certificate EKU missing Client Auth 1.3.6.1.5.5.7.3.2 attribute.');
-      logger.error('See https://docs.zowe.org/stable/user-guide/configure-certificates#extended-key-usage');
-      logger.error('Create a new certificate that meets the EKU requirements of Zowe before using Zowe.');
+      logger.severe('Error: Certificate EKU missing Client Auth 1.3.6.1.5.5.7.3.2 attribute.');
+      logger.severe('See https://docs.zowe.org/stable/user-guide/configure-certificates#extended-key-usage');
+      logger.severe('Create a new certificate that meets the EKU requirements of Zowe before using Zowe.');
       process.exit(-1);
     } else {
       logger.info('Certificate EKU present with both server and client auth');
@@ -135,13 +146,13 @@ if (cert != undefined && userInput.eku) {
 let currentTime = Date.now();
 if (cert.validity?.notBefore) {
   if (cert.validity.notBefore.getTime() > currentTime) {
-    logger.error('Error: Certificate is not yet valid. Will not be valid until: '+cert.validity.notBefore.toString());
+    logger.severe('Error: Certificate is not yet valid. Will not be valid until: '+cert.validity.notBefore.toString());
     process.exit(-1);
   }
 }
 if (cert.validity?.notAfter) {
   if (cert.validity.notAfter.getTime() < currentTime) {
-    logger.error('Error: Certificate has expired at '+cert.validity.notAfter.toString());
+    logger.severe('Error: Certificate has expired at '+cert.validity.notAfter.toString());
     process.exit(-1);
   }
   logger.info('Certificate is valid until '+cert.validity.notAfter.toString());
