@@ -74,5 +74,10 @@
   "optionalDependencies": {
     "fsevents": "~2.3.2",
     "keyring_js": "~1.1.0"
+  },
+  "overrides": {
+    "@rocketsoftware/eureka-js-client": {
+      "@cypress/request": "^3.0.9"
+    }
   }
 }

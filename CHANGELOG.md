@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.18.3
+- Enhancement: Upgraded some old dependencies to new versions.
+
 ## 2.18.2
 - Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#609](https://github.com/zowe/zlux-server-framework/pull/609))
 
