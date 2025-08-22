@@ -4,7 +4,8 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.4.0
-- Enhancement: Logging of URLs now accomodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#?])()
+- Enhancement: Logging of URLs now accomodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
+- Enhancement: Eureka registration to discovery server now handles IPv6 in URLs ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
 
 ## 3.3.0
 - Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#610](https://github.com/zowe/zlux-server-framework/pull/610))
