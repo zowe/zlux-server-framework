@@ -78,6 +78,11 @@
   "overrides": {
     "@rocketsoftware/eureka-js-client": {
       "@cypress/request": "^3.0.9"
+    },
+    "chai-http": {
+      "superagent": {
+        "form-data": "4.0.4"
+      }
     }
   }
 }
