@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.4.0
+- Bugfix: Workaround for AT-TLS CORS error between the gateway and App Server by adding cors metadata to the eureka registration([#617](https://github.com/zowe/zlux-server-framework/pull/617))
+
 ## 3.3.0
 - Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#610](https://github.com/zowe/zlux-server-framework/pull/610))
 - Enhancement: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. ([#608](https://github.com/zowe/zlux-server-framework/pull/608))
