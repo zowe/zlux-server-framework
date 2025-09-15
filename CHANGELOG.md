@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.4.0
+- Enhancement: Added enablePasswordChange flag to zowe.yaml to control visibility of 'Change Password' option in the Personalization Panel. Default value of this flag is true.
+
 ## 3.2.0
 - Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#588)
 - Enhancement: Added utility certificateChecker.js which can use NodeJS to determine if a keystore of PKCS12, PEM, or SAF keyring is valid for use in Zowe (#597)
