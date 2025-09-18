@@ -6,6 +6,11 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 3.4.0
 - Enhancement: Added enablePasswordChange flag to zowe.yaml to control visibility of 'Change Password' option in the Personalization Panel. Default value of this flag is true.
 
+## 3.3.0
+- Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#610](https://github.com/zowe/zlux-server-framework/pull/610))
+- Enhancement: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. ([#608](https://github.com/zowe/zlux-server-framework/pull/608))
+- Enhancement: Upgraded some old dependencies to new versions. ([#612](https://github.com/zowe/zlux-server-framework/pull/612))
+
 ## 3.2.0
 - Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#588)
 - Enhancement: Added utility certificateChecker.js which can use NodeJS to determine if a keystore of PKCS12, PEM, or SAF keyring is valid for use in Zowe (#597)
@@ -18,6 +23,11 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 3.0.0
 - Enhancement: Add ability for server to dynamically load plugin web content based on `entryPoint` specification in the
 `pluginDefinition.json`
+
+## 2.18.1
+- Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#581)
+- Bugfix: App-server /server/environment endpoint was missing the "agent" object, causing the Desktop to choose an indirect route to accessing ZSS. This fix improves latency and high availability behavior of ZSS APIs in the Desktop. (#589)
+- Bugfix: When eureka registration experienced a network failure, troubleshooting information was not available. The property `components.app-server.node.mediationLayer.traceTls` now exists for troubleshooting TLS issues. (#591)
 
 ## 2.17.0
 - Enhancement: Added function `isClientAttls(zoweConfig)` within `libs/util.js`. Whenever a plugin makes a network request, it should always use this to determine if a normally HTTPS request should instead be made as HTTP due to AT-TLS handling the TLS when enabled. (#544)
