@@ -3,6 +3,10 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.4.0
+- Bugfix: Fix TN3270 and VT terminals not appearing in the Zowe Desktop when using AT-TLS by adding a workaround for an AT-TLS CORS error between the gateway and App Server where CORS metadata has been added to the eureka registration ([#617](https://github.com/zowe/zlux-server-framework/pull/617))
+- Enhancement: Added components.app-server.enablePasswordChange parameter to the Zowe YAML configuration file for controlling visibility of the 'Change Password' option in the Zowe Desktop Personalization Panel. This value defaults to true, the prior behavior, when not present in the YAML. ([#616](https://github.com/zowe/zlux-server-framework/pull/616))
+
 ## 3.3.0
 - Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#610](https://github.com/zowe/zlux-server-framework/pull/610))
 - Enhancement: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. ([#608](https://github.com/zowe/zlux-server-framework/pull/608))
