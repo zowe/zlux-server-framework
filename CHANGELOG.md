@@ -3,8 +3,8 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
-## 3.1.0
-- Enhancement: Server can be set to log using the local timezone via property `zowe.logger.timezone: environment` which will use the value of the TZ environment variable. (#572)
+## 3.4.0
+- Enhancement: Server can be set to log using the local timezone via property `zowe.logging.timezone: environment` which will use the value of the TZ environment variable. (#572)
 
 ## 3.0.0
 - Enhancement: Add ability for server to dynamically load plugin web content based on `entryPoint` specification in the `pluginDefinition.json`
