@@ -48,7 +48,7 @@ jobs:
             -Dsonar.projectKey=zowe_zlux-server-framework
             -Dsonar.organization=zowe
             -Dsonar.sources=./
-            -Dsonar.tests=./
+            -Dsonar.tests=test/
             -Dsonar.test.inclusions=**/*.(spec|test).ts,**/*.(spec|test).tsx,**/*.(spec|test).js,**/*.(spec|test).jsx
             -Dsonar.exclusions=**/node_modules/**,**/dist/**,**/build/**,**/*.d.ts
             -Dsonar.javascript.lcov.reportPaths=./coverage/lcov.info
