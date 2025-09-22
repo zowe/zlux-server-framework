@@ -37,15 +37,14 @@
     "test:storage": "mocha --timeout 10000 ./test/storage/*.js"
   },
   "dependencies": {
-    "@rocketsoftware/eureka-js-client": "~4.5.7",
-    "@rocketsoftware/express-ws": "^5.0.0",
+    "@rocketsoftware/eureka-js-client": "^4.5.9",
+    "@rocketsoftware/express-ws": "^5.0.1",
     "accept-language-parser": "~1.5.0",
-    "axios": "^1.7.7",
     "bluebird": "3.7.2",
     "body-parser": "~1.20.3",
     "cookie-parser": "~1.4.6",
     "diffie-hellman": "^5.0.3",
-    "express": "~4.21.0",
+    "express": "^4.21.2",
     "express-session": "~1.18.0",
     "express-static-gzip": "~2.1.7",
     "graceful-fs": "~4.2.11",
@@ -55,7 +54,8 @@
     "require-from-string": "~2.0.2",
     "semver": "~7.6.0",
     "swagger-parser": "~10.0.3",
-    "ws": "^6.2.2",
+    "undici": "6.21.2",
+    "ws": "^6.2.3",
     "yaml": "~2.4.1",
     "yauzl": "~3.1.2"
   },
@@ -68,11 +68,21 @@
     "@types/qs": "6.9.3",
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
-    "mocha": "~10.2.0",
+    "mocha": "^11.2.2",
     "typescript": "~5.0.0"
   },
   "optionalDependencies": {
     "fsevents": "~2.3.2",
     "keyring_js": "~1.1.0"
+  },
+  "overrides": {
+    "@rocketsoftware/eureka-js-client": {
+      "@cypress/request": "^3.0.9"
+    },
+    "chai-http": {
+      "superagent": {
+        "form-data": "4.0.4"
+      }
+    }
   }
 }
