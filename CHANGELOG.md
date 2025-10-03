@@ -6,6 +6,8 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 3.4.0
 - Enhancement: Logging of URLs now accomodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
 - Enhancement: Eureka registration to discovery server now handles IPv6 in URLs ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
+- Bugfix: Fix TN3270 and VT terminals not appearing in the Zowe Desktop when using AT-TLS by adding a workaround for an AT-TLS CORS error between the gateway and App Server where CORS metadata has been added to the eureka registration ([#617](https://github.com/zowe/zlux-server-framework/pull/617))
+- Enhancement: Added components.app-server.enablePasswordChange parameter to the Zowe YAML configuration file for controlling visibility of the 'Change Password' option in the Zowe Desktop Personalization Panel. This value defaults to true, the prior behavior, when not present in the YAML. ([#616](https://github.com/zowe/zlux-server-framework/pull/616))
 
 ## 3.3.0
 - Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#610](https://github.com/zowe/zlux-server-framework/pull/610))
