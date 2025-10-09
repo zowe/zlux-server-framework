@@ -3,8 +3,8 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
-## 3.4.0
-- Enhancement: Added components.app-server.enablePasswordChange parameter to the Zowe YAML configuration file for controlling visibility of the 'Change Password' option in the Zowe Desktop Personalization Panel. This value defaults to true, the prior behavior, when not present in the YAML. ([#616](https://github.com/zowe/zlux-server-framework/pull/616))
+## 3.3.1
+- Bugfix/Enhancement: Added components.app-server.enablePasswordChange parameter to the Zowe YAML configuration file for controlling visibility of the 'Change Password' option in the Zowe Desktop Personalization Panel. This value defaults to true, the prior behavior, when not present in the YAML. ([#616](https://github.com/zowe/zlux-server-framework/pull/616))
 
 ## 3.3.0
 - Bugfix: Workaround for API Catalog issuing double-TLS request when it is under AT-TLS by changing eureka registration content to match state of API Catalog ([#610](https://github.com/zowe/zlux-server-framework/pull/610))
