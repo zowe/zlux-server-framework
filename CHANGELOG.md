@@ -4,7 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.5.0
-- Bugfix: Fixed error ZWED149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. ([#???]())
+- Bugfix: Fixed error ZWED149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. ([#633](https://github.com/zowe/zlux-server-framework/pull/633))
 
 ## 3.4.0
 - Enhancement: Logging of URLs now accomodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
