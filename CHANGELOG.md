@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.4.0
+- Enhancement: app-server log messages have use local timestamps instead of UTC timestamps by setting Zowe YAML configuration property `zowe.logging.timezone: local` which will take system settings into consideration for determining the right timezone to use. ([#572](https://github.com/zowe/zlux-server-framework/pull/572))
 - Enhancement: Logging of URLs now accomodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
 - Enhancement: Eureka registration to discovery server now handles IPv6 in URLs ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
 - Bugfix: Fix TN3270 and VT terminals not appearing in the Zowe Desktop when using AT-TLS by adding a workaround for an AT-TLS CORS error between the gateway and App Server where CORS metadata has been added to the eureka registration ([#617](https://github.com/zowe/zlux-server-framework/pull/617))
@@ -26,8 +27,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#580)
 
 ## 3.0.0
-- Enhancement: Add ability for server to dynamically load plugin web content based on `entryPoint` specification in the
-`pluginDefinition.json`
+- Enhancement: Add ability for server to dynamically load plugin web content based on `entryPoint` specification in the `pluginDefinition.json`
 
 ## 2.18.1
 - Bugfix: App-server could not register with discovery server when AT-TLS was enabled for app-server. (#581)
