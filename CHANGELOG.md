@@ -3,8 +3,11 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.5.0
+- Bugfix: Fixed error ZWED0149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. ([#633](https://github.com/zowe/zlux-server-framework/pull/633))
+
 ## 3.4.0
-- Enhancement: Logging of URLs now accomodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
+- Enhancement: Logging of URLs now accommodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
 - Enhancement: Eureka registration to discovery server now handles IPv6 in URLs ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
 - Bugfix: Fix TN3270 and VT terminals not appearing in the Zowe Desktop when using AT-TLS by adding a workaround for an AT-TLS CORS error between the gateway and App Server where CORS metadata has been added to the eureka registration ([#617](https://github.com/zowe/zlux-server-framework/pull/617))
 
@@ -74,7 +77,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 2.3.0
 
-- Bugfix: Proxies (zss, external services, and those made by router services) now default to the same HTTPS/TLS settings as the app-esrver.
+- Bugfix: Proxies (zss, external services, and those made by router services) now default to the same HTTPS/TLS settings as the app-server.
 
 ## 2.0.0
 
