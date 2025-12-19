@@ -10,38 +10,38 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const tls = require('tls');
-
-exports.EXIT_GENERIC = 2;
-exports.EXIT_AUTH = 3;
-exports.EXIT_PFX_READ = 4;
-exports.EXIT_HTTPS_LOAD = 5;
-exports.EXIT_NO_PLUGINS = 6;
-exports.EXIT_NO_SAFKEYRING = 7;
+import * as tls from 'node:tls';
 
 
+export const EXIT_GENERIC: number = 2;
+export const EXIT_AUTH: number = 3;
+export const EXIT_PFX_READ: number = 4;
+export const EXIT_HTTPS_LOAD: number = 5;
+export const EXIT_NO_PLUGINS: number = 6;
+export const EXIT_NO_SAFKEYRING: number = 7;
 
-exports.WEBSOCKET_CLOSE_INTERNAL_ERROR = 4999;
-exports.WEBSOCKET_CLOSE_BY_PROXY = 4998;
-exports.WEBSOCKET_CLOSE_CODE_MINIMUM = 3000;
 
-exports.APP_NAME = "zlux"; //this seems to be pretty "variable"
 
-exports.setProductCode = function(productCode) {
-  exports.APP_NAME = productCode.toLowerCase();
+export const WEBSOCKET_CLOSE_INTERNAL_ERROR: number = 4999;
+export const WEBSOCKET_CLOSE_BY_PROXY: number = 4998;
+export const WEBSOCKET_CLOSE_CODE_MINIMUM: number = 3000;
+
+export let APP_NAME: string = "zlux"; //this seems to be pretty "variable"
+
+export function setProductCode(productCode: string): void {
+  APP_NAME = productCode.toLowerCase();
 }
 
-const TLS_VERSION = {
+export const TLS_VERSION: Record<string, number> = {
   //0: invalid
   "TLSv1.0": 1,
   "TLSv1.1": 2,
   "TLSv1.2": 3,
   "TLSv1.3": 4
 };
-exports.TLS_VERSION = TLS_VERSION;
 
 //from https://testssl.sh/openssl-iana.mapping.html on 2023-11-16
-const OPENSSL_CIPHER_NAME_FROM_IANA = {
+export const OPENSSL_CIPHER_NAME_FROM_IANA: Record<string, string> = {
   "TLS_RSA_WITH_NULL_MD5": "NULL-MD5",
   "TLS_RSA_WITH_NULL_SHA": "NULL-SHA",
   "TLS_RSA_EXPORT_WITH_RC4_40_MD5": "EXP-RC4-MD5",
@@ -288,9 +288,8 @@ const OPENSSL_CIPHER_NAME_FROM_IANA = {
   "SSL_CK_DES_64_CFB64_WITH_MD5_1": "DES-CFB-M1",
   "SSL_CK_NULL": "NULL"
 }
-exports.OPENSSL_CIPHER_NAME_FROM_IANA = OPENSSL_CIPHER_NAME_FROM_IANA;
 
-const HTTPS_DESIRED_CIPHERS = [
+const HTTPS_DESIRED_CIPHERS: string[] = [
   'DHE-RSA-AES128-GCM-SHA256',
   'DHE-RSA-AES256-GCM-SHA384',
   'ECDHE-ECDSA-AES128-GCM-SHA256',
@@ -308,14 +307,12 @@ const HTTPS_DESIRED_CIPHERS = [
 
 const supportedCiphers = tls.getCiphers().map((cipher)=> {return cipher.toUpperCase();});
 
-const HTTPS_DEFAULT_CIPHERS = [];
-HTTPS_DESIRED_CIPHERS.forEach((cipher)=> {
+export const HTTPS_DEFAULT_CIPHERS: string[] = HTTPS_DESIRED_CIPHERS.filter((cipher)=> {
   if (supportedCiphers.indexOf(cipher) != -1) {
-    HTTPS_DEFAULT_CIPHERS.push(cipher);
+    return true;
   }
+  return false;
 });
-  
-exports.HTTPS_DEFAULT_CIPHERS = HTTPS_DEFAULT_CIPHERS;
 
 /*
   This program and the accompanying materials are
