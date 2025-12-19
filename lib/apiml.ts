@@ -412,35 +412,36 @@ class ApimlConnector {
         service.version;
     }
     
-  }*/
-}
+    }*/
 
-module.exports = ApimlConnector;
-module.exports.getUserId = (apimlTkn) => {
-  let base64UrlToBase64 = (input) => {
-    let result = input.replace(/-/g, '+').replace(/_/g, '/');
-    const padCount = result.length % 4;
-    if (padCount > 0) {
-      if (padCount === 1) {
-        throw new Error('bad length of base64url string');
+  static getUserId(apimlTkn) {
+    let base64UrlToBase64 = (input) => {
+      let result = input.replace(/-/g, '+').replace(/_/g, '/');
+      const padCount = result.length % 4;
+      if (padCount > 0) {
+        if (padCount === 1) {
+          throw new Error('bad length of base64url string');
+        }
+        result += new Array(5 - padCount).join('=');
       }
-      result += new Array(5 - padCount).join('=');
+      return result;
     }
-    return result;
-  }
 
-  let userid;
-  try {
-    const payloadBase64Url = apimlTkn.split('.')[1];
-    const payloadBase64 = base64UrlToBase64(payloadBase64Url);
-    const payloadString = Buffer.from(payloadBase64, 'base64').toString();
-    const payloadObject = JSON.parse(payloadString);
-    userid = payloadObject.sub;
-  } catch (e) {
-    throw new Error(`failed to parse APIML token: ${e}`);
+    let userid;
+    try {
+      const payloadBase64Url = apimlTkn.split('.')[1];
+      const payloadBase64 = base64UrlToBase64(payloadBase64Url);
+      const payloadString = Buffer.from(payloadBase64, 'base64').toString();
+      const payloadObject = JSON.parse(payloadString);
+      userid = payloadObject.sub;
+    } catch (e) {
+      throw new Error(`failed to parse APIML token: ${e}`);
+    }
+    return userid;
   }
-  return userid;
 }
+
+export = ApimlConnector;
 
 /*
   This program and the accompanying materials are
