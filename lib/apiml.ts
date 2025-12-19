@@ -8,11 +8,11 @@
   
   Copyright Contributors to the Zowe Project.
 */
-const Promise = require("bluebird");
-const eureka = require('@rocketsoftware/eureka-js-client').Eureka;
-const zluxUtil = require('./util');
-const https = require('https');
-const http = require('http');
+import * as BBPromise from 'bluebird';
+import { Eureka as eureka } from '@rocketsoftware/eureka-js-client';
+import * as zluxUtil from './util';
+import * as http from 'node:http';
+import * as https from 'node:https';
 
 const log = zluxUtil.loggers.apiml;
 
@@ -69,12 +69,12 @@ const MEDIATION_LAYER_INSTANCE_DEFAULTS = (zluxProto, zluxHostname, zluxPort) =>
 
     "apiml.catalog.tile.id": "zlux",
     "apiml.catalog.tile.title": "App Server",
-    "apiml.catalog.tile.description": `Zowe's App Server is the component of Zowe which serves the Zowe Desktop. It is an extensible webserver for HTTPS and Websocket APIs written using ExpressJS. Extensions are delivered as 'App Framework Plugins', and several are included by default.`,
+    "apiml.catalog.tile.description": "Zowe's App Server is the component of Zowe which serves the Zowe Desktop. It is an extensible webserver for HTTPS and Websocket APIs written using ExpressJS. Extensions are delivered as 'App Framework Plugins', and several are included by default.",
     "apiml.catalog.tile.version": zluxUtil.getZoweVersion(),
 
 
     "apiml.service.title": "App Server",
-    "apiml.service.description": `This list includes core APIs for management of plugins, management of the server itself, and APIs brought by plugins and the app server agent, ZSS. Plugins that do not bring their own API documentation are shown here as stubs.`,
+    "apiml.service.description": "This list includes core APIs for management of plugins, management of the server itself, and APIs brought by plugins and the app server agent, ZSS. Plugins that do not bring their own API documentation are shown here as stubs.",
 
     "apiml.authentication.sso": "true",
 
@@ -82,46 +82,62 @@ const MEDIATION_LAYER_INSTANCE_DEFAULTS = (zluxProto, zluxHostname, zluxPort) =>
   }
 }};
 
-function ApimlConnector({ hostName, port, discoveryUrls,
-                          discoveryPort, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
-  Object.assign(this, { hostName, port, discoveryUrls,
-                        discoveryPort, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
-  //TODO config should never be checked through env var, but is temporarily needed to temporarily read gateway's ATTLS state to provide it with Eureka info it can work with.
-  const clientGlobalAttls = process.env['ZWE_zowe_network_client_tls_attls'];
-  const serverGlobalAttls = process.env['ZWE_zowe_network_server_tls_attls'] == 'true';
+class ApimlConnector {
+  isGatewayClientAttls: boolean;
+  isApiCatalogClientAttls: boolean;
+  vipAddress: string;
+  isClientAttls: boolean;
+  discoveryHost: string;
+  discoveryPort: number;
+  hostName: string;
+  port: number;
+  gatewayPort: number;
+  catalogPort: number;
+  tlsOptions: any;
+  traceTls: boolean;
+  discoveryUrls: string[];
+  eurekaClient: any;
+  eurekaOverrides: Record<string, any>;
+  ipAddr: string;
 
-  const clientGatewayAttls = process.env['ZWE_components_gateway_zowe_network_client_tls_attls'];
-  const clientAGAttls = (clientGlobalAttls == 'true') || (clientGatewayAttls == 'true');
-  this.isGatewayClientAttls = false;
-  if ((clientGlobalAttls === undefined) && (clientGatewayAttls === undefined)) {
-    // If client attls env vars are not set, have client follow server attls variable. it simplifies common case in which users want both.
-    const serverGatewayAttls = process.env['ZWE_components_gateway_zowe_network_server_tls_attls'] == 'true';
-    this.isGatewayClientAttls = serverGlobalAttls || serverGatewayAttls;
-  } else {
-    this.isGatewayClientAttls = clientAGAttls;
-  }
 
-
-  //TODO config should never be checked through env var, but is temporarily needed to temporarily read apiCatalog's ATTLS state to provide it with Eureka info it can work with.
-  const clientApiCatalogAttls = process.env['ZWE_components_api_catalog_zowe_network_client_tls_attls'];
-  const clientACAttls = (clientGlobalAttls == 'true') || (clientApiCatalogAttls == 'true');
-  this.isApiCatalogClientAttls = false;
-  if ((clientGlobalAttls === undefined) && (clientApiCatalogAttls === undefined)) {
-    // If client attls env vars are not set, have client follow server attls variable. it simplifies common case in which users want both.
-    const serverApiCatalogAttls = process.env['ZWE_components_api_catalog_zowe_network_server_tls_attls'] == 'true';
-    this.isApiCatalogClientAttls = serverGlobalAttls || serverApiCatalogAttls;
-  } else {
-    this.isApiCatalogClientAttls = clientACAttls;
-  }
-
+  constructor({ hostName, port, discoveryUrls,
+                            discoveryPort, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
+    Object.assign(this, { hostName, port, discoveryUrls,
+                          discoveryPort, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
+    //TODO config should never be checked through env var, but is temporarily needed to temporarily read gateway's ATTLS state to provide it with Eureka info it can work with.
+    const clientGlobalAttls = process.env['ZWE_zowe_network_client_tls_attls'];
+    const serverGlobalAttls = process.env['ZWE_zowe_network_server_tls_attls'] == 'true';
   
-  this.vipAddress = hostName;
-}
+    const clientGatewayAttls = process.env['ZWE_components_gateway_zowe_network_client_tls_attls'];
+    const clientAGAttls = (clientGlobalAttls == 'true') || (clientGatewayAttls == 'true');
+    this.isGatewayClientAttls = false;
+    if ((clientGlobalAttls === undefined) && (clientGatewayAttls === undefined)) {
+      // If client attls env vars are not set, have client follow server attls variable. it simplifies common case in which users want both.
+      const serverGatewayAttls = process.env['ZWE_components_gateway_zowe_network_server_tls_attls'] == 'true';
+      this.isGatewayClientAttls = serverGlobalAttls || serverGatewayAttls;
+    } else {
+      this.isGatewayClientAttls = clientAGAttls;
+    }
+  
+  
+    //TODO config should never be checked through env var, but is temporarily needed to temporarily read apiCatalog's ATTLS state to provide it with Eureka info it can work with.
+    const clientApiCatalogAttls = process.env['ZWE_components_api_catalog_zowe_network_client_tls_attls'];
+    const clientACAttls = (clientGlobalAttls == 'true') || (clientApiCatalogAttls == 'true');
+    this.isApiCatalogClientAttls = false;
+    if ((clientGlobalAttls === undefined) && (clientApiCatalogAttls === undefined)) {
+      // If client attls env vars are not set, have client follow server attls variable. it simplifies common case in which users want both.
+      const serverApiCatalogAttls = process.env['ZWE_components_api_catalog_zowe_network_server_tls_attls'] == 'true';
+      this.isApiCatalogClientAttls = serverGlobalAttls || serverApiCatalogAttls;
+    } else {
+      this.isApiCatalogClientAttls = clientACAttls;
+    }
+  
+    
+    this.vipAddress = hostName;
+  }
 
-ApimlConnector.prototype = {
-  constructor: ApimlConnector,
-
-  setBestIpFromConfig: Promise.coroutine(function *getBaseIpFromConfig(nodeConfig) {
+  setBestIpFromConfig = BBPromise.coroutine(function *getBaseIpFromConfig(nodeConfig) {
     const nodeIps = yield zluxUtil.uniqueIps(nodeConfig.https && nodeConfig.https.ipAddresses ? nodeConfig.https.ipAddresses : nodeConfig.http.ipAddresses);
     const eurekaIp = yield zluxUtil.uniqueIps([nodeConfig.mediationLayer.server.hostname]);
     if (nodeIps.includes(eurekaIp)) {
@@ -137,13 +153,13 @@ ApimlConnector.prototype = {
       this.ipAddr = zluxUtil.getLoopbackAddress(nodeIps);
       return this.ipAddr;
     }
-  }),
+  })
   
   checkAgent(timeout, serviceName) {
     let timer = timeout ? timeout : DEFAULT_AGENT_CHECK_TIMEOUT;
     const end = Date.now() + timer;
     
-    return new Promise((resolve, reject) => {
+    return new BBPromise((resolve, reject) => {
       const optionsArray = this.getRequestOptionsArray('GET', `/eureka/apps/${serviceName}`);
       let optionsIndex = 0;
       
@@ -192,9 +208,9 @@ ApimlConnector.prototype = {
       
       issueRequest();
     });
-  },
+  }
   
-  _makeMainInstanceProperties(overrides) {
+  private _makeMainInstanceProperties(overrides?) {
     const protocolObject = {
       // http port is specified no matter what
       // as a workaround for routing issues in the API ML
@@ -251,7 +267,7 @@ ApimlConnector.prototype = {
      log.debug("ZWED0143I", JSON.stringify(instance)); //log.debug("API ML registration settings:", JSON.stringify(instance));
 
     return instance;
-  },
+  }
 
   /*
    * TODO: commented out as this is a stretch goal
@@ -321,7 +337,7 @@ ApimlConnector.prototype = {
     log.error = hideTimingError;
     this.eurekaClient = eurekaClient;
     const ipAddr = this.ipAddr;
-    return new Promise((resolve, reject) => {
+    return new BBPromise((resolve, reject) => {
       eurekaClient.start((error) => {
         //suppress expected errors (due to timing) by substituting logger temporarily, but capture last seen error and log it after restoring error logger on connect
         log.error = errorHandler;
@@ -335,7 +351,7 @@ ApimlConnector.prototype = {
         }
       });
     });
-  },
+  }
 
   getServiceUrls() {
     let urls = this.discoveryUrls.map(url => url + (url.endsWith('/') ? '' : '/') + 'apps');
@@ -344,7 +360,7 @@ ApimlConnector.prototype = {
     } else {
       return urls;
     }
-  },
+  }
 
   getRequestOptionsArray(method, path) {
     return this.discoveryUrls.map((url)=>{
