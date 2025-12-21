@@ -15,20 +15,21 @@
  * 
  */
 'use strict';
-const http = require('http');
-const https = require('https');
-const express = require('express');
-const util = require('./util');
-const unpconst = require('./unp-constants');
-const WebSocket = require('ws');
-const net = require('net');
+import * as http from 'node:http';
+import * as https from 'node:https';
+import * as express from 'express';
+import * as util from './util';
+import * as unpconst from './unp-constants';
+import * as WebSocket from 'ws';
+import * as net from 'node:net';
+import * as url from 'node:url';
 
 const proxyLog = util.loggers.proxyLogger;
 const RECONNECT_DELAY = 5000;
 const DEFAULT_HANDSHAKE_TIMEOUT = 30000;
 
-function convertOptions(request, realHost, realPort, urlPrefix, requestProcessingOptions) {
-  var options = {};
+function convertOptions(request, realHost: string, realPort: number, urlPrefix: string, requestProcessingOptions?) {
+  let options: any = {};
   proxyLog.debug("ZWED0166I", request.headers.host); //proxyLog.debug("request host " + request.headers.host);
 
   let ipFamily = 4;
@@ -72,7 +73,7 @@ function convertOptions(request, realHost, realPort, urlPrefix, requestProcessin
   return options;
 }
 
-function makeSimpleProxy(host, port, options, pluginID, serviceName) {
+function makeSimpleProxy(host: string, port: number, options, pluginID: string, serviceName: string) {
   if (!(host && port)) {
     throw new Error(`ZWED0047E - Proxy (${pluginID}:${serviceName}) setup failed.\n`
                     + `Host & Port for proxy destination are required but were missing.\n`
@@ -151,7 +152,7 @@ function makeSimpleProxy(host, port, options, pluginID, serviceName) {
   }
 }
 
-function makeWsProxy(host, port, urlPrefix, options) {
+function makeWsProxy(host: string, port: number, urlPrefix: string, options) {
   // copied and pasted with only minimal fixes to formatting
   var toString = function() {
     return '[Proxy URL: '+urlPrefix+']';
@@ -329,7 +330,7 @@ function makeWsProxy(host, port, urlPrefix, options) {
   };
 };
 
-function checkProxiedHost(host, port, handshakeTimeout) {
+function checkProxiedHost(host: string, port: number, handshakeTimeout?: number) {
   const client = new net.Socket();
   let timeLeft = handshakeTimeout ? handshakeTimeout : DEFAULT_HANDSHAKE_TIMEOUT;
   return new Promise((resolve, reject) => {
@@ -340,10 +341,10 @@ function checkProxiedHost(host, port, handshakeTimeout) {
 
     client.once("connect", () => {
       client.destroy();
-      resolve();
+      resolve(null);
     });
 
-    client.on('error', (e) => {
+    client.on('error', (e: any) => {
       if (timeLeft <= 0) {
         proxyLog.warn(`ZWED0045W`, host, port); //proxyLog.warn(`Failed to reach the auth services host for address ${host}:${port}`);
         if (host === '127.0.0.1') {
@@ -364,10 +365,7 @@ function checkProxiedHost(host, port, handshakeTimeout) {
   });
 }
 
-exports.makeSimpleProxy = makeSimpleProxy;
-exports.makeWsProxy = makeWsProxy;
-exports.checkProxiedHost = checkProxiedHost;
-
+export = { makeSimpleProxy, makeWsProxy, checkProxiedHost };
 
 /*
   This program and the accompanying materials are
