@@ -101,10 +101,8 @@ class ApimlConnector {
   ipAddr: string;
 
 
-  constructor({ hostName, port, discoveryUrls,
-                            discoveryPort, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
-    Object.assign(this, { hostName, port, discoveryUrls,
-                          discoveryPort, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
+  constructor({ hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
+    Object.assign(this, { hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
     //TODO config should never be checked through env var, but is temporarily needed to temporarily read gateway's ATTLS state to provide it with Eureka info it can work with.
     const clientGlobalAttls = process.env['ZWE_zowe_network_client_tls_attls'];
     const serverGlobalAttls = process.env['ZWE_zowe_network_server_tls_attls'] == 'true';
