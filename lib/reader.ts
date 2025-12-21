@@ -10,20 +10,21 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const readline = require('readline');
+import * as BBPromise from 'bluebird';
+import * as readline from 'node:readline';
 
-function Reader() {
-  this.readlineReader = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-}
-Reader.prototype = {
-  constructor: Reader,
-  readlineReader: null,
-
+class Reader {
+  readlineReader: readline.Interface;
+  
+  constructor() {
+    this.readlineReader = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+  }
+  
   readPassword(question) {
-    return new Promise((resolve, reject) => {
+    return new BBPromise((resolve, reject) => {
       const stdin = process.openStdin();
       stdin.on('data', function(c) {
         c+='';
@@ -39,33 +40,32 @@ Reader.prototype = {
       this.readlineReader.question(question, (answer) => {
         resolve(answer);
         //do not retain the history of the password for future questions
-        this.readlineReader.history = this.readlineReader.history.slice(1); 
+        (this.readlineReader as any).history = (this.readlineReader as any).history.slice(1); 
       });
     })
-  },
+  }
 
   close() {
     this.readlineReader.close();
   }
 };
 
+export = Reader;
 
-module.exports = Reader;
 
-
-_unitTest = false;
+var _unitTest = false;
 if (_unitTest) {
-  const Promise = require('bluebird');
-  unitTest = Promise.coroutine(function* (app) {
+
+  var unitTest = BBPromise.coroutine(function* (app) {
     let password;
-    const r1 = makeReader();
+    const r1 = new Reader();
     try {
       password = yield r1.readPassword("Enter password (should not be displayed): ");
       console.log("password is: ", password);
     } finally {
       r1.close();
     }
-    const r2 = makeReader();
+    const r2 = new Reader();
     try {
       password = yield r2.readPassword("One more time: ");
       console.log("password is: ", password);
