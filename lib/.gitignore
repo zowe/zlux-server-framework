@@ -59,6 +59,7 @@ javaManager.js
 javaTypes.js
 tomcatManager.js
 apimlStorage.js
+reader.js
 pluginStorage.js
 
 # This program and the accompanying materials are
