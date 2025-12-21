@@ -12,40 +12,44 @@
 
 'use strict';
 
-const Promise = require('bluebird');
-const fs = require('fs');
-const http = require('http');
-const https = require('https');
-const url = require('url');
-const WebSocket = require('ws');
-const expressWs = require('@rocketsoftware/express-ws');
-const util = require('./util');
-const constants = require('./unp-constants');
-const reader = require('./reader');
-const crypto = require('crypto');
+import * as BBPromise from 'bluebird';
+import * as fs from 'node:fs';
+import * as http from 'node:http';
+import * as https from 'node:https';
+import * as tls from 'node:tls';
+import * as url from 'node:url';
+import * as Websocket from 'ws';
+import * as expressWs from '@rocketsoftware/express-ws';
+import * as util from './util';
+import * as constants from './unp-constants';
+import * as reader from './reader';
+import * as crypto from 'node:crypto';
+import * as os from 'node:os';
 
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const contentLogger = util.loggers.contentLogger;
 const childLogger = util.loggers.childLogger;
 const networkLogger = util.loggers.network;
 
-const os = require('os');
+
 let keyring_js;
 try {
-  if (os.platform() == 'os390') {
+  if ((os.platform() as any) == 'os390') {
     keyring_js = require('keyring_js');
   }
 } catch (e) {
   bootstrapLogger.warn('Could not load zcrypto library, SAF keyrings will be unavailable');
 }
 
-const CRYPTO_CONTENT_CERT=0;
-const CRYPTO_CONTENT_KEY=1;
-const CRYPTO_CONTENT_CA=2;
-const CRYPTO_CONTENT_CRL=3;
+enum DigitalCertType {
+  Cert,
+  Key,
+  Ca,
+  Crl
+};
 
 
-function readCiphers(stringOrArray) {
+function readCiphers(stringOrArray: string|string[]): string|null {
   let cipherArray = stringOrArray;
   if (typeof stringOrArray == 'string') {
     if (stringOrArray.length==0) {
@@ -75,7 +79,7 @@ function readCiphers(stringOrArray) {
   }
 };
 
-function parseSafKeyringAddress(safEntry) {
+function parseSafKeyringAddress(safEntry: string): {userId: string, keyringName: string, label?: string} {
   const endUserIndex = safEntry.indexOf('/');
   if (endUserIndex == -1) {
     return null;
@@ -97,13 +101,13 @@ function parseSafKeyringAddress(safEntry) {
   }
 }
 
-function getAttributeNameForCryptoType(locationType, cryptoType) {
+function getAttributeNameForCryptoType(locationType: string, cryptoType: DigitalCertType): string|null {
   switch (locationType) {
   case 'safkeyring':
   default:
-    if (cryptoType == CRYPTO_CONTENT_CERT || cryptoType == CRYPTO_CONTENT_CA) {
+    if (cryptoType == DigitalCertType.Cert || cryptoType == DigitalCertType.Ca) {
       return 'certificate';
-    } else if (cryptoType == CRYPTO_CONTENT_KEY) {
+    } else if (cryptoType == DigitalCertType.Key) {
       return 'key';
     } else {
       return null;
@@ -111,7 +115,7 @@ function getAttributeNameForCryptoType(locationType, cryptoType) {
   }
 }
 
-function splitCryptoLocationsByType(locations) {
+function splitCryptoLocationsByType(locations: string[]): Record<string, any> {
   const locationsByType = {};
   locations.forEach((location)=> {
     const index = location.indexOf('://');
@@ -131,14 +135,14 @@ function splitCryptoLocationsByType(locations) {
 }
 
 //  safkeyring://
-function loadPem(locations, type, keyrings, pass) {
+function loadPem(locations: string[], type: DigitalCertType, keyrings: Record<string, any>, pass?:string) {
   const locationsByType = splitCryptoLocationsByType(locations);
   let content = [];
   const types = Object.keys(locationsByType);
   let saf = [];
   types.filter(type=> type.startsWith('safkeyring'))
        .forEach((type)=> { saf = saf.concat(locationsByType[type]) });
-  if (saf.length > 0 && os.platform() != 'os390') {
+  if (saf.length > 0 && (os.platform() as any) != 'os390') {
     bootstrapLogger.severe('ZWED0145E');//Cannot load SAF keyring content outside of z/OS'
     process.exit(constants.EXIT_NO_SAFKEYRING);
   } else if (saf.length > 0 && keyring_js) {
@@ -194,7 +198,7 @@ function loadPem(locations, type, keyrings, pass) {
   return {content, keyrings};
 }
 
-function readTlsOptionsFromConfig(nodeConfig, httpsOptions, pass) {
+function readTlsOptionsFromConfig(nodeConfig, httpsOptions: tls.ConnectionOptions, pass?: string) {
   //in case keys and certs can be read from the same keyring, store them here for later retrieval
   let keyrings = {};
   if (nodeConfig.https.pfx) {
@@ -209,35 +213,33 @@ function readTlsOptionsFromConfig(nodeConfig, httpsOptions, pass) {
     }
   } else {
     if (nodeConfig.https.certificates) {
-      httpsOptions.cert = loadPem(nodeConfig.https.certificates, CRYPTO_CONTENT_CERT, keyrings, pass).content;
+      httpsOptions.cert = loadPem(nodeConfig.https.certificates, DigitalCertType.Cert, keyrings, pass).content;
       bootstrapLogger.info('ZWED0072I', nodeConfig.https.certificates); //bootstrapLogger.info('Using Certificate: ' + nodeConfig.https.certificates);
     }
     if (nodeConfig.https.keys) {
-      httpsOptions.key = loadPem(nodeConfig.https.keys, CRYPTO_CONTENT_KEY, keyrings, pass).content;
+      httpsOptions.key = loadPem(nodeConfig.https.keys, DigitalCertType.Key, keyrings, pass).content;
     }
   }
   if (nodeConfig.https.certificateAuthorities) {
-    httpsOptions.ca = loadPem(nodeConfig.https.certificateAuthorities, CRYPTO_CONTENT_CA, keyrings, pass).content;
+    httpsOptions.ca = loadPem(nodeConfig.https.certificateAuthorities, DigitalCertType.Ca, keyrings, pass).content;
   }
   if (nodeConfig.https.certificateRevocationLists) {
-    httpsOptions.crl = loadPem(nodeConfig.https.certificateRevocationLists, CRYPTO_CONTENT_CRL, keyrings, pass).content;
+    httpsOptions.crl = loadPem(nodeConfig.https.certificateRevocationLists, DigitalCertType.Crl, keyrings, pass).content;
   }
 }
   
-function WebServer() {
-  this.config = null;
-}
-WebServer.prototype = {
-  constructor: WebServer,
-  config: null,
-  httpOptions: null,
-  httpsOptions: null,
-  httpsServers: [],
-  httpServers: [],
-  expressWsHttps: [],
-  expressWsHttp: [],
+class WebServer {
+  config = null;
+  httpOptions: http.ServerOptions;
+  httpsOptions: tls.ConnectionOptions;
+  httpsServers: https.Server[] = [];
+  httpServers: http.Server[] = [];
+  expressWsHttps = [];
+  expressWsHttp = [];
+  
+  constructor() { }
 
-  _setErrorLogger(server, type, ipAddress, port) {
+  _setErrorLogger(server, serverType: string, ipAddress: string, port: number) {
     //the server object will not tell the ipAddr & port unless it has successfully connected,
     //making logging poor unless passed
     server.on('error',(e)=> {
@@ -261,13 +263,13 @@ WebServer.prototype = {
       }
     });
 
-  },
+  }
   
-  getTlsOptions() {
+  getTlsOptions(): tls.ConnectionOptions {
     return this.httpsOptions;
-  },
+  }
 
-  validateAndPreprocessConfig: Promise.coroutine(function *validateAndPreprocessConfig(zoweConfig) {
+  validateAndPreprocessConfig = BBPromise.coroutine(function *validateAndPreprocessConfig(zoweConfig) {
     const config = zoweConfig.components['app-server'].node;
     let canRun = false;
     if (config.http?.port) {
@@ -326,7 +328,7 @@ WebServer.prototype = {
       }
     }
     return canRun;
-  }),
+  })
 
   setConfig(zoweConfig) {
     const nodeConfig = zoweConfig.components['app-server'].node;
@@ -341,7 +343,7 @@ WebServer.prototype = {
         this.httpsOptions.rejectUnauthorized = !nodeConfig.allowInvalidTLSProxy;
       }
       if (process.env.ZWE_zowe_verifyCertificates == 'NONSTRICT') {
-        this.httpsOptions.checkServerIdentity = function(hostname, cert) { return undefined; } 
+        this.httpsOptions.checkServerIdentity = function(hostname: string, cert) { return undefined; } 
       }
       //secureOptions and secureProtocol documented here: 
       //https://nodejs.org/api/tls.html#tls_tls_createsecurecontext_options
@@ -352,7 +354,7 @@ WebServer.prototype = {
       } else if (typeof options.secureProtocol == 'string') {
         this.httpsOptions.secureProtocol = options.secureProtocol;
       } else {
-        let consts = crypto.constants;
+        let consts = (crypto.constants as any);
         //tls 1.3 was released in 2018, and tls 1.2 should be in this blacklist list when it has widespread support
         let maxTls = constants.TLS_VERSION[options.maxTls || "TLSv1.3"];
         let minTls = constants.TLS_VERSION[options.minTls || "TLSv1.2"];
@@ -403,9 +405,9 @@ WebServer.prototype = {
         readTlsOptionsFromConfig(nodeConfig, this.httpsOptions, zoweConfig.zowe?.certificate?.keystore?.password);
       }
     }
-  },  
+  }  
 
-  startListening: Promise.coroutine(function* (webapp) {
+  startListening = BBPromise.coroutine(function* (webapp) {
     if (this.config.https && this.config.https.port) {
       const port = this.config.https.port;
       for (let ipAddress of this.config.https.ipAddresses) {
@@ -434,7 +436,7 @@ WebServer.prototype = {
             }
           }
         }
-        this.callListen(httpsServer, 'https', 'HTTPS', ipAddress, port);
+        this.callListen(httpsServer, 'HTTPS', ipAddress, port);
       }
     }
     if (this.config.http && this.config.http.port) {
@@ -445,12 +447,12 @@ WebServer.prototype = {
         this.httpServers.push(httpServer);
         webapp.expressWs = expressWs(webapp.expressApp, httpServer, {maxPayload: 50000});
         this.expressWsHttp.push(webapp.expressWs);
-        this.callListen(httpServer, 'http', 'HTTP', ipAddress, port);
+        this.callListen(httpServer, 'HTTP', ipAddress, port);
       }
     }
-  }),
+  })
 
-  callListen(methodServer, methodName, methodNameForLogging, ipAddress, port) {
+  callListen(methodServer, methodNameForLogging: string, ipAddress: string, port: number) {
     //We wrap : in [ ] due to IPv6 formatting
     const addressForLogging = `${ipAddress.includes(':') ? '['+ipAddress+']' : ipAddress}:${port}`;
     const logFunction = function () {
@@ -460,10 +462,10 @@ WebServer.prototype = {
     networkLogger.info("ZWED0130I", methodNameForLogging, addressForLogging); //networkLogger.log(bootstrapLogger.INFO, `(${methodNameForLogging})  `
         //+ `About to start listening on ${addressForLogging}`);
     methodServer.listen(port, ipAddress, logFunction);
-  },
+  }
 
   close() {
-    this.httpServers.forEach((server)=> {
+    this.httpServers.forEach((server: any)=> {
       let info = server.address();
       if (info) {
         //could be undefined if there was an error binding, yet close() still works
@@ -471,7 +473,7 @@ WebServer.prototype = {
       }
       server.close();      
     });
-    this.httpsServers.forEach((server)=> {
+    this.httpsServers.forEach((server: any)=> {
       let info = server.address();
       if (info) {
         //could be undefined if there was an error binding, yet close() still works
@@ -482,8 +484,7 @@ WebServer.prototype = {
   }
 };
 
-module.exports = WebServer;
-module.exports.readTlsOptionsFromConfig = readTlsOptionsFromConfig;
+export = WebServer;
 
 /*
   This program and the accompanying materials are

@@ -64,7 +64,7 @@
     "@types/express": "4.17.17",
     "@types/express-serve-static-core": "4.17.35",
     "@types/mime": "3.0.1",
-    "@types/node": "~16.18.0",
+    "@types/node": "18.19.130",
     "@types/qs": "6.9.3",
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
