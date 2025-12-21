@@ -145,13 +145,13 @@ export function getHostAndPortFromUrl(url: string): {host: string, port: number}
 }
 
 //maybe better in apiml.js but there would be a circular dependency around the logger init.
-export function getPrefixForService(serviceName: string, type?: string, version?: string): string {
+export function getPrefixForService(serviceName: string, type?: string, version?: string|number): string {
   let typePath = type || 'api';
   let versionPath = version || '1';
   return `/${serviceName}/${typePath}/v${versionPath}`;
 };
   
-export function getGatewayUrlForService(zoweConfig, includeProtocol: boolean, serviceName: string, type?: string, version?: string): string {
+export function getGatewayUrlForService(zoweConfig, includeProtocol: boolean, serviceName: string, type?: string, version?: string|number): string {
   const apimlConfig = zoweConfig.components['app-server'].node.mediationLayer.server;
   return `${includeProtocol?'https://':''}${apimlConfig.gatewayHostname.includes(':') ? '['+apimlConfig.gatewayHostname+']' : apimlConfig.gatewayHostname}:${apimlConfig.gatewayPort}${getPrefixForService(serviceName, type, version)}`;
 };
@@ -235,7 +235,7 @@ export function clonefunction(obj: any): any {
 };
 
 
-export function deepFreeze(obj: any, seen): any {
+export function deepFreeze(obj: any, seen?:Map<any, any>): any {
   if (!seen) {
     seen = new Map();
   }
