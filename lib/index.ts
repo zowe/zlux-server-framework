@@ -10,24 +10,25 @@
 */
 
 'use strict';
-const Promise = require('bluebird');
-const util = require('./util');
-const os = require('os');
-const WebServer = require('./webserver');
-const PluginLoader = require('./plugin-loader');
-const makeWebApp = require('./webapp').makeWebApp;
-const ProcessManager = require('./process');
-const AuthManager = require('./auth-manager');
-const WebAuth = require('./webauth');
-const unp = require('./unp-constants');
-const ApimlConnector = require('./apiml');
-const checkProxiedHost = require('./proxy').checkProxiedHost;
+import * as BBPromise from 'bluebird';
+import * as util from './util';
+import * as os from 'node:os';
+import * as tls from 'node:tls';
+import * as WebServer from './webserver';
+import * as PluginLoader from './plugin-loader';
+import { makeWebApp } from './webapp';
+import * as ProcessManager from './process';
+import * as AuthManager from './auth-manager';
+import * as WebAuth from './webauth';
+import * as unp from './unp-constants';
+import * as ApimlConnector from './apiml';
+import { checkProxiedHost } from './proxy';
+import * as ipaddr from 'ipaddr.js';
+import * as apimlStorage from './apimlStorage';
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const installLogger = util.loggers.installLogger;
-const ipaddr = require('ipaddr.js');
-const apimlStorage = require('./apimlStorage');
 
-function getInternalURL(zoweConfig, port) {
+function getInternalURL(zoweConfig, port: number): string {
   let addr, typeString;
   if (util.isServerHttps(zoweConfig)) {
     addr = util.getHttpsListeningAddresses(zoweConfig)[0];
@@ -49,7 +50,7 @@ function getInternalURL(zoweConfig, port) {
   return typeString+addr+':'+this.port;
 }
 
-function getLangManagers(zoweConfig, port) {
+function getLangManagers(zoweConfig, port: number): any[] {
   let langManagers = [];
   const componentConfig = zoweConfig.components['app-server'];
   if (componentConfig.languages && componentConfig.languages.java) {
@@ -66,70 +67,76 @@ function getLangManagers(zoweConfig, port) {
 }
  
 
-function Server(zoweConfig, configLocation) {
-  this.componentConfig = zoweConfig.components['app-server'];
-  util.initLoggerMessages(this.componentConfig.logLanguage);
-  this.setLogLevels();
-  const productCode = util.getProductCode(zoweConfig); 
-  unp.setProductCode(productCode);
-
-  util.setZoweVersionFromManifest(zoweConfig); 
+class Server {
+  componentConfig;
+  zoweConfig;
+  configLocation: string;
+  port: number;
+  langManagers: any[];
+  processManager;
+  authManager;
+  pluginLoader;
+  pluginMapRO: Record<string, any>;
+  webServer;
+  webApp;
+  tlsOptions: tls.ConnectionOptions;
+  startUpConfig;
+  pluginManager;
   
-  this.componentConfig.node.hostname = this.componentConfig.node.hostname ? this.componentConfig.node.hostname : os.hostname();
-
-
-  this.zoweConfig = zoweConfig;
-  this.configLocation = configLocation;
-  util.resolveRelativePaths(zoweConfig, util.normalizePath, process.cwd());
-
-  //for non-js code that needs to be included in plugin process
-  this.port = util.getBestPort(zoweConfig);
-
-  this.langManagers = getLangManagers(zoweConfig, this.port);
-  this.processManager = new ProcessManager(true, this.langManagers);
-
+  constructor(zoweConfig, configLocation: string) {
+    this.componentConfig = zoweConfig.components['app-server'];
+    util.initLoggerMessages(this.componentConfig.logLanguage);
+    this.setLogLevels();
+    const productCode = util.getProductCode(zoweConfig); 
+    unp.setProductCode(productCode);
   
-  this.authManager = new AuthManager({
-    productCode:  productCode,
-    config: this.componentConfig.dataserviceAuthentication,
-    sessionTimeoutMs: this.componentConfig.node.session?.timeoutMS || this.componentConfig.node.session?.cookie?.timeoutMS || undefined
-  });
-
-  this.pluginLoader = new PluginLoader({
-    productCode: productCode,
-    authManager: this.authManager,
-    pluginsDir: this.componentConfig.pluginsDir,
-    serverConfig: zoweConfig,
-    langManagers: this.langManagers,
-  });
-
-  this.pluginMapRO = util.readOnlyProxy(this.pluginLoader.pluginMap);
-  this.webServer = new WebServer();
-
-  this.webApp = null;
-  if (process.clusterManager) {
-    process.clusterManager.onScanPlugins(function(wi){
-      bootstrapLogger.debug('ZWED0293I',wi); //"Handling scan plugin request from worker=%d"
-      this.pluginLoader.scanForPlugins();
-    }.bind(this));
-    process.clusterManager.onAddDynamicPlugin(function(wi, pluginDef) {
-      bootstrapLogger.info("ZWED0114I", pluginDef.identifier); //bootstrapLogger.log(bootstrapLogger.INFO, "adding plugin remotely " + pluginDef.identifier);
-      this.pluginLoader.addDynamicPlugin(pluginDef);
-    }.bind(this));
+    util.setZoweVersionFromManifest(zoweConfig); 
+    
+    this.componentConfig.node.hostname = this.componentConfig.node.hostname ? this.componentConfig.node.hostname : os.hostname();
+  
+  
+    this.zoweConfig = zoweConfig;
+    this.configLocation = configLocation;
+    util.resolveRelativePaths(zoweConfig, util.normalizePath, process.cwd());
+  
+    //for non-js code that needs to be included in plugin process
+    this.port = util.getBestPort(zoweConfig);
+  
+    this.langManagers = getLangManagers(zoweConfig, this.port);
+    this.processManager = new ProcessManager(true, this.langManagers);
+  
+    
+    this.authManager = new AuthManager({
+      productCode:  productCode,
+      config: this.componentConfig.dataserviceAuthentication,
+      sessionTimeoutMs: this.componentConfig.node.session?.timeoutMS || this.componentConfig.node.session?.cookie?.timeoutMS || undefined
+    });
+  
+    this.pluginLoader = new PluginLoader({
+      productCode: productCode,
+      authManager: this.authManager,
+      pluginsDir: this.componentConfig.pluginsDir,
+      serverConfig: zoweConfig,
+      langManagers: this.langManagers,
+    });
+  
+    this.pluginMapRO = util.readOnlyProxy(this.pluginLoader.pluginMap);
+    this.webServer = new WebServer();
+  
+    this.webApp = null;
+    if ((process as any).clusterManager) {
+      (process as any).clusterManager.onScanPlugins(function(wi){
+        bootstrapLogger.debug('ZWED0293I',wi); //"Handling scan plugin request from worker=%d"
+        this.pluginLoader.scanForPlugins();
+      }.bind(this));
+      (process as any).clusterManager.onAddDynamicPlugin(function(wi, pluginDef) {
+        bootstrapLogger.info("ZWED0114I", pluginDef.identifier); //bootstrapLogger.log(bootstrapLogger.INFO, "adding plugin remotely " + pluginDef.identifier);
+        this.pluginLoader.addDynamicPlugin(pluginDef);
+      }.bind(this));
+    }
   }
-}
-Server.prototype = {
-  constructor: Server,
-  zoweConfig: null,
-  startUpConfig: null,
-  configLocation: null,
-  pluginManager: null,
-  processManager: null,
-  webApp: null,
-  webServer: null,
-  authManager: null,
 
-  setLogLevels: function() {
+  setLogLevels() {
     const logLevels = this.componentConfig.logLevels;
     if (logLevels && global.COM_RS_COMMON_LOGGER) {
       var logArray = Object.keys(logLevels);
@@ -142,26 +149,26 @@ Server.prototype = {
         }
       });
     }    
-  },
+  }
 
-  spawnChildProcesses: function() {
+  spawnChildProcesses() {
     if (this.componentConfig.node.childProcesses) {
       for (const proc of this.componentConfig.node.childProcesses) {
-        if (!process.clusterManager || process.clusterManager.getIndexInCluster() == 0 || !proc.once) {
+        if (!(process as any).clusterManager || (process as any).clusterManager.getIndexInCluster() == 0 || !proc.once) {
           try {
             this.processManager.spawn(proc); 
           } catch (error) {
             bootstrapLogger.warn(`ZWED0020W`, JSON.stringify(proc), error.message); //bootstrapLogger.warn(`Could not spawn ${JSON.stringify(proc)}: ${error.message}`);
           }  
         } else {
-          bootstrapLogger.info("ZWED0115I", process.clusterManager.getIndexInCluster(), proc.path); //bootstrapLogger.log(bootstrapLogger.INFO, `Skip child process spawning on worker ${process.clusterManager.getIndexInCluster()} ${proc.path}\n`);
+          bootstrapLogger.info("ZWED0115I", (process as any).clusterManager.getIndexInCluster(), proc.path); //bootstrapLogger.log(bootstrapLogger.INFO, `Skip child process spawning on worker ${(process as any).clusterManager.getIndexInCluster()} ${proc.path}\n`);
         }
       }
     }
-  },
+  }
   
-  start: Promise.coroutine(function*() {    
-    const firstWorker = !(process.clusterManager && process.clusterManager.getIndexInCluster() != 0);
+  start = BBPromise.coroutine(function*() {    
+    const firstWorker = !((process as any).clusterManager && (process as any).clusterManager.getIndexInCluster() != 0);
     if (!firstWorker) {
       this.suppressDuplicateLogging();
     }
@@ -190,7 +197,7 @@ Server.prototype = {
     this.pluginLoader.setTlsOptions(this.tlsOptions);
     const proxiedOptions = util.getAgentRequestOptions(this.zoweConfig, this.tlsOptions, false);
     
-    const webAppOptions = {
+    const webAppOptions: any = {
       //networking
       hostname: this.componentConfig.node.hostname,
       port: this.port,
@@ -250,7 +257,7 @@ Server.prototype = {
       }
     } else if (this.componentConfig.agent) {
       if (firstWorker &&
-          (process.platform !== 'os390') &&
+          ((process.platform as any) !== 'os390') &&
           ((webAppOptions.proxiedHost !== undefined) || (webAppOptions.proxiedPort !== undefined))){
           /*
             if either proxiedHost or proxiedPort were specified, then there is intent to connect to an agent.
@@ -283,9 +290,9 @@ Server.prototype = {
     for (let i = 0; i < this.langManagers.length; i++) {
       yield this.langManagers[i].startAll();
     }
-  }),
+  })
 
-  loadPlugins: Promise.coroutine(function*() {
+  loadPlugins = BBPromise.coroutine(function*() {
     let pluginsLoaded = 0;
     let pluginCount = 0;
     let messageIssued = false;
@@ -298,7 +305,7 @@ Server.prototype = {
 
       const percentComplete = `${Math.round((pluginCount/event.count)*100)}% (${pluginCount}/${event.count})`;
       let percentLoaded = `${Math.round((pluginsLoaded/event.count)*100)}% (${pluginsLoaded}/${event.count})`;
-      const primaryProcess = !process.clusterManager || process.clusterManager.getIndexInCluster() == 0;
+      const primaryProcess = !(process as any).clusterManager || (process as any).clusterManager.getIndexInCluster() == 0;
       function handleIfComplete(index) {
         if (pluginCount === event.count) {
           if (!messageIssued) {
@@ -339,9 +346,9 @@ Server.prototype = {
       }
     }, installLogger));
     return yield this.pluginLoader.loadPlugins();
-  }),
+  })
   
-  configureApimlStorage(apimlConfig, isHttps) {
+  configureApimlStorage(apimlConfig, isHttps: boolean) {
     apimlStorage.configure({
       host: apimlConfig.server.gatewayHostname,
       port: apimlConfig.server.gatewayPort,
@@ -349,21 +356,21 @@ Server.prototype = {
       isHttps: isHttps
     });
     bootstrapLogger.info(`ZWED0300I`); // Caching Service configured
-  },
+  }
 
-  pluginLoadingFinished(adr, percent, loaded, total) {
-    if (process.clusterManager && process.clusterManager.getIndexInCluster() != 0) {
+  pluginLoadingFinished(adr: string, percent, loaded: number, total: number) {
+    if ((process as any).clusterManager && (process as any).clusterManager.getIndexInCluster() != 0) {
       this.restoreWorkerLogging();
     } else {
       installLogger.info(`ZWED0031I`, adr, percent, loaded, total);
       //Server is ready at ${adr}, Plugins successfully loaded: ${percent}% (${loaded}/${total})`);
     }
     this.pluginLoader.enablePluginScanner(this.componentConfig.node.pluginScanIntervalSec);
-  },
+  }
 
   suppressDuplicateLogging() {
     global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_zsf\..*",1);
-  },
+  }
 
   restoreWorkerLogging() {
     global.COM_RS_COMMON_LOGGER.setLogLevelForComponentPattern("_zsf\..*",2);
@@ -373,15 +380,15 @@ Server.prototype = {
         global.COM_RS_COMMON_LOGGER.setLogLevelForComponentName(key, this.componentConfig.logLevels[key]);
       });
     }
-  },
+  }
 
   newPluginSubmitted(pluginDef) {
     installLogger.debug("ZWED0162I", pluginDef); //installLogger.debug("Adding plugin ", pluginDef);
     this.pluginLoader.addDynamicPlugin(pluginDef);
-    if (process.clusterManager) {
-      process.clusterManager.addDynamicPlugin(pluginDef);
+    if ((process as any).clusterManager) {
+      (process as any).clusterManager.addDynamicPlugin(pluginDef);
     }
-  },
+  }
 
   pluginLoaded(pluginDef) {
     const pluginContext = {
@@ -410,7 +417,7 @@ Server.prototype = {
   }
 };
 
-module.exports = Server;
+export = Server;
 
 
 /*
