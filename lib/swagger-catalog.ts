@@ -10,15 +10,13 @@
 */
 
 
-const express = require('express');
-const Promise = require('bluebird');
-const zLuxUrl = require('./url')
-const path = require('path');
-const fs = require('fs');
-const yaml = require('yaml');
-const swaggerParser = require('@apidevtools/swagger-parser')
-const os = require('os');
-const zluxUtil = require('./util');
+import * as zLuxUrl from './url';
+import * as BBPromise from 'bluebird';
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as yaml from 'yaml';
+import * as swaggerParser from '@apidevtools/swagger-parser';
+import * as zluxUtil from './util';
 
 var installLog = zluxUtil.loggers.installLogger;
 
@@ -52,8 +50,8 @@ const makeCatalogForPlugin = () => {
       return zluxServerDocs;
   }
 
-  return (plugin, productCode, serverConfig) => {
-    return new Promise((resolve) => {
+  return (plugin, productCode: string, serverConfig) => {
+    return new BBPromise((resolve) => {
       const nodeContext = serverConfig.components['app-server'].node;
       const openApi = {
         swagger: "2.0",
@@ -124,7 +122,7 @@ const makeCatalogForPlugin = () => {
 
 
 
-var getSwaggerDocs = Promise.coroutine(function* (plugin, productCode, zoweConfig) {
+var getSwaggerDocs = BBPromise.coroutine(function* (plugin, productCode: string, zoweConfig) {
   var allServiceDocs = [];
   if (plugin.dataServices) {
     let serviceList = plugin.dataServices;
@@ -166,9 +164,9 @@ var getSwaggerDocs = Promise.coroutine(function* (plugin, productCode, zoweConfi
   return allServiceDocs;
 })
 
-function readSingleSwaggerFile (dirName, serviceName, serviceVersion) {
+function readSingleSwaggerFile (dirName: string, serviceName: string, serviceVersion: string|number) {
   // read one swagger file and validate the json that is returned
-  return new Promise ((resolve, reject) => {
+  return new BBPromise ((resolve, reject) => {
     const jsonName = serviceName+'.json';
     const jsonNameV = serviceName+'_'+serviceVersion+'.json';
     const yamlName = serviceName+'.yaml';
@@ -232,7 +230,7 @@ function overwriteSwaggerFieldsForExternal(swaggerJson, serviceOrPlugin) {
   return swaggerJson;
 }
 
-function overwriteSwaggerFieldsForServer (swaggerJson, urlBase, nodeContext) {
+function overwriteSwaggerFieldsForServer (swaggerJson, urlBase:string, nodeContext) {
   // overwrite swagger fields with more accurate info from server and config
   swaggerJson.basePath = urlBase + "/services" + swaggerJson.basePath
     + (swaggerJson.basePath.endsWith('/')?"":"/") + swaggerJson.info.version;
@@ -257,7 +255,7 @@ function getHost(zoweConfig) {
   return `${zluxUtil.getBestHostname(zoweConfig)}:${zluxUtil.getBestPort(zoweConfig)}`;
 }
 
-module.exports = makeCatalogForPlugin();
+export = makeCatalogForPlugin();
 
 /*
   This program and the accompanying materials are
