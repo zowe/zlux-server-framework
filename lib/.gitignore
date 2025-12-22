@@ -54,6 +54,7 @@ proxy.conf.json
 Thumbs.db
 
 # TS Output files
+depgraph.js
 jarManager.js
 javaManager.js
 javaTypes.js
