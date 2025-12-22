@@ -1,4 +1,3 @@
-
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
@@ -10,46 +9,64 @@
 */
 "use strict";
 
-const semver = require('semver');
-//const assert = require('assert');
-const zluxUtil = require('./util');
+import * as semver from 'semver';
+import * as zluxUtil from './util';
 
-module.exports = DependencyGraph;
-// TODO translation
-module.exports.statuses = {
-  "REQUIRED_PLUGIN_FAILED_TO_LOAD": "Required plugin failed to load",
-  "REQUIRED_PLUGIN_NOT_FOUND": "Required plugin not found",
-  "INVALID_REQUIRED_VERSION_RANGE": "Invalid required version range",
-  "IMPORTED_SERVICE_IS_AN_IMPORT": "Imported service is itself an import",
-  "REQUIRED_SERVICE_VERSION_NOT_FOUND": "Required service version not found",
-  "REQUIRED_SERVICE_NOT_FOUND": "Required service not found"
+const logger: ZLUXServerFramework.ComponentLogger = zluxUtil.loggers.bootstrapLogger;
+
+type DependencyGraphNode = {
+  pluginId: string;
+  visited?: boolean;
+  visiting?: boolean;
+  valid?: boolean;
+  validationError?: any;
+  discoveryTime?: number;
+  finishingTime?: number;
+  deps: DependencyGraphLink[]
 }
 
-const logger = zluxUtil.loggers.bootstrapLogger
+type DependencyGraphLink = {
+  provider: string;
+  service: string;
+  importer: string;
+  alias: string;
+  requiredVersionRange: string;
+  serviceRef: ZLUXServerFramework.ImportDataserviceDefinition;
+  valid?: boolean;
+  validationError?: any;
+  actualVersion?: string;
+};
 
 /**
  * Checks if all plugin dependencies are met, including versions.
  * Sorts the plugins so that they can be installed in that order.
  */
-function DependencyGraph(initialPlugins) {
-  this.pluginsById = {};
-  for (const p of initialPlugins) {
-    this.addPlugin(p);
-  }
-}
+class DependencyGraph {
+  pluginsById: Record<string, ZLUXServerFramework.PluginDefinition> = {};
 
-DependencyGraph.prototype = {
-  constructor: DependencyGraph,
+  // TODO translation
+  static statuses = {
+    "REQUIRED_PLUGIN_FAILED_TO_LOAD": "Required plugin failed to load",
+    "REQUIRED_PLUGIN_NOT_FOUND": "Required plugin not found",
+    "INVALID_REQUIRED_VERSION_RANGE": "Invalid required version range",
+    "IMPORTED_SERVICE_IS_AN_IMPORT": "Imported service is itself an import",
+    "REQUIRED_SERVICE_VERSION_NOT_FOUND": "Required service version not found",
+    "REQUIRED_SERVICE_NOT_FOUND": "Required service not found"
+  }
   
-  pluginsById: null,
+  constructor (initialPlugins: ZLUXServerFramework.PluginDefinition[]) {
+    for (const p of initialPlugins) {
+      this.addPlugin(p);
+    }
+  }
   
-  addPlugin(plugin) {
+  addPlugin(plugin: ZLUXServerFramework.PluginDefinition): void {
     logger.debug("ZWED0146I", plugin.identifier); //logger.debug(`Adding plugin ${plugin.identifier}`);
     if (this.pluginsById[plugin.identifier]) {
       logger.warn(`ZWED0017W`, plugin.identifier); //logger.warn(`Duplicate plugin identifier ` + plugin.identifier + ` found.`);
     }
     this.pluginsById[plugin.identifier] = plugin;
-  },
+  }
   
   /**
    * "n -> m" means "n is a dependency of m". Note that this is the direct 
@@ -59,8 +76,8 @@ DependencyGraph.prototype = {
    * if there's an edge "n -> m" here then we know that plugin m actually 
    * exists, but n might either exist or just be m's dream.
    */
-  _buildGraph() {
-    const g = {};
+  private _buildGraph() {
+    const g: Record<string, DependencyGraphNode> = {};
     let brokenDeps = [];
     for (const plugin of Object.values(this.pluginsById)) {
       logger.debug("ZWED0147I", plugin); //logger.debug("processing plugin ", plugin, "\n")
@@ -76,7 +93,7 @@ DependencyGraph.prototype = {
       }
       for (const service of plugin.dataServices) {
         if (service.type == 'import') {
-          const serviceImport = service;
+          const serviceImport = (service as ZLUXServerFramework.ImportDataserviceDefinition);
           const providerId = serviceImport.sourcePlugin;
           let providerNode = g[providerId];
           if (!providerNode) {
@@ -85,7 +102,7 @@ DependencyGraph.prototype = {
               deps: []
             };
           }
-          const depLink = {
+          const depLink: DependencyGraphLink = {
             provider: providerId,
             service: serviceImport.sourceName,
             importer: importerId,
@@ -136,7 +153,7 @@ DependencyGraph.prototype = {
       graph: g,
       brokenDeps
     }
-  },
+  }
   
   /**
    * Separates all invalid imports into a separate object.
@@ -147,14 +164,14 @@ DependencyGraph.prototype = {
    * wish that cannot be fulfilled, but also everyone who depends on m cannot be
    * properly instantiated.
    */
-  _removeBrokenPlugins(graphWithBrokenDeps) {
+  private _removeBrokenPlugins(graphWithBrokenDeps) {
     logger.debug('ZWED0152I', graphWithBrokenDeps); //logger.debug('graph: ', graphWithBrokenDeps)
-    const rejects = {};
-    const graph = graphWithBrokenDeps.graph;
+    const rejects: Record<string, DependencyGraphNode>  = {};
+    const graph: Record<string, DependencyGraphNode> = graphWithBrokenDeps.graph;
     for (let brokenDep of graphWithBrokenDeps.brokenDeps) {
       visit(graph[brokenDep.importer], brokenDep.validationError);
     }
-    function visit(pluginNode, validationError) {
+    function visit(pluginNode: DependencyGraphNode, validationError) {
       logger.debug('ZWED0153I', pluginNode); //logger.debug('visiting broken node ', pluginNode)
       if (pluginNode.visited) {
         return;
@@ -188,10 +205,10 @@ DependencyGraph.prototype = {
       pluginNode.visited = true;
     }
     for (const reject of Object.keys(rejects)) {
-      delete graphWithBrokenDeps.graph[reject.pluginId];
+      delete graphWithBrokenDeps.graph[(reject as any).pluginId];
     }
     return rejects;
-  },
+  }
   
   /**
    * Produces a topologically sorted array of plugins. 
@@ -201,7 +218,7 @@ DependencyGraph.prototype = {
    * importers will of course be correctly rejected)
    * 
    */
-  _toposort(graph) {
+  private _toposort(graph: Record<string, DependencyGraphNode>) {
     logger.debug('ZWED0155I', graph); //logger.debug('graph: ', graph)
     const pluginsSorted = [];
     let time = 0;
@@ -210,7 +227,7 @@ DependencyGraph.prototype = {
     }
     return pluginsSorted;
     
-    function visit(pluginNode) {
+    function visit(pluginNode: DependencyGraphNode) {
       logger.debug('ZWED0156I', pluginNode); //logger.debug('visiting node ', pluginNode)
       if (pluginNode.visited) {
         return;
@@ -239,7 +256,7 @@ DependencyGraph.prototype = {
       //   || (pluginNode.finishingTime > pluginsSorted[0].finishingTime));
       pluginsSorted.unshift(pluginNode);
     } 
-  },
+  }
   
   processImports() {
     const graphWithBrokenDeps = this._buildGraph();
@@ -272,7 +289,7 @@ DependencyGraph.prototype = {
  * Checks if the provider plugin (1) exists (2) contains a service that could
  * satisfy the import
  */
-function validateDep(dep, providerPlugin) {
+function validateDep(dep: DependencyGraphLink, providerPlugin: ZLUXServerFramework.PluginDefinition) {
   let valid = false;
   let validationError;
   if (!providerPlugin) {
@@ -292,7 +309,7 @@ function validateDep(dep, providerPlugin) {
     let found = false;
     let foundAtDifferentVersion = false;
     for (const service of providerPlugin.dataServices) {
-      if (service.name == dep.service || (service.localName == dep.service && service.type == 'import')) {
+      if (service.name == dep.service || ((service as ZLUXServerFramework.ImportDataserviceDefinition).localName == dep.service && service.type == 'import')) {
         if (!semver.valid(service.version)) {
           foundAtDifferentVersion = true;
         } else if (!semver.satisfies(service.version, dep.requiredVersionRange)) {
@@ -326,6 +343,8 @@ function validateDep(dep, providerPlugin) {
   dep.validationError = validationError;
   logger.debug('ZWED0160I', dep.valid); //logger.debug('dep.valid: ', dep.valid)
 }
+
+export = DependencyGraph;
 
 /*
   This program and the accompanying materials are
