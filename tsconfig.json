@@ -15,6 +15,6 @@
       "node",
       "express"
     ],
-    "lib": ["DOM", "es2021"]
+    "lib": ["es2021", "DOM"]
   }
 }

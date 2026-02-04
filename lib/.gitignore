@@ -54,12 +54,14 @@ proxy.conf.json
 Thumbs.db
 
 # TS Output files
+auth-manager.js
 jarManager.js
 javaManager.js
 javaTypes.js
 tomcatManager.js
 apimlStorage.js
 pluginStorage.js
+process.js
 webserver.js
 
 # This program and the accompanying materials are
