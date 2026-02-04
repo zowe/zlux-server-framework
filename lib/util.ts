@@ -340,7 +340,7 @@ const errorProto = {
     "messageDetails": "An error occurred when processing the request"
   };
 
-export function  makeError(details) {
+export function makeErrorObject(details) {
   if ((details._objectType !== undefined) 
       || (details._metaDataVersion !== undefined)) {
     throw new Error("ZWED0049E - Can't specify error metadata");
