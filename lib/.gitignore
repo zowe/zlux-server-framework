@@ -62,6 +62,7 @@ tomcatManager.js
 apimlStorage.js
 pluginStorage.js
 process.js
+util.js
 
 # This program and the accompanying materials are
 # made available under the terms of the Eclipse Public License v2.0 which accompanies

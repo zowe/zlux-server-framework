@@ -17,17 +17,18 @@ if (!global.COM_RS_COMMON_LOGGER) {
   global.COM_RS_COMMON_LOGGER.addDestination(global.COM_RS_COMMON_LOGGER.makeDefaultDestination(true,true,true,true,true));
 }
 
-const path = require('path');
-const fs = require('fs');
-const util = require('node:util');
-const Promise = require('bluebird');
-const ipaddr = require('ipaddr.js');
-const dns = require('dns');
+import * as path from 'node:path';
+import * as fs from 'node:fs';
+import * as util from 'node:util';
+import * as BBPromise from 'bluebird';
+import * as ipaddr from 'ipaddr.js';
+import * as dns from 'node:dns';
+import * as mergeUtils from '../utils/mergeUtils';
+import * as forge from 'node-forge';
 const dnsLookup = util.promisify(dns.lookup);
-const mergeUtils = require('../utils/mergeUtils');
-const forge = require('node-forge');
 
-const loggers = {
+
+export const loggers = {
   bootstrapLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.bootstrap"),
   authLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.auth"),
   contentLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.static"),
@@ -43,9 +44,8 @@ const loggers = {
   storeLogger: global.COM_RS_COMMON_LOGGER.makeComponentLogger("_zsf.store")
 };
 
-module.exports.loggers = loggers;
 
-module.exports.initLoggerMessages = function initLoggerMessages(logLanguage) {
+export function initLoggerMessages(logLanguage) {
   var messages;
   let lang = logLanguage ? logLanguage : 'en';
   try { // Attempt to get a log message for a language a user may have specified
@@ -94,7 +94,7 @@ module.exports.initLoggerMessages = function initLoggerMessages(logLanguage) {
 
 let zoweVersion = "0.0.0";
 //This will read manifest.json within zowe's runtime directory, location known by zowe config.
-module.exports.setZoweVersionFromManifest = function setZoweVersionFromManifest(zoweConfig) {
+export function setZoweVersionFromManifest(zoweConfig) {
   if (zoweConfig.zowe.runtimeDirectory) {
     try {
       const contents = fs.readFileSync(path.join(zoweConfig.zowe.runtimeDirectory, 'manifest.json'), {encoding: 'utf8'});
@@ -112,13 +112,13 @@ module.exports.setZoweVersionFromManifest = function setZoweVersionFromManifest(
   }
 }
 
-module.exports.getZoweVersion = function getZoweVersion() {
+export function getZoweVersion() {
   return zoweVersion;
 }
 
 
 const urlRegexp = new RegExp(":\/\/");
-module.exports.getHostAndPortFromUrl = function getHostAndPortFromUrl(url) {
+export function getHostAndPortFromUrl(url: string): {host: string, port: number} {
   const urlStartIndex = url.search(urlRegexp);
   if (urlStartIndex == -1) {
     return undefined;
@@ -139,27 +139,24 @@ module.exports.getHostAndPortFromUrl = function getHostAndPortFromUrl(url) {
     return {
       //strip [] around ipv6 if exists
       host: hostAndPort.substring(0, lastColonIndex).replace('[', '').replace(']', ''),
-      port: hostAndPort.substring(lastColonIndex+1)
+      port: Number(hostAndPort.substring(lastColonIndex+1))
     }
   }
 }
 
 //maybe better in apiml.js but there would be a circular dependency around the logger init.
-function getPrefixForService(serviceName, type, version) {
+export function getPrefixForService(serviceName: string, type?: string, version?: string|number): string {
   let typePath = type || 'api';
   let versionPath = version || '1';
   return `/${serviceName}/${typePath}/v${versionPath}`;
 };
   
-function getGatewayUrlForService(zoweConfig, includeProtocol, serviceName, type, version) {
+export function getGatewayUrlForService(zoweConfig, includeProtocol: boolean, serviceName: string, type?: string, version?: string|number): string {
   const apimlConfig = zoweConfig.components['app-server'].node.mediationLayer.server;
   return `${includeProtocol?'https://':''}${apimlConfig.gatewayHostname.includes(':') ? '['+apimlConfig.gatewayHostname+']' : apimlConfig.gatewayHostname}:${apimlConfig.gatewayPort}${getPrefixForService(serviceName, type, version)}`;
 };
 
-module.exports.getGatewayUrlForService = getGatewayUrlForService;
-module.exports.getPrefixForService = getPrefixForService;
-
-module.exports.getAgentRequestOptions = function(zoweConfig, tlsOptions, includeCert, path) {
+export function getAgentRequestOptions(zoweConfig, tlsOptions?, includeCert?: boolean, path?: string) {
   if (zoweConfig.components['app-server'] && zoweConfig.components['app-server'].node && zoweConfig.components['app-server'].agent && (zoweConfig.components['app-server'].agent.https || zoweConfig.components['app-server'].agent.http)) {
     const agentConfig = zoweConfig.components['app-server'].agent;
     const useApiml = !!(agentConfig.mediationLayer &&
@@ -213,7 +210,7 @@ module.exports.getAgentRequestOptions = function(zoweConfig, tlsOptions, include
   return undefined;
 }
 
-module.exports.resolveRelativePaths = function resolveRelativePaths(root, resolver, relativeTo) {
+export function resolveRelativePaths(root: Record<string, any>, resolver, relativeTo: string) {
   for (const key of Object.keys(root)) {
     const value = root[key];
     const valueType = typeof value;
@@ -226,17 +223,19 @@ module.exports.resolveRelativePaths = function resolveRelativePaths(root, resolv
   }
 };
 
-module.exports.makeOptionsObject = function (defaultOptions, optionsIn) {
+export function makeOptionsObject(defaultOptions: any, optionsIn: any): any {
   const o = Object.create(defaultOptions);
   Object.assign(o, optionsIn);
   return Object.seal(o);
 };
 
-module.exports.clone = function(obj) {
+
+export function clone(obj: any): any {
   return JSON.parse(JSON.stringify(obj));
 };
 
-module.exports.deepFreeze = function deepFreeze(obj, seen) {
+
+export function deepFreeze(obj: any, seen?:Map<any, any>): any {
   if (!seen) {
     seen = new Map();
   }
@@ -254,7 +253,7 @@ module.exports.deepFreeze = function deepFreeze(obj, seen) {
   return Object.freeze(obj);
 };
 
-module.exports.readOnlyProxy = function readOnlyProxy(obj) {
+export function readOnlyProxy(obj: any) {
   return new Proxy(obj, {
     get: function(target, property) {
       return target[property];
@@ -262,7 +261,7 @@ module.exports.readOnlyProxy = function readOnlyProxy(obj) {
   });  
 };
 
-module.exports.getOrInit = function(obj, key, dflt) {
+export function getOrInit(obj: any, key: string, dflt: any) {
   let value = obj[key];
   if (!value) {
     value = obj[key] = dflt;
@@ -270,7 +269,7 @@ module.exports.getOrInit = function(obj, key, dflt) {
   return value;
 };
 
-module.exports.readFilesToArray = function(fileList, type, pass) {
+export function readFilesToArray(fileList: string[], type: number, pass?: string): string[] {
   var contentArray = [];
   fileList.forEach(function(filePath) {
     try {
@@ -341,7 +340,7 @@ const errorProto = {
     "messageDetails": "An error occurred when processing the request"
   };
 
-module.exports.makeErrorObject = function makeError(details) {
+export function makeErrorObject(details) {
   if ((details._objectType !== undefined) 
       || (details._metaDataVersion !== undefined)) {
     throw new Error("ZWED0049E - Can't specify error metadata");
@@ -352,7 +351,7 @@ module.exports.makeErrorObject = function makeError(details) {
   return err;
 }
 
-module.exports.concatIterables = function* concatIterables() {
+export function* concatIterables() {
   for (let i=0; i < arguments.length; i++) {
     yield *arguments[i];
   }
@@ -364,7 +363,7 @@ module.exports.concatIterables = function* concatIterables() {
  * 
  * `listenerFun` should return a promise
  */
-module.exports.asyncEventListener = function(listenerFun, logger) {
+export function asyncEventListener(listenerFun, logger) {
   //the handler for the most recent event: when this is resolved,
   //another event can be handled
   let promise = Promise.resolve();
@@ -380,7 +379,7 @@ module.exports.asyncEventListener = function(listenerFun, logger) {
   }
 }
 
-module.exports.uniqueIps = Promise.coroutine(function *uniqueIps(hostnames) {
+export let uniqueIps = BBPromise.coroutine(function *uniqueIps(hostnames?: string[]) {
   if (hostnames == null) {
     loggers.network.debug("ZWED0184I"); //loggers.network.debug("uniqueIps: no addresses specified, returning 0.0.0.0");
     return [ '0.0.0.0' ];
@@ -406,9 +405,10 @@ module.exports.uniqueIps = Promise.coroutine(function *uniqueIps(hostnames) {
   const arr = Array.from(set)
   loggers.network.debug("ZWED0185I", arr); //loggers.network.debug("uniqueIps: " + arr);
   return arr;
-})
+});
 
-module.exports.getLoopbackAddress = function getLoopbackAddress(listenerAddresses) {
+
+export function getLoopbackAddress(listenerAddresses?: string[]): string {
   if (listenerAddresses == null || listenerAddresses.length === 0) {
     loggers.network.debug("ZWED0186I"); //loggers.network.debug("getLoopbackAddress: no addresses specified, "
         //+ "loopback address is 127.0.0.1");
@@ -436,7 +436,7 @@ module.exports.getLoopbackAddress = function getLoopbackAddress(listenerAddresse
   return listenerAddresses[0];
 }
 
-module.exports.formatErrorStatus = function formatErrorStatus(err, descriptions) {
+export function formatErrorStatus(err, descriptions) {
   const description = (descriptions[err.status] || err.status) + ": ";
   const keywords = [];
   
@@ -449,7 +449,7 @@ module.exports.formatErrorStatus = function formatErrorStatus(err, descriptions)
   return description + keywords.join(', ');
 }
 
-function normalizePath(oldPath, relativeTo) {
+export function normalizePath(oldPath: string, relativeTo: string): string {
   let normalized = oldPath;
   if (!relativeTo) { relativeTo = process.cwd();}
   if (!path.isAbsolute(oldPath)) {
@@ -461,14 +461,13 @@ function normalizePath(oldPath, relativeTo) {
   loggers.utilLogger.debug(`ZWED0051I`, oldPath, normalized);   //loggers.utilLogger.info(`Resolved path: ${oldPath} -> ${normalized}`);  
   return normalized;
 }
-module.exports.normalizePath = normalizePath;
 
 const defaultRemoteAppTemplate = fs.readFileSync(path.join(__dirname,'default-remote-app-template.html'),"utf-8");
-module.exports.getRemoteIframeTemplate = function(remoteUrl) {
+export function getRemoteIframeTemplate(remoteUrl) {
   return defaultRemoteAppTemplate.replace('${remoteUrl}', remoteUrl);
 }
 
-module.exports.makeRemoteUrl = function(destination, req, zoweConfig) {
+export function makeRemoteUrl(destination: string, req, zoweConfig): string {
   const nodeConfig = zoweConfig.components['app-server'].node;
   let referer = req.get('Referer');
   let hostname = !referer ? '' : new URL(referer).hostname;
@@ -509,33 +508,34 @@ module.exports.makeRemoteUrl = function(destination, req, zoweConfig) {
           .replace('${ZWE_EXTERNAL_PORT}', zoweExternalPort);
 }
 
-module.exports.isPluginExternal = (plugin) => {
+export function isPluginExternal(plugin){
   return plugin.dataServices && plugin.dataServices.length>0 && plugin.dataServices[0].constructor.name === 'ExternalService'
 }
 
-module.exports.timeout = (ms) => {
+export function timeout(ms: number){
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-module.exports.serverSwaggerPluginId = 'org.zowe.zlux'
-module.exports.agentSwaggerPluginId = 'org.zowe.zlux.agent';
+export const serverSwaggerPluginId = 'org.zowe.zlux';
+export const agentSwaggerPluginId = 'org.zowe.zlux.agent';
 
-module.exports.getCookieName = (cookieIdentifier) => {
+export function getCookieName(cookieIdentifier: string): string{
   return 'connect.sid.' + cookieIdentifier;
 }
 
 
 const HA_INSTANCE_COUNT=Object.keys(process.env).filter(key=>!key.match(/ZWE_haInstances_.*_components_.*hostname.*/)).filter(key=>key.match(/ZWE_haInstances_.*hostname/)).length;
-const isHaMode = module.exports.isHaMode = function () {
+export function isHaMode() {
   let isHaMode = (!isNaN(HA_INSTANCE_COUNT) && HA_INSTANCE_COUNT > 1);
   return isHaMode;
 }
 
-module.exports.isServerHttps = function(zoweConfig) {
+
+export function isServerHttps(zoweConfig): boolean {
   return Number.isInteger(zoweConfig.components['app-server'].node.https?.port);
 }
 
-function isClientAttls(zoweConfig) {
+export function isClientAttls(zoweConfig): boolean {
   let clientGlobalAttls = zoweConfig.zowe.network?.client?.tls?.attls;
   let clientLocalAttls = zoweConfig.components['app-server'].zowe?.network?.client?.tls?.attls;
   let clientAttls = clientGlobalAttls || clientLocalAttls;
@@ -546,20 +546,19 @@ function isClientAttls(zoweConfig) {
     return clientAttls;
   }
 }
-module.exports.isClientAttls = isClientAttls;
 
-module.exports.getBestPort = function(zoweConfig) {
+export function getBestPort(zoweConfig): number {
   return zoweConfig.components['app-server'].node.https?.port
     ? zoweConfig.components['app-server'].node.https.port
     : zoweConfig.components['app-server'].node.http.port;
 }
 
 
-module.exports.getBestHostname = function(zoweConfig) {
+export function getBestHostname(zoweConfig): string {
   return zoweConfig.zowe.externalDomains[0];
 }
 
-module.exports.getListeningAddresses = function(zoweConfig) {
+export function getListeningAddresses(zoweConfig): string[] {
   let httpsAddrsCollection = getHttpsListeningAddresses(zoweConfig);
   let addrs = [...httpsAddrsCollection];
   let otherAddrs = getHttpListeningAddresses(zoweConfig);
@@ -569,28 +568,28 @@ module.exports.getListeningAddresses = function(zoweConfig) {
   return addrs;
 }
 
-function getHttpListeningAddresses(zoweConfig) {
+export function getHttpListeningAddresses(zoweConfig): string[] {
   return zoweConfig.components['app-server'].node.http?.ipAddresses || [];
 }
-module.exports.getHttpListeningAddresses = getHttpListeningAddresses;
 
 
-function getHttpsListeningAddresses(zoweConfig) {
+export function getHttpsListeningAddresses(zoweConfig): string[] {
   return zoweConfig.components['app-server'].node.https?.ipAddresses || [];
 }
-module.exports.getHttpsListeningAddresses = getHttpsListeningAddresses;
 
-module.exports.getProductCode = function(zoweConfig) {
+
+export function getProductCode(zoweConfig): string {
   return zoweConfig.components['app-server'].node.productCode;
 }
-module.exports.getRootRedirectUrl = function(zoweConfig) {
+
+export function getRootRedirectUrl(zoweConfig): string {
   return zoweConfig.components['app-server'].node.rootRedirectUrl;
 }
 
-function getComponentConfig(zoweConfig) {
+export function getComponentConfig(zoweConfig): string {
   return zoweConfig.components['app-server'];
 }
-module.exports.getComponentConfig = getComponentConfig;
+
 /*
   This program and the accompanying materials are
   made available under the terms of the Eclipse Public License v2.0 which accompanies
