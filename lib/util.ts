@@ -230,7 +230,7 @@ export function makeOptionsObject(defaultOptions: any, optionsIn: any): any {
 };
 
 
-export function clonefunction(obj: any): any {
+export function clone(obj: any): any {
   return JSON.parse(JSON.stringify(obj));
 };
 
