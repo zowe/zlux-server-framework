@@ -11,10 +11,10 @@
 */
 
 'use strict';
-const Promise = require('bluebird');
-const constants = require('./unp-constants');
-const configService = require('../plugins/config/lib/configService.js');
-const zluxUtil = require('./util');
+import * as BBPromise from 'bluebird';
+import * as constants from './unp-constants';
+import * as configService from '../plugins/config/lib/configService';
+import * as zluxUtil from './util';
 
 const bootstrapLogger = zluxUtil.loggers.bootstrapLogger;
 const authLog = zluxUtil.loggers.authLogger;
@@ -28,6 +28,8 @@ const acceptAllHandler = {
 }
 
 class AuthPluginContext {
+  logger;
+  tlsOptions;
   constructor(plugin, tlsOptions) {
     this.logger = global.COM_RS_COMMON_LOGGER.makeComponentLogger(plugin.identifier);
     this.tlsOptions = tlsOptions;
@@ -39,37 +41,35 @@ class AuthPluginContext {
  * - keeps track of loaded authentication plugins
  * - ensures that auth configuration is consistent with the global configuration
  */
-function AuthManager(options) {
-  if (!AuthManager.prototype.isConfigValid(options.config)) {
-    process.exit(constants.EXIT_AUTH);
-  }
-  Object.assign(this, options);
-  Object.assign(this, {
-    handlers: {},
-    defaultType: options.config.defaultAuthentication,
-    authTypes: {},
-    pendingPlugins: [],
-    rbacEnabled: !!options.config.rbac
-  });
-  if (!this.sessionTimeoutMs) {
-    this.sessionTimeoutMs = DEFAULT_SESSION_TIMEOUT_MS;
-  }
-  if (!this.rbacEnabled) {
-    bootstrapLogger.warn("ZWED0006W"); //bootstrapLogger.warn('RBAC is disabled in the configuration. All authenticated'
-        //+ ' users will have access to all servces. Enable RBAC in the configuration'
-        //+ " to control users' access to individual services");
-  }
-}
-AuthManager.prototype = {
-  constructor: AuthManager,
-  //The dataserviceAuthentication section of server configuration
-  config: null,
-  handlers : null,
-  defaultType: null,
-  authTypes: null,
-  pendingPlugins: null,
+class AuthManager{
 
-  isConfigValid(serviceAuthJSON) {
+  //The dataserviceAuthentication section of server configuration
+  config: any = null;
+
+  handlers: Record<string, any> = {};
+  defaultType: string = null;
+  authTypes: Record<string, string[]> = {};
+  pendingPlugins: any[] = [];
+  sessionTimeoutMs: number = DEFAULT_SESSION_TIMEOUT_MS;
+  rbacEnabled: boolean;
+  
+  constructor(options) {
+    if (!AuthManager.isConfigValid(options.config)) {
+      process.exit(constants.EXIT_AUTH);
+    }
+    Object.assign(this, options);
+    Object.assign(this, {
+      defaultType: options.config.defaultAuthentication,
+      rbacEnabled: !!options.config.rbac
+    });
+    if (!this.rbacEnabled) {
+      bootstrapLogger.warn("ZWED0006W"); //bootstrapLogger.warn('RBAC is disabled in the configuration. All authenticated'
+      //+ ' users will have access to all servces. Enable RBAC in the configuration'
+      //+ " to control users' access to individual services");
+    }
+  }
+
+  static isConfigValid(serviceAuthJSON): boolean {
     if (!serviceAuthJSON || !serviceAuthJSON.defaultAuthentication) {
       bootstrapLogger.warn('ZWED0007W'); //bootstrapLogger.warn('Dataservice authentication definition is not present'
           //+ 'in server configuration file, or malformed.\n Correct the configuration'
@@ -77,11 +77,11 @@ AuthManager.prototype = {
       return false;
     }
     return true;
-  },
+  }
   
-  registerAuthenticator(plugin) {
+  registerAuthenticator(plugin: any): void {
     this.pendingPlugins.push(plugin);
-  },
+  }
 
   getRequestedAuthCategories(startupPlugins, componentConfig) {
     const requestedCategories = [componentConfig.dataserviceAuthentication.defaultAuthentication];
@@ -100,10 +100,10 @@ AuthManager.prototype = {
       }
     });
     return requestedCategories;
-  },
+  }
   
   
-  loadAuthenticators: Promise.coroutine(function*(config, tlsOptions, startupPlugins) {
+  loadAuthenticators = BBPromise.coroutine(function*(config, tlsOptions, startupPlugins) {
     const componentConfig = config.components['app-server'];
     const requestedCategories = this.getRequestedAuthCategories(startupPlugins, componentConfig);
 
@@ -112,7 +112,7 @@ AuthManager.prototype = {
     const isHaMode = zluxUtil.isHaMode();
     while ((plugin = this.pendingPlugins.pop()) !== undefined) {
       try {
-        const authenticationHandler = yield plugin.authenticationModule(
+        const authenticationHandler:any = yield plugin.authenticationModule(
                                               plugin,
                                               this.configuration,
                                               componentConfig,
@@ -178,7 +178,7 @@ AuthManager.prototype = {
         authLog.warn('ZWED0008W', plugin.identifier, e); //authLog.warn(`error loading auth plugin ${plugin.identifier}: ` + e);
       }
     }
-  }),
+  })
   
   /*
     scans the authJSON to see what plugins were requested but not present. 
@@ -207,17 +207,17 @@ AuthManager.prototype = {
           //+ ` default authentication type of ${this.config.defaultAuthentication}.`);
       process.exit(constants.EXIT_AUTH);    
     }
-  },
+  }
 
   /*
     This forced unneccessary configuration steps on the admin.
     It is easier to say a plugin was requested if it was installed.
   */
-  authPluginRequested(pluginID, pluginCategory) {
+  authPluginRequested(pluginID, pluginCategory): boolean {
     return true;
-  }, 
+  } 
   
-  getBestAuthenticationHandler(authType, criteria) {
+  getBestAuthenticationHandler(authType) {
     if (!authType) {
       authType = this.defaultType;
     }
@@ -229,11 +229,11 @@ AuthManager.prototype = {
       handler = this.handlers[handlerIDs[0]];
     }
     return handler;
-  },
+  }
   
-  getAllHandlers() {
+  getAllHandlers(): any[] {
     return Object.values(this.handlers);
-  },
+  }
   
   getAuthHandlerForService(authenticationData) {
     if (!authenticationData) {
@@ -245,15 +245,14 @@ AuthManager.prototype = {
     }    
     const authType = authenticationData.authType;
     return this.getBestAuthenticationHandler(authType);
-  },
+  }
   
-  isRbacEnabled() {
+  isRbacEnabled(): boolean {
     return this.rbacEnabled;
   }
 };
 
-module.exports = AuthManager; 
-
+export = AuthManager;
 
 /*
   This program and the accompanying materials are
