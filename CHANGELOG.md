@@ -6,7 +6,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 3.5.0
 - Bugfix: Fixed error ZWED0149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. ([#633](https://github.com/zowe/zlux-server-framework/pull/633))
 - Bugfix: App-server was not respecting property "components.app-server.zowe.network.client.tls.attls". Instead, property "zowe.network.client.tls.attls" was taking priority, [(#653)](https://github.com/zowe/zlux-server-framework/pull/653)
-- Enhancement: Added Zowe Version information to the /server/environment endpoint. This allows plugins and the Desktop to have better visibility into the Zowe version being used, which can be helpful for troubleshooting and support. ([#661](https://github.com/zowe/zlux-server-framework/pull/661))
+- Enhancement: Added Zowe Version information to the /server/environment endpoint. ([#661](https://github.com/zowe/zlux-server-framework/pull/661))
 
 ## 3.4.0
 - Enhancement: Logging of URLs now accommodates when the app-server or gateway server are instructed to bind to an IPv6 address ([#614](https://github.com/zowe/zlux-server-framework/pull/614))
