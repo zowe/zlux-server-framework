@@ -1,0 +1,74 @@
+name: Run Unit Tests
+
+on:
+  pull_request:
+    branches: ['**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - name: Checkout zlux-server-framework (PR branch)
+        uses: actions/checkout@v4
+        with:
+          path: zlux-server-framework
+
+      - name: Determine target branch
+        id: branch
+        run: echo "name=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout zlux-shared
+        uses: actions/checkout@v4
+        with:
+          repository: zowe/zlux-shared
+          ref: ${{ steps.branch.outputs.name }}
+          path: zlux-shared
+
+      - name: Checkout zlux-platform
+        uses: actions/checkout@v4
+        with:
+          repository: zowe/zlux-platform
+          ref: ${{ steps.branch.outputs.name }}
+          path: zlux-platform
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Build zlux-shared
+        working-directory: zlux-shared/lib
+        run: |
+          npm install
+          npm run build
+
+      - name: Build zlux-platform
+        working-directory: zlux-platform/interface
+        run: |
+          npm install
+          npm run build
+
+      - name: Install zlux-server-framework dependencies
+        working-directory: zlux-server-framework
+        run: npm install
+
+      - name: Build zlux-server-framework
+        working-directory: zlux-server-framework
+        run: npm run build
+
+      - name: Run tests with coverage
+        working-directory: zlux-server-framework
+        run: npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-node-${{ matrix.node-version }}
+          path: zlux-server-framework/coverage/
+          retention-days: 30
