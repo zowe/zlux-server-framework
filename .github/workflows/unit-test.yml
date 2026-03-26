@@ -41,19 +41,41 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Rearrange directories as siblings
+        run: |
+          # GitHub workspace is /home/runner/work/zlux-server-framework/zlux-server-framework
+          # path: X puts repos at $GITHUB_WORKSPACE/X
+          # But relative requires like ../../zlux-shared expect repos to be siblings
+          # of zlux-server-framework. So we move them one level up.
+          mv ${{ github.workspace }}/zlux-shared ${{ github.workspace }}/../zlux-shared
+          mv ${{ github.workspace }}/zlux-platform ${{ github.workspace }}/../zlux-platform
+          mv ${{ github.workspace }}/zlux-server-framework ${{ github.workspace }}/../zlux-server-framework-temp
+          mv ${{ github.workspace }}/../zlux-server-framework-temp ${{ github.workspace }}/
+
+          echo "=== Verify layout ==="
+          echo "--- workspace parent ---"
+          ls -la ${{ github.workspace }}/../
+          echo "--- workspace ---"
+          ls -la ${{ github.workspace }}/
+
+      - name: Build zlux-shared logger
+        run: |
+          cd ${{ github.workspace }}/../zlux-shared/src/logging
+          npx tsc logger.ts ../../../zlux-platform/interface/src/index.d.ts --module commonjs --target es5 --skipLibCheck --outDir .
+
       - name: Install zlux-server-framework dependencies
         run: |
-          cd ${{ github.workspace }}/zlux-server-framework
+          cd ${{ github.workspace }}
           npm install
 
       - name: Build zlux-server-framework
         run: |
-          cd ${{ github.workspace }}/zlux-server-framework
+          cd ${{ github.workspace }}
           npm run build
 
       - name: Run tests with coverage
         run: |
-          cd ${{ github.workspace }}/zlux-server-framework
+          cd ${{ github.workspace }}
           npm run test:coverage
 
       - name: Upload coverage report
@@ -61,5 +83,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report-node-${{ matrix.node-version }}
-          path: ${{ github.workspace }}/zlux-server-framework/coverage/
+          path: ${{ github.workspace }}/coverage/
           retention-days: 30
