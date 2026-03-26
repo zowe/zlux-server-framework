@@ -41,15 +41,24 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
-      - name: Build zlux-shared
-        working-directory: zlux-shared/lib
+      - name: Debug directory structure
         run: |
+          echo "Workspace: ${{ github.workspace }}"
+          ls -la ${{ github.workspace }}
+          echo "--- zlux-shared ---"
+          ls -la ${{ github.workspace }}/zlux-shared/
+          echo "--- zlux-platform ---"
+          ls -la ${{ github.workspace }}/zlux-platform/
+
+      - name: Build zlux-shared
+        run: |
+          cd ${{ github.workspace }}/zlux-shared/lib
           npm install
           npm run build
 
       - name: Build zlux-platform
-        working-directory: zlux-platform/interface
         run: |
+          cd ${{ github.workspace }}/zlux-platform/interface
           npm install
           npm run build
 
