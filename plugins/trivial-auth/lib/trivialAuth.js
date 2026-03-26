@@ -18,7 +18,7 @@ function TrivialAuthenticator(pluginDef, pluginConf, serverConf) {
     "canRefresh": true,
     "canAuthenticate": true,
     "canAuthorize": true,
-    "proxyAuthorizations": false,
+    "proxyAuthorizations": true,
     "canResetPassword": false
   };
 }
@@ -52,6 +52,13 @@ TrivialAuthenticator.prototype = {
     if (request.body && request.body.username) {
       sessionState.username = request.body.username;
       sessionState.authenticated = true;
+      // Store credentials for proxy auth to ZSS (dev/test only)
+      // ZSS in single-user mode expects uppercase credentials in the auth blob
+      if (request.body.password) {
+        sessionState._basicAuth = Buffer.from(
+          request.body.username.toUpperCase() + ':' + request.body.password.toUpperCase()
+        ).toString('base64');
+      }
       return Promise.resolve({ success: true });
     } else if (request.cookies && request.cookies[TOKEN_NAME]) {
       try{
@@ -98,7 +105,13 @@ TrivialAuthenticator.prototype = {
   },
 
   addProxyAuthorizations(req1, req2Options, sessionState) {
-    return; //trivially, adds no new authorization
+    // Forward Basic auth credentials to ZSS for proxied requests
+    if (sessionState && sessionState._basicAuth) {
+      if (!req2Options.headers) {
+        req2Options.headers = {};
+      }
+      req2Options.headers['Authorization'] = 'Basic ' + sessionState._basicAuth;
+    }
   }
 };
 
