@@ -41,18 +41,45 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Debug layout before rearrange
+        run: |
+          echo "=== GITHUB_WORKSPACE: ${{ github.workspace }} ==="
+          ls -la ${{ github.workspace }}/
+          echo "=== parent ==="
+          ls -la ${{ github.workspace }}/../
+
       - name: Rearrange directories as siblings
         run: |
-          mv ${{ github.workspace }}/zlux-shared ${{ github.workspace }}/../zlux-shared
-          mv ${{ github.workspace }}/zlux-platform ${{ github.workspace }}/../zlux-platform
-          mv ${{ github.workspace }}/zlux-server-framework ${{ github.workspace }}/../zlux-server-framework-temp
-          mv ${{ github.workspace }}/../zlux-server-framework-temp ${{ github.workspace }}/
+          WORK_ROOT=${{ github.workspace }}/..
+          # Move all three repos to be siblings under WORK_ROOT
+          # zlux-server-framework is checked out at $GITHUB_WORKSPACE/zlux-server-framework
+          # We need:
+          #   WORK_ROOT/zlux-server-framework/  (with package.json etc)
+          #   WORK_ROOT/zlux-shared/
+          #   WORK_ROOT/zlux-platform/
+          
+          # zlux-shared and zlux-platform are at $GITHUB_WORKSPACE/zlux-shared etc
+          # Move them up one level
+          mv ${{ github.workspace }}/zlux-shared $WORK_ROOT/zlux-shared
+          mv ${{ github.workspace }}/zlux-platform $WORK_ROOT/zlux-platform
+          
+          # zlux-server-framework contents are at $GITHUB_WORKSPACE/zlux-server-framework/
+          # The workspace dir itself IS named zlux-server-framework, so
+          # $GITHUB_WORKSPACE/zlux-server-framework/ = WORK_ROOT/zlux-server-framework/zlux-server-framework/
+          # We need to move those files up into $GITHUB_WORKSPACE directly
+          cp -r ${{ github.workspace }}/zlux-server-framework/* ${{ github.workspace }}/
+          cp -r ${{ github.workspace }}/zlux-server-framework/.[!.]* ${{ github.workspace }}/ 2>/dev/null || true
+          rm -rf ${{ github.workspace }}/zlux-server-framework
 
           echo "=== Verify layout ==="
-          echo "--- workspace parent ---"
-          ls -la ${{ github.workspace }}/../
-          echo "--- workspace ---"
+          echo "--- WORK_ROOT ---"
+          ls -la $WORK_ROOT/
+          echo "--- workspace (should be zlux-server-framework contents) ---"
           ls -la ${{ github.workspace }}/
+          echo "--- zlux-shared ---"
+          ls -la $WORK_ROOT/zlux-shared/
+          echo "--- zlux-platform ---"
+          ls -la $WORK_ROOT/zlux-platform/
 
       - name: Install zlux-server-framework dependencies
         run: |
