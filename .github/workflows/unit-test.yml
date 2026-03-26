@@ -46,37 +46,46 @@ jobs:
           echo "=== github.workspace ==="
           echo "${{ github.workspace }}"
           echo "=== workspace contents ==="
-          ls -la ${{ github.workspace }}/
-          echo "=== one level up ==="
-          ls -la ${{ github.workspace }}/../
-          echo "=== find zlux-shared ==="
-          find /home/runner/work -maxdepth 4 -name "zlux-shared" -type d 2>/dev/null
-          echo "=== find package.json in zlux-shared ==="
-          find /home/runner/work -path "*/zlux-shared/lib/package.json" 2>/dev/null
+          ls -laR ${{ github.workspace }}/zlux-shared/ | head -50
+          echo "=== zlux-platform ==="
+          ls -laR ${{ github.workspace }}/zlux-platform/ | head -50
 
       - name: Build zlux-shared
-        working-directory: ${{ github.workspace }}/zlux-shared/lib
         run: |
-          npm install
-          npm run build
+          cd ${{ github.workspace }}/zlux-shared
+          ls -la
+          if [ -d "lib" ]; then
+            cd lib && npm install && npm run build
+          else
+            echo "No lib/ directory found, listing contents:"
+            find . -name "package.json" -maxdepth 3
+          fi
 
       - name: Build zlux-platform
-        working-directory: ${{ github.workspace }}/zlux-platform/interface
         run: |
-          npm install
-          npm run build
+          cd ${{ github.workspace }}/zlux-platform
+          ls -la
+          if [ -d "interface" ]; then
+            cd interface && npm install && npm run build
+          else
+            echo "No interface/ directory found, listing contents:"
+            find . -name "package.json" -maxdepth 3
+          fi
 
       - name: Install zlux-server-framework dependencies
-        working-directory: ${{ github.workspace }}/zlux-server-framework
-        run: npm install
+        run: |
+          cd ${{ github.workspace }}/zlux-server-framework
+          npm install
 
       - name: Build zlux-server-framework
-        working-directory: ${{ github.workspace }}/zlux-server-framework
-        run: npm run build
+        run: |
+          cd ${{ github.workspace }}/zlux-server-framework
+          npm run build
 
       - name: Run tests with coverage
-        working-directory: ${{ github.workspace }}/zlux-server-framework
-        run: npm run test:coverage
+        run: |
+          cd ${{ github.workspace }}/zlux-server-framework
+          npm run test:coverage
 
       - name: Upload coverage report
         if: always()
