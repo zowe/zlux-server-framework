@@ -11,6 +11,7 @@
 */
 
 const crypto = require("crypto");
+const zlib = require('zlib');
 
 var clientVersion = 'SSH-2.0-UNP_1.2';
 var traceCrypto = false;
@@ -219,8 +220,10 @@ exports.setLogger = function(logger) {
   sshLogger = logger;
 }
 
-exports.SUPPORTED_CIPHER = SUPPORTED_CIPHER;
-exports.SUPPORTED_HMAC = SUPPORTED_HMAC;
+// These are exposed as live getter functions so callers always see the current (possibly
+// vtConfig-narrowed) list rather than a snapshot captured at require() time.
+exports.getDefaultCiphers = function() { return SUPPORTED_CIPHER.slice(); };
+exports.getDefaultHmac    = function() { return SUPPORTED_HMAC.slice(); };
 
 exports.setSupportedCiphers = function(ciphers) {
   SUPPORTED_CIPHER = ciphers;
@@ -228,6 +231,14 @@ exports.setSupportedCiphers = function(ciphers) {
 
 exports.setSupportedHmac = function(hmacs) {
   SUPPORTED_HMAC = hmacs;
+};
+
+exports.enableCompression = function(enabled) {
+  if (enabled) {
+    SUPPORTED_COMPRESS = ['zlib', 'none'];
+  } else {
+    SUPPORTED_COMPRESS = ['none'];
+  }
 };
 
 exports.processEncryptedData = function(terminalWebsocketProxy,data) {
@@ -738,7 +749,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
                    clientToServerMACAlgorithms,
                    serverToClientMACAlgorithms,
                    clientToServerCompressionAlgorithms,
-                   serverToClientCompressionAlgorithms);
+                   serverToClientCompressionAlgorithms,
+                   terminalWebsocketProxy.sshPrefs);
 
         if (!sessionData.isKeyExchangingInitSent){
           sessionData.clientKexPayload = clientKexPDU.data;
@@ -1436,8 +1448,15 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition,clientIP){
   var payload = Buffer.alloc(payloadLength);
      
   decryptedData.copy(payload,0,currentPosition);
+  if (sessionData.compressRead === 'zlib' && sessionData.zlibInflate) {
+    sessionData.zlibInflate.write(payload);
+    const zlibChunks = [];
+    let zlibChunk;
+    while ((zlibChunk = sessionData.zlibInflate.read()) !== null) zlibChunks.push(zlibChunk);
+    if (zlibChunks.length > 0) payload = Buffer.concat(zlibChunks);
+  }
   
-  sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - Decrypted payload: \n${hexDump(payload)}`); 
+  sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - Decrypted payload: \n${hexDump(payload)}`);  
 
   currentPosition+=payloadLength+paddingLength;
   if (sessionData.readingMACAlgorithm) {
@@ -1462,6 +1481,14 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition,clientIP){
 function writeSSHv2PDU(socketWriteFunction,sessionData, pdu) {
     
   var payload = pdu.data;
+  if (sessionData.compressWrite === 'zlib' && sessionData.zlibDeflate) {
+    sessionData.zlibDeflate.write(payload);
+    sessionData.zlibDeflate.flush(zlib.constants.Z_SYNC_FLUSH, () => {});
+    const zlibChunks = [];
+    let zlibChunk;
+    while ((zlibChunk = sessionData.zlibDeflate.read()) !== null) zlibChunks.push(zlibChunk);
+    if (zlibChunks.length > 0) payload = Buffer.concat(zlibChunks);
+  }
 
   var messageSequenceNumber = sessionData.messagesSent; // needed for MAC computation
   
@@ -1776,6 +1803,20 @@ function initializeCrypto(sessionData)  {
     
     console.log( sessionData.readingMACKey.toString('hex')+"\n");
   }
+  const clientToServerCompressAlg = sessionData.clientToServerCompressionAlgorithms
+    ? sessionData.clientToServerCompressionAlgorithms[0] : 'none';
+  const serverToClientCompressAlg = sessionData.serverToClientCompressionAlgorithms
+    ? sessionData.serverToClientCompressionAlgorithms[0] : 'none';
+  sessionData.compressWrite = clientToServerCompressAlg;
+  sessionData.compressRead = serverToClientCompressAlg;
+  if (clientToServerCompressAlg === 'zlib') {
+    sessionData.zlibDeflate = zlib.createDeflate({ level: zlib.constants.Z_DEFAULT_COMPRESSION });
+    sessionData.zlibDeflate.pause();
+  }
+  if (serverToClientCompressAlg === 'zlib') {
+    sessionData.zlibInflate = zlib.createInflate();
+    sessionData.zlibInflate.pause();
+  }
   releaseImtermediateSessionData(sessionData);
 }
 
@@ -1841,8 +1882,16 @@ function makeKeyExchangeResponse (sessionData,keyExchangeAlgorithms,
 							   clientToServerMACAlgorithms,
 							   serverToClientMACAlgorithms,
 							   clientToServerCompressionAlgorithms,
-							   serverToClientCompressionAlgorithms)
+							   serverToClientCompressionAlgorithms,
+							   prefs)
 {
+  // Per-connection preferences (from CONFIG message) narrow the module-level defaults.
+  const effectiveCiphers  = (prefs && prefs.ciphers)  || SUPPORTED_CIPHER;
+  const effectiveHmac     = (prefs && prefs.hmac)     || SUPPORTED_HMAC;
+  const effectiveCompress = (prefs && prefs.compression !== undefined)
+    ? (prefs.compression ? ['zlib', 'none'] : ['none'])
+    : SUPPORTED_COMPRESS;
+
   var agreeableKeyExchangeAlgorithms = getAgreeableAlgorithms(SUPPORTED_KEX,keyExchangeAlgorithms);
   if (!agreeableKeyExchangeAlgorithms){
     return undefined;
@@ -1857,14 +1906,14 @@ function makeKeyExchangeResponse (sessionData,keyExchangeAlgorithms,
   sessionData.serverHostKeyAlgorithms=agreeableServerHostKeyAlgorithms;
   if(traceCrypto) console.log("agreeableServerHostKeyAlgorithms " + agreeableServerHostKeyAlgorithms);
 
-  var agreeableClientToServerEncryptionAlgorithms = getAgreeableAlgorithms(SUPPORTED_CIPHER,clientToServerEncryptionAlgorithms);
+  var agreeableClientToServerEncryptionAlgorithms = getAgreeableAlgorithms(effectiveCiphers,clientToServerEncryptionAlgorithms);
   if (!agreeableClientToServerEncryptionAlgorithms){
     return undefined;
   }
   sessionData.clientToServerEncryptionAlgorithms=agreeableClientToServerEncryptionAlgorithms;
   if(traceCrypto) console.log("agreeableClientToServerEncryptionAlgorithms " + agreeableClientToServerEncryptionAlgorithms);
 
-  var agreeableServerToClientEncryptionAlgorithms = getAgreeableAlgorithms(SUPPORTED_CIPHER,serverToClientEncryptionAlgorithms);
+  var agreeableServerToClientEncryptionAlgorithms = getAgreeableAlgorithms(effectiveCiphers,serverToClientEncryptionAlgorithms);
   if (!agreeableServerToClientEncryptionAlgorithms){
     return undefined;
   }
@@ -1872,27 +1921,27 @@ function makeKeyExchangeResponse (sessionData,keyExchangeAlgorithms,
   sessionData.serverToClientEncryptionAlgorithms=agreeableServerToClientEncryptionAlgorithms;
   if(traceCrypto) console.log("agreeableServerToClientEncryptionAlgorithms " + agreeableServerToClientEncryptionAlgorithms);
 
-  var agreeableClientToServerMACAlgorithms = getAgreeableAlgorithms(SUPPORTED_HMAC,clientToServerMACAlgorithms);
+  var agreeableClientToServerMACAlgorithms = getAgreeableAlgorithms(effectiveHmac,clientToServerMACAlgorithms);
   if (!agreeableClientToServerMACAlgorithms){
     return undefined;
   }
   sessionData.clientToServerMACAlgorithms=agreeableClientToServerMACAlgorithms;
   if(traceCrypto) console.log("agreeableClientToServerMACAlgorithms " + agreeableClientToServerMACAlgorithms);
 
-  var agreeableServerToClientMACAlgorithms = getAgreeableAlgorithms(SUPPORTED_HMAC,serverToClientMACAlgorithms);
+  var agreeableServerToClientMACAlgorithms = getAgreeableAlgorithms(effectiveHmac,serverToClientMACAlgorithms);
   if (!agreeableServerToClientMACAlgorithms){
     return undefined;
   }
   sessionData.serverToClientMACAlgorithms=agreeableServerToClientMACAlgorithms;
   if(traceCrypto) console.log("agreeableServerToClientMACAlgorithms " + agreeableServerToClientMACAlgorithms);
 
-  var agreeableClientToServerCompressionAlgorithms = getAgreeableAlgorithms(SUPPORTED_COMPRESS,clientToServerCompressionAlgorithms);
+  var agreeableClientToServerCompressionAlgorithms = getAgreeableAlgorithms(effectiveCompress,clientToServerCompressionAlgorithms);
   if (!agreeableClientToServerCompressionAlgorithms){
     return undefined;
   }
   sessionData.clientToServerCompressionAlgorithms=agreeableClientToServerCompressionAlgorithms;
   
-  var agreeableServerToClientCompressionAlgorithms = getAgreeableAlgorithms(SUPPORTED_COMPRESS,serverToClientCompressionAlgorithms);
+  var agreeableServerToClientCompressionAlgorithms = getAgreeableAlgorithms(effectiveCompress,serverToClientCompressionAlgorithms);
   if (!agreeableServerToClientCompressionAlgorithms){
     return undefined;
   }
