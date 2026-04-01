@@ -166,6 +166,7 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
   this.hostSocket;
   this.usingSSH = false;
   this.sshSessionData;
+  this.sshPrefs = null;
   this.hostConnected = false;
   this.clientIP = clientIP;
   this.logger = context.logger;
@@ -283,6 +284,21 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
     }
     if (this.hostConnected === false) {
       if (jsonObject.t === 'CONFIG') {
+        if (jsonObject.security && jsonObject.security.t === 'ssh') {
+          const prefs = {};
+          if (Array.isArray(jsonObject.security.ciphers)) {
+            const valid = filterSshAlgorithms(jsonObject.security.ciphers, ssh.getDefaultCiphers(), 'cipher', this.logger);
+            if (valid) prefs.ciphers = valid;
+          }
+          if (Array.isArray(jsonObject.security.hmac)) {
+            const valid = filterSshAlgorithms(jsonObject.security.hmac, ssh.getDefaultHmac(), 'hmac', this.logger);
+            if (valid) prefs.hmac = valid;
+          }
+          if (typeof jsonObject.compression === 'boolean') {
+            prefs.compression = jsonObject.compression;
+          }
+          this.sshPrefs = prefs;
+        }
         this.connect(jsonObject.host, jsonObject.port, websocket, jsonObject.security);
       }
     }
@@ -765,6 +781,29 @@ let scanAndImportHandlers = function(logger, serverConfig) {
   return handlerModules;
 };
 
+/**
+ * Validates a caller-supplied list of SSH algorithm names against the server's
+ * supported set, warns about any unsupported entries, and returns the filtered
+ * list (or null when nothing valid remains).
+ *
+ * @param {string[]} requested - Algorithm names requested by the caller.
+ * @param {string[]} defaults  - The current supported list from ssh.js.
+ * @param {string}   algType   - Human-readable type label, e.g. 'cipher' or 'hmac'.
+ * @param {object}   logger    - Component logger.
+ * @returns {string[]|null} Filtered list, or null if none were valid.
+ */
+function filterSshAlgorithms(requested, defaults, algType, logger) {
+  const valid = [];
+  for (const alg of requested) {
+    if (defaults.indexOf(alg) !== -1) {
+      valid.push(alg);
+    } else {
+      logger.warn('ZWED0181W', algType, alg); //logger.warn('Unsupported SSH ' + algType + ' will be ignored: ' + alg);
+    }
+  }
+  return valid.length > 0 ? valid : null;
+}
+
 exports.tn3270WebsocketRouter = function(context) {
   /* 
     a handler is an external component for interpreting messages of types or in ways not covered in this code alone
@@ -831,36 +870,16 @@ exports.vtWebsocketRouter = function(context) {
   const vtConfig = context.plugin.server.config.all
     && context.plugin.server.config.all.components
     && context.plugin.server.config.all.components['vt-ng2'];
-  const configuredCiphers = vtConfig && vtConfig.ssh && Array.isArray(vtConfig.ssh.ciphers)
-    ? vtConfig.ssh.ciphers : null;
-  if (configuredCiphers) {
-    const allSupported = ssh.SUPPORTED_CIPHER;
-    const validCiphers = [];
-    for (const cipher of configuredCiphers) {
-      if (allSupported.indexOf(cipher) !== -1) {
-        validCiphers.push(cipher);
-      } else {
-        context.logger.warn('ZWED0181W', 'cipher', cipher); //context.logger.warn('Configured SSH cipher is not supported and will be ignored: ' + cipher);
-      }
-    }
-    if (validCiphers.length > 0) {
-      ssh.setSupportedCiphers(validCiphers);
-    }
+  if (vtConfig && vtConfig.ssh && Array.isArray(vtConfig.ssh.ciphers)) {
+    const validCiphers = filterSshAlgorithms(vtConfig.ssh.ciphers, ssh.getDefaultCiphers(), 'cipher', context.logger);
+    if (validCiphers) ssh.setSupportedCiphers(validCiphers);
   }
-  const configuredHmac = vtConfig && vtConfig.ssh && Array.isArray(vtConfig.ssh.hmac) ? vtConfig.ssh.hmac : null;
-  if (configuredHmac) {
-    const allSupportedHmac = ssh.SUPPORTED_HMAC;
-    const validHmac = [];
-    for (const hmac of configuredHmac) {
-      if (allSupportedHmac.indexOf(hmac) !== -1) {
-        validHmac.push(hmac);
-      } else {
-        context.logger.warn('ZWED0181W', 'hmac', hmac); //context.logger.warn('Configured SSH HMAC algorithm is not supported and will be ignored: ' + hmac);
-      }
-    }
-    if (validHmac.length > 0) {
-      ssh.setSupportedHmac(validHmac);
-    }
+  if (vtConfig && vtConfig.ssh && Array.isArray(vtConfig.ssh.hmac)) {
+    const validHmac = filterSshAlgorithms(vtConfig.ssh.hmac, ssh.getDefaultHmac(), 'hmac', context.logger);
+    if (validHmac) ssh.setSupportedHmac(validHmac);
+  }
+  if (vtConfig?.ssh?.compression === true) {
+    ssh.enableCompression(true);
   }
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
