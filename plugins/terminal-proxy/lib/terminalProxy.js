@@ -156,7 +156,7 @@ const binToB64 =[0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4
 function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, handlers) {
   websocket.on('error', (error) => {
     this.logger.warn("ZWED0129W", error); //this.logger.warn("websocket error", error);
-    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'websocket error occurred');
+    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_WEBSOCKET_ERROR, 'websocket error occurred');
   });
   websocket.on('close',(code,reason)=>{this.handleWebsocketClosed(code,reason);});
 
@@ -260,7 +260,7 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
   } catch (e) {
     //not json
     this.logger.warn("ZWED0133W", this.identifierString()); //this.logger.warn(this.identifierString()+' sent messsage which was not JSON');
-    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'Message not JSON');
+    this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_BAD_CLIENT_MESSAGE, 'Message not JSON');
   }
   this.logger.debug("ZWED0269I", this.identifierString(), message.length); //this.logger.debug(this.identifierString()+' Websocket client message received. Length='+message.length);
   this.logger.trace("ZWED0135I", this.identifierString(), message); //this.logger.log(this.logger.FINER,this.identifierString()+' Websocket client message content='+message);
@@ -402,8 +402,18 @@ TerminalWebsocketProxy.prototype.wsSend = function(websocket,string) {
   websocket.send(string);
 };
 
-const WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR = 4999;
-const WEBSOCKET_REASON_TERMPROXY_GOING_AWAY = 4000;
+const WEBSOCKET_REASON_TERMPROXY_GOING_AWAY                 = 4000; // normal / orderly close
+const WEBSOCKET_REASON_TERMPROXY_HOST_NOT_FOUND              = 4001; // DNS resolution failed for target host
+const WEBSOCKET_REASON_TERMPROXY_HOST_CONNECTION_FAILED      = 4002; // TCP/TLS connect() threw synchronously
+const WEBSOCKET_REASON_TERMPROXY_HOST_CLOSED                 = 4003; // host closed the TCP socket
+const WEBSOCKET_REASON_TERMPROXY_HOST_COMMUNICATION_ERROR    = 4004; // error on an established host connection
+const WEBSOCKET_REASON_TERMPROXY_SSH_DISCONNECTED            = 4010; // server sent SSH_MSG_DISCONNECT
+const WEBSOCKET_REASON_TERMPROXY_SSH_CHANNEL_OPEN_FAILED     = 4011; // server sent SSH_MSG_CHANNEL_OPEN_FAILURE
+const WEBSOCKET_REASON_TERMPROXY_SSH_CHANNEL_CLOSED          = 4012; // server sent SSH_MSG_CHANNEL_CLOSE
+const WEBSOCKET_REASON_TERMPROXY_SSH_ERROR                   = 4013; // SSH protocol parse/layer error
+const WEBSOCKET_REASON_TERMPROXY_BAD_CLIENT_MESSAGE          = 4020; // client sent a non-JSON message
+const WEBSOCKET_REASON_TERMPROXY_WEBSOCKET_ERROR             = 4021; // WebSocket transport error event
+const WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR              = 4999; // unexpected server-side failure
 
 TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
   var t = this;
@@ -442,7 +452,7 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
           case SSH_MESSAGE.SSH_MSG_DISCONNECT:
             var errorMessage = 'SSH session disconnected';
             t.logger.warn("ZWED0137W", t.identifierString(), errorMessage); //t.logger.warn(t.identifierString()+' '+errorMessage);
-            t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_GOING_AWAY,errorMessage);
+            t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_SSH_DISCONNECTED, errorMessage);
             break;
           case SSH_MESSAGE.SSH_MSG_CHANNEL_REQUEST:
             var b64Data = utf8ArrayToB64(Buffer.from(sshMessage.data,'utf8'));
@@ -460,10 +470,29 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
               t: "SSH_USER_AUTH_REQ"
             });                
             break;
+          case SSH_MESSAGE.SSH_MSG_REQUEST_FAILURE:
+            t.logger.debug(t.identifierString()); //t.logger.debug(t.identifierString()+' SSH_MSG_REQUEST_FAILURE received from server');
+            replies.push({ t: 'SSH_REQ_FAIL' });
+            break;
+          case SSH_MESSAGE.SSH_MSG_CHANNEL_OPEN_FAILURE: {
+            var openFailDescription = Buffer.from(sshMessage.description).toString('utf8');
+            var openFailMessage = 'SSH channel open failed (reason=' + sshMessage.reasonCode + '): ' + openFailDescription;
+            t.logger.warn('ZWED0139W', t.identifierString(), openFailMessage);
+            t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_SSH_CHANNEL_OPEN_FAILED, openFailMessage);
+            break;
+          }
+          case SSH_MESSAGE.SSH_MSG_CHANNEL_EOF:
+            t.logger.debug(t.identifierString(), sshMessage.channelNumber); //t.logger.debug(t.identifierString()+' SSH_MSG_CHANNEL_EOF received on channel '+sshMessage.channelNumber);
+            replies.push({ t: 'SSH_CH_EOF', ch: sshMessage.channelNumber });
+            break;
+          case SSH_MESSAGE.SSH_MSG_CHANNEL_CLOSE:
+            t.logger.info(t.identifierString(), sshMessage.channelNumber); //t.logger.info(t.identifierString()+' SSH_MSG_CHANNEL_CLOSE received on channel '+sshMessage.channelNumber+', closing connection');
+            t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_SSH_CHANNEL_CLOSED, 'SSH channel closed by server');
+            break;
           case SSH_MESSAGE.ERROR:
             var errorMessage = 'SSH encountered error='+sshMessage.msg;
             t.logger.warn("ZWED0138W", t.identifierString(), errorMessage); //t.logger.warn(t.identifierString()+' '+errorMessage);
-            t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);            
+            t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_SSH_ERROR, errorMessage);            
             break;
           default:
             //ignore
@@ -485,7 +514,7 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
   } catch (e) {
     var errorMessage = 'Host communication error='+e.message;
     t.logger.warn("ZWED0139W", e.message); //t.logger.warn(errorMessage);
-    t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);
+    t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_HOST_COMMUNICATION_ERROR, errorMessage);
   }
 };
 
@@ -574,17 +603,20 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
     try {
       var errorHandler = function(e) {
         var errorMessage;
+        var closeCode;
         if (e.code && e.code === 'ENOTFOUND') {
-          errorMessage="Error: Host not found";
+          errorMessage = 'Error: Host not found';
+          closeCode = WEBSOCKET_REASON_TERMPROXY_HOST_NOT_FOUND;
         } else {
           errorMessage = 'Host communication error='+e.message;
+          closeCode = WEBSOCKET_REASON_TERMPROXY_HOST_COMMUNICATION_ERROR;
         }
 
         if (t.usingTLS) {
           var hostCert = t.hostSocket.getPeerCertificate();
           t.logger.debug('ZWED0281I', JSON.stringify(hostCert)); //t.logger.debug('The host had a certificate of: '+JSON.stringify(hostCert));
         }
-        t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);        
+        t.closeConnection(ws, closeCode, errorMessage);        
         t.logger.warn("ZWED0140W", t.identifierString(), errorMessage); //t.logger.warn(t.identifierString()+' '+errorMessage);
       };
       
@@ -605,7 +637,7 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
         t.hostSocket.on('close',function() {
           var errorMessage = 'Error: Host closed socket';
           t.logger.debug("ZWED0282I", t.identifierString(), errorMessage); //t.logger.debug(t.identifierString()+' '+errorMessage);
-          t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_GOING_AWAY,errorMessage);
+          t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_HOST_CLOSED, errorMessage);
         });
 
         //connect
@@ -625,21 +657,21 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
       } catch (e) {
         var errorMessage = 'Error durring connection='+e.message;
         t.logger.warn("ZWED0141W", t.identifierString(), errorMessage); //t.logger.warn(t.identifierString()+' '+errorMessage);
-        t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);
+        t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_HOST_CONNECTION_FAILED, errorMessage);
       }
       
     }
     catch (e) {
       var errorMessage;
       if (e.code && e.code === 'ENOTFOUND') {
-        errorMessage="Error: Host not found";
+        errorMessage = 'Error: Host not found';
         t.logger.warn("ZWED0142W");
+        t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_HOST_NOT_FOUND, errorMessage);
       } else {
         errorMessage = 'Host communication error='+e.message;
         t.logger.warn("ZWED0143W", e.message);
+        t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_HOST_COMMUNICATION_ERROR, errorMessage);
       }
-      //t.logger.warn(errorMessage);
-      t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);
     }
 
   }
@@ -794,8 +826,42 @@ exports.tn5250WebsocketRouter = function(context) {
   });
 };
 exports.vtWebsocketRouter = function(context) {
-  let handlers = scanAndImportHandlers(context.logger);
+  let handlers = scanAndImportHandlers(context.logger, context.plugin.server.config.all);
   ssh.setLogger(context.logger);
+  const vtConfig = context.plugin.server.config.all
+    && context.plugin.server.config.all.components
+    && context.plugin.server.config.all.components['vt-ng2'];
+  const configuredCiphers = vtConfig && vtConfig.ssh && Array.isArray(vtConfig.ssh.ciphers)
+    ? vtConfig.ssh.ciphers : null;
+  if (configuredCiphers) {
+    const allSupported = ssh.SUPPORTED_CIPHER;
+    const validCiphers = [];
+    for (const cipher of configuredCiphers) {
+      if (allSupported.indexOf(cipher) !== -1) {
+        validCiphers.push(cipher);
+      } else {
+        context.logger.warn('ZWED0181W', 'cipher', cipher); //context.logger.warn('Configured SSH cipher is not supported and will be ignored: ' + cipher);
+      }
+    }
+    if (validCiphers.length > 0) {
+      ssh.setSupportedCiphers(validCiphers);
+    }
+  }
+  const configuredHmac = vtConfig && vtConfig.ssh && Array.isArray(vtConfig.ssh.hmac) ? vtConfig.ssh.hmac : null;
+  if (configuredHmac) {
+    const allSupportedHmac = ssh.SUPPORTED_HMAC;
+    const validHmac = [];
+    for (const hmac of configuredHmac) {
+      if (allSupportedHmac.indexOf(hmac) !== -1) {
+        validHmac.push(hmac);
+      } else {
+        context.logger.warn('ZWED0181W', 'hmac', hmac); //context.logger.warn('Configured SSH HMAC algorithm is not supported and will be ignored: ' + hmac);
+      }
+    }
+    if (validHmac.length > 0) {
+      ssh.setSupportedHmac(validHmac);
+    }
+  }
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
