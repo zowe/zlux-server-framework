@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.5.0
+- Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [()]() 
 - Bugfix: Fixed error ZWED0149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. ([#633](https://github.com/zowe/zlux-server-framework/pull/633))
 - Bugfix: App-server was not respecting property "components.app-server.zowe.network.client.tls.attls". Instead, property "zowe.network.client.tls.attls" was taking priority, [(#653)](https://github.com/zowe/zlux-server-framework/pull/653)
 
