@@ -44,7 +44,6 @@
     "bluebird": "3.7.2",
     "body-parser": "~1.20.3",
     "cookie-parser": "~1.4.6",
-    "diffie-hellman": "^5.0.3",
     "express": "^4.21.2",
     "express-session": "~1.18.0",
     "express-static-gzip": "~2.1.7",
