@@ -1,0 +1,58 @@
+# Zowe zowe.yaml fixture: includes unknown extension components.
+#
+# The "widget" component is a hypothetical Zowe plugin at port 7590.
+# It is enabled but not in the known COMPONENT_META list — the checker
+# cannot validate its AT-TLS coverage, but should warn about it.
+#
+# "foobar" is another hypothetical plugin that is DISABLED — should be
+# ignored (not appear in unknownComponents).
+#
+# "noport" is an enabled plugin with no port configured — should also be
+# ignored since it has no AT-TLS relevance.
+#
+# Standard AT-TLS is enabled globally; known components use default ports.
+
+zowe:
+  job:
+    prefix: ZWE1
+    name: ZWE1SV
+  network:
+    server:
+      tls:
+        attls: true
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+
+zOSMF:
+  host: zosmf.example.com
+  port: 443
+
+components:
+  gateway:
+    enabled: true
+    port: 7554
+  discovery:
+    enabled: true
+    port: 7553
+  app-server:
+    enabled: true
+    port: 7556
+  zss:
+    enabled: true
+    port: 7557
+
+  # Unknown extension component — enabled, should appear in unknownComponents
+  widget:
+    enabled: true
+    port: 7590
+
+  # Unknown extension component — disabled, should NOT appear in unknownComponents
+  foobar:
+    enabled: false
+    port: 7591
+
+  # Unknown extension component — enabled but no port, should NOT appear
+  noport:
+    enabled: true

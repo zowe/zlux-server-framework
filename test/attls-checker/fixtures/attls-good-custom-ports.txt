@@ -1,0 +1,93 @@
+# attls-good-custom-ports.txt
+#
+# GOOD: Full coverage for zowe-custom-ports.yaml.
+# That config uses:
+#   jobPrefix: ZPRD (jobs: ZPRDAC, ZPRDAD, ZPRDSG, ZPRDCS, ZPRDDS, ZPRDSZ, ZPRDAZ)
+#   Ports : api-catalog=8552, discovery=8553, gateway=8554, caching=8555,
+#           app-server=8556, zss=8557, zaas=8558
+#   z/OSMF: port 10443
+#   No infinispan entries in that fixture.
+
+TTLSGroupAction ZoweCustomServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweCustomClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweCustomServerEnv
+{
+  HandshakeRole ServerWithClientAuth
+  TTLSKeyringParmsRef ZoweCustomKeyring
+}
+
+TTLSEnvironmentAction ZoweCustomClientEnv
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweCustomKeyring
+}
+
+TTLSConnectionAction ZoweCustomServerConn
+{
+  HandshakeRole ServerWithClientAuth
+}
+
+TTLSConnectionAction ZoweCustomClientConn
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms ZoweCustomKeyring
+{
+  Keyring ZPRD/ZPRD_RING
+}
+
+# ── Inbound: custom Zowe ports 8552-8558 with ZPRD* jobname ──────────────────
+
+TTLSRule ZoweCustomInbound
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 8552-8558
+  Jobname ZPRD*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweCustomServerGroup
+  TTLSEnvironmentActionRef ZoweCustomServerEnv
+  TTLSConnectionActionRef ZoweCustomServerConn
+}
+
+# ── Outbound: internal traffic between custom Zowe services ──────────────────
+
+TTLSRule ZoweCustomOutboundInternal
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 8552-8558
+  Jobname ZPRD*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweCustomClientGroup
+  TTLSEnvironmentActionRef ZoweCustomClientEnv
+  TTLSConnectionActionRef ZoweCustomClientConn
+}
+
+# ── Outbound: z/OSMF on custom port 10443 ────────────────────────────────────
+
+TTLSRule ZoweCustomOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 10443
+  Jobname ZPRD*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweCustomClientGroup
+  TTLSEnvironmentActionRef ZoweCustomClientEnv
+  TTLSConnectionActionRef ZoweCustomClientConn
+}

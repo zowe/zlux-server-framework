@@ -1,0 +1,61 @@
+# Zowe zowe.yaml fixture: per-component AT-TLS override.
+#
+# Global: zowe.network.server.tls.attls = true (AT-TLS on by default)
+# Override: components.api-catalog.zowe.network.server.tls.attls = false
+#           (API Catalog runs without AT-TLS — e.g. for testing or a legacy client)
+#
+# Expected behaviour:
+#   - All components except api-catalog have attls=true
+#   - api-catalog has attls=false → no inbound:api-catalog requirement
+#   - No mismatch warnings (no client.attls set anywhere)
+
+zowe:
+  job:
+    prefix: ZWE1
+    name: ZWE1SV
+  network:
+    server:
+      tls:
+        attls: true
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+
+zOSMF:
+  host: zosmf.example.com
+  port: 443
+
+components:
+  api-catalog:
+    enabled: true
+    port: 7552
+    zowe:
+      network:
+        server:
+          tls:
+            attls: false   # override: API Catalog does NOT use AT-TLS
+  discovery:
+    enabled: true
+    port: 7553
+  gateway:
+    enabled: true
+    port: 7554
+    storage:
+      infinispan:
+        jgroups:
+          port: 7600
+          keyExchange:
+            port: 7601
+  caching-service:
+    enabled: true
+    port: 7555
+  app-server:
+    enabled: true
+    port: 7556
+  zss:
+    enabled: true
+    port: 7557
+  zaas:
+    enabled: true
+    port: 7558

@@ -34,7 +34,9 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc --watch",
-    "test:storage": "mocha --timeout 10000 ./test/storage/*.js"
+    "test:storage": "mocha --timeout 10000 ./test/storage/*.js",
+    "test:attls": "mocha --timeout 10000 ./test/attls-checker/test.js",
+    "test": "npm run test:attls"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "12.1.0",

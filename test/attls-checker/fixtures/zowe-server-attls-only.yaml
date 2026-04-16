@@ -1,0 +1,49 @@
+# Zowe zowe.yaml fixture: only inbound AT-TLS enabled, no outbound.
+# Used to verify that outbound checks are skipped when client.attls=false.
+
+zowe:
+  job:
+    name: ZWE1SV
+    prefix: ZWE1
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+      alias: localhost
+    truststore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+  network:
+    server:
+      tls:
+        attls: true
+    client:
+      tls:
+        attls: false
+
+zOSMF:
+  host: zosmf.example.com
+  port: 443
+
+components:
+  gateway:
+    enabled: true
+    port: 7554
+  zaas:
+    enabled: true
+    port: 7558
+  api-catalog:
+    enabled: true
+    port: 7552
+  discovery:
+    enabled: true
+    port: 7553
+  caching-service:
+    enabled: true
+    port: 7555
+  app-server:
+    enabled: true
+    port: 7556
+  zss:
+    enabled: true
+    port: 7557

@@ -1,0 +1,79 @@
+# zowe-legacy-attls.yaml
+#
+# Fixture representing a pre-v2.18.4 Zowe AT-TLS configuration.
+# Old Zowe used:  components.<id>.server.ssl.enabled: false
+# instead of the current:  zowe.network.server.tls.attls: true
+#
+# The global zowe.network.server.tls.attls property did not exist in those
+# versions.  The checker must detect the legacy indicator on each component,
+# treat it as attls=true, and emit a strong upgrade warning.
+
+zowe:
+  job:
+    name: ZWE1SV
+    prefix: ZWE1
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+      alias: localhost
+    truststore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+
+zOSMF:
+  host: zosmf.example.com
+  port: 443
+
+components:
+  gateway:
+    enabled: true
+    port: 7554
+    server:
+      ssl:
+        enabled: false
+
+  zaas:
+    enabled: true
+    port: 7558
+    server:
+      ssl:
+        enabled: false
+
+  api-catalog:
+    enabled: true
+    port: 7552
+    server:
+      ssl:
+        enabled: false
+
+  discovery:
+    enabled: true
+    port: 7553
+    server:
+      ssl:
+        enabled: false
+
+  caching-service:
+    enabled: true
+    port: 7555
+    storage:
+      mode: infinispan
+      infinispan:
+        jgroups:
+          port: 7600
+          keyExchange:
+            port: 7601
+    server:
+      ssl:
+        enabled: false
+
+  # app-server and zss did not use server.ssl.enabled in old Zowe;
+  # they are not AT-TLS–enabled in this legacy configuration.
+  app-server:
+    enabled: true
+    port: 7556
+
+  zss:
+    enabled: true
+    port: 7557

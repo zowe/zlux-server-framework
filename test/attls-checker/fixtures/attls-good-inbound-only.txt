@@ -1,0 +1,56 @@
+# attls-good-inbound-only.txt
+#
+# GOOD: Inbound-only rules for use with zowe-server-attls-only.yaml
+# (server.attls=true, client.attls=false).  Only inbound rules are required.
+# There are NO outbound rules — that is intentional and correct for this config.
+
+TTLSGroupAction ZoweServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweServerEnvAction
+{
+  HandshakeRole Server
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweServerConnAction
+{
+  HandshakeRole Server
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Inbound: all core Zowe API ML + app-server + zss + zaas ──────────────────
+
+TTLSRule ZoweInboundMain
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: caching service infinispan (peer replication) ────────────────────
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname ZWE1CS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}

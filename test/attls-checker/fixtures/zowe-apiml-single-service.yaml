@@ -1,0 +1,64 @@
+# Zowe zowe.yaml fixture: single-service deployment mode (components.apiml.enabled: true).
+#
+# When apiml.enabled is true, api-catalog, discovery, gateway, caching-service,
+# and zaas ALL run under the single ZWE1AG job.  Their individual enabled flags
+# are ignored by the AT-TLS checker.
+#
+# app-server (ZWE1DS) and zss (ZWE1SZ) are unaffected by single-service mode
+# and continue to run under their own job names.
+
+zowe:
+  job:
+    name: ZWE1SV
+    prefix: ZWE1
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+      alias: localhost
+    truststore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+  network:
+    server:
+      tls:
+        attls: true
+    client:
+      tls:
+        attls: true
+
+zOSMF:
+  host: zosmf.example.com
+  port: 443
+
+components:
+  apiml:
+    enabled: true
+
+  # Individual APIML component ports can still be configured in single-service
+  # mode. The enabled flags below are intentionally absent / irrelevant.
+  gateway:
+    port: 7554
+  discovery:
+    port: 7553
+  api-catalog:
+    port: 7552       # NOT an externally exposed inbound port in single-service
+  caching-service:
+    port: 7555       # NOT an externally exposed inbound port in single-service
+    storage:
+      mode: infinispan
+      infinispan:
+        jgroups:
+          port: 7600
+          keyExchange:
+            port: 7601
+  zaas:
+    port: 7558       # NOT an externally exposed inbound port in single-service
+
+  # app-server and zss are separate jobs, unaffected by apiml single-service
+  app-server:
+    enabled: true
+    port: 7556
+  zss:
+    enabled: true
+    port: 7557

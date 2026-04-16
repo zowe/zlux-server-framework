@@ -1,0 +1,54 @@
+# Zowe zowe.yaml fixture: app-server cluster mode DISABLED (ZLUX_NO_CLUSTER=1).
+#
+# When ZLUX_NO_CLUSTER=1, the app-server runs as a single non-clustered process
+# under ${prefix}DS (ZWE1DS).  There is no parent STC child-process split, so
+# the AT-TLS inbound rule for port 7556 must match ZWE1DS — NOT ZWE1SV.
+
+zowe:
+  job:
+    name: ZWE1SV
+    prefix: ZWE1
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+      alias: localhost
+    truststore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+  network:
+    server:
+      tls:
+        attls: true
+    client:
+      tls:
+        attls: true
+  environments:
+    ZLUX_NO_CLUSTER: 1
+
+zOSMF:
+  host: zosmf.example.com
+  port: 443
+
+components:
+  gateway:
+    enabled: true
+    port: 7554
+  zaas:
+    enabled: true
+    port: 7558
+  api-catalog:
+    enabled: true
+    port: 7552
+  discovery:
+    enabled: true
+    port: 7553
+  caching-service:
+    enabled: true
+    port: 7555
+  app-server:
+    enabled: true
+    port: 7556
+  zss:
+    enabled: true
+    port: 7557

@@ -1,0 +1,56 @@
+# Zowe zowe.yaml fixture: AT-TLS fully enabled, all standard components on default ports.
+# Used by: scenario-complete tests (all-good cases).
+
+zowe:
+  job:
+    name: ZWE1SV
+    prefix: ZWE1
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+      alias: localhost
+    truststore:
+      type: JCERACFKS
+      file: "safkeyring://ZOWE/ZOWE_RING"
+  network:
+    server:
+      tls:
+        attls: true
+    client:
+      tls:
+        attls: true
+
+zOSMF:
+  host: zosmf.example.com
+  port: 443
+
+components:
+  gateway:
+    enabled: true
+    port: 7554
+  zaas:
+    enabled: true
+    port: 7558
+  api-catalog:
+    enabled: true
+    port: 7552
+  discovery:
+    enabled: true
+    port: 7553
+  caching-service:
+    enabled: true
+    port: 7555
+    storage:
+      mode: infinispan
+      infinispan:
+        jgroups:
+          port: 7600
+          keyExchange:
+            port: 7601
+  app-server:
+    enabled: true
+    port: 7556
+  zss:
+    enabled: true
+    port: 7557

@@ -1,0 +1,113 @@
+# attls-bad-wrong-keyring.txt
+#
+# BAD: Identical port/jobname coverage to attls-good-complete.txt but all
+# TTLSKeyringParms declarations reference WRONG/KEYRING rather than ZOWE/ZOWE_RING.
+#
+# When used with zowe-full-attls.yaml (which specifies
+#   safkeyring://ZOWE/ZOWE_RING), all Zowe-to-Zowe connections will be
+# covered (correct ports + jobnames) but every matched rule will carry the
+# wrong keyring → status='warn', warnReasons=['keyring'].
+#
+# The one exception is the z/OSMF outbound connection: that rule is exempt from
+# the keyring check, so it stays 'ok' regardless of the keyring used.
+
+TTLSGroupAction ZoweServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweClientGroup
+{
+  TTLSEnabled On
+}
+
+# Wrong keyring — should be ZOWE/ZOWE_RING for Zowe-to-Zowe connections
+
+TTLSEnvironmentAction ZoweServerEnvAction
+{
+  HandshakeRole ServerWithClientAuth
+  TTLSKeyringParmsRef WrongKeyring
+}
+
+TTLSEnvironmentAction ZoweClientEnvAction
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef WrongKeyring
+}
+
+TTLSConnectionAction ZoweServerConnAction
+{
+  HandshakeRole ServerWithClientAuth
+}
+
+TTLSConnectionAction ZoweClientConnAction
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms WrongKeyring
+{
+  Keyring WRONG/KEYRING
+}
+
+# ── Inbound: core API ML + ZAAS (ports 7552-7558) ────────────────────────────
+
+TTLSRule ZoweInboundMain
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: Caching Service infinispan (ports 7600-7601) ────────────────────
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname ZWE1CS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Outbound: all inter-service communication within Zowe ─────────────────────
+
+TTLSRule ZoweOutboundInternal
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7552-7601
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}
+
+# ── Outbound: z/OSMF (exempt from keyring check — may use any trust keyring) ─
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}

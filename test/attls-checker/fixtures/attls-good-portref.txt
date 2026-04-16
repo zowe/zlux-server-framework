@@ -1,0 +1,131 @@
+# attls-good-portref.txt
+#
+# GOOD: Same coverage as attls-good-complete.txt but uses PortRange declarations
+# (referenced via LocalPortRangeRef / RemotePortRangeRef) instead of inline port
+# ranges.  Tests the PortRange declaration resolution path.
+
+TTLSGroupAction ZoweServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweServerEnvAction
+{
+  HandshakeRole ServerWithClientAuth
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSEnvironmentAction ZoweClientEnvAction
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweServerConnAction
+{
+  HandshakeRole ServerWithClientAuth
+}
+
+TTLSConnectionAction ZoweClientConnAction
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── PortRange declarations ────────────────────────────────────────────────────
+
+PortRange zoweInboundPorts
+{
+  Port 7552-7558
+}
+
+PortRange zoweInfinispanPorts
+{
+  Port 7600-7601
+}
+
+PortRange zoweAllPorts
+{
+  Port 7552-7601
+}
+
+PortRange zosmfPort
+{
+  Port 443
+}
+
+PortRange ephemeralPorts
+{
+  Port 1024-65535
+}
+
+# ── Inbound: core services via PortRange ref ──────────────────────────────────
+
+TTLSRule ZoweInboundMain
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRangeRef zoweInboundPorts
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: infinispan via PortRange ref ──────────────────────────────────────
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRangeRef zoweInfinispanPorts
+  Jobname ZWE1CS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Outbound: internal Zowe traffic via PortRange ref ────────────────────────
+
+TTLSRule ZoweOutboundInternal
+{
+  LocalAddr ALL
+  LocalPortRangeRef ephemeralPorts
+  RemoteAddr ALL
+  RemotePortRangeRef zoweAllPorts
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}
+
+# ── Outbound: z/OSMF via PortRange ref ───────────────────────────────────────
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRangeRef ephemeralPorts
+  RemoteAddr ALL
+  RemotePortRangeRef zosmfPort
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}

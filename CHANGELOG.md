@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.6.0
+- Enhancement: Added a utility, "check-zowe-attls.js" that can be called with node provided with a pagent attls rule file and a zowe yaml, and it will give you an approximate summary of if your attls rules are compatible with zowe's configuration.
+
 ## 3.5.0
 - Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#669)](https://github.com/zowe/zlux-server-framework/pull/669) 
 - Bugfix: Fixed error ZWED0149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. ([#633](https://github.com/zowe/zlux-server-framework/pull/633))

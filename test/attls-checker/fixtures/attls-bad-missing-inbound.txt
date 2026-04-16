@@ -1,0 +1,107 @@
+# attls-bad-missing-inbound.txt
+#
+# BAD: Only covers gateway (7554) and api-catalog (7552) inbound.
+# Missing inbound rules for: discovery (7553), caching-service (7555),
+# app-server (7556), zss (7557), zaas (7558).
+# Also has no infinispan coverage (7600/7601).
+# Outbound rules are present (so only INBOUND gaps are tested when used
+# with zowe-full-attls.yaml which has server.attls=true).
+
+TTLSGroupAction PartialServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction PartialClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction PartialServerEnv
+{
+  HandshakeRole Server
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSEnvironmentAction PartialClientEnv
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction PartialServerConn
+{
+  HandshakeRole Server
+}
+
+TTLSConnectionAction PartialClientConn
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Inbound: ONLY api-catalog (7552) and gateway (7554) ──────────────────────
+
+TTLSRule ZoweInboundApiCatalog
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552
+  Jobname ZWE1AC
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef PartialServerGroup
+  TTLSEnvironmentActionRef PartialServerEnv
+  TTLSConnectionActionRef PartialServerConn
+}
+
+TTLSRule ZoweInboundGateway
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7554
+  Jobname ZWE1AG
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef PartialServerGroup
+  TTLSEnvironmentActionRef PartialServerEnv
+  TTLSConnectionActionRef PartialServerConn
+}
+
+# ── Outbound: broad rule covers all Zowe ports + z/OSMF ─────────────────────
+# (Outbound is "good" so it should not add misses in inbound-only test)
+
+TTLSRule ZoweOutboundAll
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7552-7601
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef PartialClientGroup
+  TTLSEnvironmentActionRef PartialClientEnv
+  TTLSConnectionActionRef PartialClientConn
+}
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef PartialClientGroup
+  TTLSEnvironmentActionRef PartialClientEnv
+  TTLSConnectionActionRef PartialClientConn
+}
+
+# NOTE: Missing coverage for discovery(7553), caching(7555), app-server(7556),
+#       zss(7557), zaas(7558), infinispan(7600, 7601) inbound connections.
