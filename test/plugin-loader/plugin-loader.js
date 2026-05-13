@@ -131,6 +131,53 @@ describe('Plugin', function() {
       assert(p.importsGrouped['something'].versions['1.0.0'])
     }),
     
+    it('should produce a LibraryPlugIn for pluginType "library"', function() {
+      const testPluginDef = {
+        "identifier": "org.zowe.testlibrary",
+        "apiVersion": "1.0.0",
+        "pluginVersion": "2.0.0",
+        "pluginType": "library",
+        "libraryVersion": "1.0.0"
+      };
+      const p = makePlugin(testPluginDef, {}, pluginContext, false);
+      assert.equal(p.constructor.name, "LibraryPlugIn");
+      assert.equal(p.identifier, "org.zowe.testlibrary");
+    }),
+
+    it('should produce a BootstrapPlugIn for pluginType "bootstrap"', function() {
+      const testPluginDef = {
+        "identifier": "org.zowe.zlux.bootstrap",
+        "apiVersion": "1.0.0",
+        "pluginVersion": "1.0.0",
+        "pluginType": "bootstrap",
+      };
+      const p = makePlugin(testPluginDef, {}, pluginContext, false);
+      assert.equal(p.constructor.name, "BootstrapPlugIn");
+    }),
+
+    it('should produce a DesktopPlugIn for pluginType "desktop"', function() {
+      const testPluginDef = {
+        "identifier": "org.zowe.zlux.appmanager",
+        "apiVersion": "1.0.0",
+        "pluginVersion": "1.0.0",
+        "pluginType": "desktop",
+      };
+      const p = makePlugin(testPluginDef, {}, pluginContext, false);
+      assert.equal(p.constructor.name, "DesktopPlugIn");
+    }),
+
+    it('should throw for an unknown pluginType', function() {
+      const testPluginDef = {
+        "identifier": "org.zowe.testplugin",
+        "apiVersion": "1.0.0",
+        "pluginVersion": "1.0.0",
+        "pluginType": "doesNotExist",
+      };
+      assert.throws(() => {
+        makePlugin(testPluginDef, {}, pluginContext, false);
+      }, /pluginType doesNotExist is unknown/);
+    }),
+
     it('should correctly check local service version dependencies', function() {
       const twoVersionsOfAService = {
         "identifier": "org.zowe.testplugin",
