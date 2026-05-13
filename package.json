@@ -65,7 +65,6 @@
     "@types/node": "~16.18.0",
     "@types/qs": "6.9.3",
     "chai": "~4.2.0",
-    "chai-http": "~4.2.0",
     "mocha": "^11.2.2",
     "typescript": "~5.0.0"
   },
@@ -76,11 +75,6 @@
   "overrides": {
     "@rocketsoftware/eureka-js-client": {
       "@cypress/request": "^3.0.9"
-    },
-    "chai-http": {
-      "superagent": {
-        "form-data": "4.0.4"
-      }
     },
     "express": {
       "path-to-regexp": "0.1.13"
