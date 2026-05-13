@@ -53,7 +53,6 @@
     "normalize-url": "~7.0.0",
     "require-from-string": "~2.0.2",
     "semver": "~7.6.0",
-    "undici": "6.24.1",
     "ws": "^6.2.3",
     "yaml": "~2.4.1",
     "yauzl": "~3.1.2"
