@@ -9,7 +9,6 @@
 */
 
 const fs = require('graceful-fs');
-const Promise = require('bluebird');
 const path = require('path');
 const packagingUtils = require('./packaging-utils');
 const serverUtils = require('../lib/util');

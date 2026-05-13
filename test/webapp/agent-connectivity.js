@@ -30,7 +30,6 @@ const config = require('./config');
 const express = require('express');
 const fs = require('fs');
 const util = require('../../lib/util');
-const Promise = require('bluebird');
 
 let webAppOptions = config.webAppOptions;
 

@@ -11,7 +11,6 @@
 */
 
 const express = require('express');
-const Promise = require('bluebird');
 var net = require('net');
 const tls = require('tls');
 const crypto = require('crypto');

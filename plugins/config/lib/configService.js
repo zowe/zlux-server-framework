@@ -17,7 +17,6 @@ const pathModule = require('path');
 const jsonUtils = require('../../../lib/jsonUtils.js');
 const proxyUtils = require('../../../lib/util.js');
 const express = require('express');
-const Promise = require('bluebird');
 const bodyParser = require('body-parser');
 const obfuscator = require ('../../../../zlux-shared/src/obfuscator/htmlObfuscator.js');
 

@@ -9,7 +9,6 @@
 */
 
 const path = require('path');
-const Promise = require('bluebird');
 const fs = require('graceful-fs');
 //assuming that this is file isnt being called from another that is already using the logger... else expect strange logs
 const logging = require('../../zlux-shared/src/logging/logger.js');

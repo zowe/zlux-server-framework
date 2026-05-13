@@ -8,7 +8,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const Promise = require('bluebird');
 const ipaddr = require('ipaddr.js');
 const url = require('url');
 const zluxUtil = require('../../../lib/util.js');
@@ -27,7 +26,7 @@ class ZssHandler {
     const zoweInstanceId = serverConf.cookieIdentifier;
     const zssPort = serverConf.agent.https && serverConf.agent.https.port ? serverConf.agent.https.port : serverConf.agent.http.port;
     this.zssCookieName = zluxUtil.isHaMode() ? COOKIE_NAME_BASE + zoweInstanceId : COOKIE_NAME_BASE + zssPort;
-    this.authorized = Promise.coroutine(function *authorized(request, sessionState, 
+    this.authorized = async function authorized(request, sessionState, 
                                                              options) {
       const result = { authenticated: false, authorized: false };
       options = options || {};
@@ -87,7 +86,7 @@ class ZssHandler {
           return result;
         }
         this.logger.debug(`Sending isAuthorized request for ${sessionState.username}`);
-        const httpResponse = yield this._callAgent(request.zluxData, 
+        const httpResponse = await this._callAgent(request.zluxData, 
                                                    sessionState.username,  resourceName);
         this._processAgentResponse(httpResponse, result, sessionState.username);
         return result;
@@ -98,7 +97,7 @@ class ZssHandler {
         result.message = "Problem checking auth permissions";
         return result;
       }
-    })
+    }
 
   }
 
