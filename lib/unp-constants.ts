@@ -26,7 +26,7 @@ export const WEBSOCKET_CLOSE_INTERNAL_ERROR: number = 4999;
 export const WEBSOCKET_CLOSE_BY_PROXY: number = 4998;
 export const WEBSOCKET_CLOSE_CODE_MINIMUM: number = 3000;
 
-export let APP_NAME: string = "zlux"; //this seems to be pretty "variable"
+export let APP_NAME: string = "zlux";
 
 export function setProductCode(productCode: string): void {
   APP_NAME = productCode.toLowerCase();
