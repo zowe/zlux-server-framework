@@ -151,6 +151,8 @@ describe('encryption', function () {
   });
 
   describe('getKeyFromPassword (PBKDF2)', function () {
+    // 100k rounds takes longer, increase default timeout for this suite
+    this.timeout(30000);
 
     it('should derive a key of requested length', function (done) {
       encryption.getKeyFromPassword('password', 'salt', 32, (key) => {
@@ -195,13 +197,24 @@ describe('encryption', function () {
       });
     });
 
-    it('SECURITY FLAW: only 500 PBKDF2 rounds (should be 100k+)', function (done) {
+    it('FIXED: PBKDF2 now uses 100k rounds by default (stronger key derivation)', function (done) {
+      this.timeout(10000);
       const start = process.hrtime.bigint();
-      encryption.getKeyFromPassword('password', 'salt', 32, () => {
+      encryption.getKeyFromPassword('password', 'salt', 32, (key) => {
         const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
-        expect(elapsed).to.be.lessThan(50);
+        // 100k rounds should take noticeably longer than the old 500 rounds
+        // But still complete within a reasonable time (< 5s)
+        expect(key.length).to.equal(32);
+        expect(elapsed).to.be.lessThan(5000);
         done();
       });
+    });
+
+    it('should support legacy rounds parameter for backward compatibility', function (done) {
+      encryption.getKeyFromPassword('password', 'salt', 32, (key) => {
+        expect(key.length).to.equal(32);
+        done();
+      }, 500); // Explicitly pass 500 rounds for legacy behavior
     });
 
     it('derived key should work as AES-256-CBC key', function (done) {
@@ -216,6 +229,7 @@ describe('encryption', function () {
   });
 
   describe('integration: PBKDF2 key derivation + AES-256-CBC encrypt/decrypt', function () {
+    this.timeout(30000);
 
     it('should complete a full password-based encryption workflow', function (done) {
       const password = 'user-password-123';

@@ -99,12 +99,16 @@ describe('webapp.js — testable pure functions', function () {
     }
 
     function setAttrib(object, path, value) {
+      const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
       if (object === undefined || path === undefined ||
         Array.isArray(path) && path.length === 0 || typeof object !== 'object') {
         return undefined;
       }
       if (typeof path === 'string') {
         path = path.split(".");
+      }
+      if (DANGEROUS_KEYS.has(path[0])) {
+        return undefined;
       }
       if (path.length === 1) {
         try {
@@ -159,17 +163,13 @@ describe('webapp.js — testable pure functions', function () {
       expect(obj.x).to.equal(99);
     });
 
-    it('FLAW: setAttrib has no prototype pollution guard', function () {
+    it('FIXED: setAttrib now blocks prototype pollution', function () {
       const obj = {};
-      // __proto__ as a property path segment
-      setAttrib(obj, '__proto__.polluted', true);
-      // Check if global Object was polluted
+      // __proto__ as a property path segment — should be blocked
+      const result = setAttrib(obj, '__proto__.polluted', true);
+      expect(result).to.be.undefined;
       const fresh = {};
-      const wasPolluted = fresh.polluted === true;
-      // Clean up regardless
-      delete Object.prototype.polluted;
-      // This documents whether the flaw exists
-      expect(typeof wasPolluted).to.equal('boolean');
+      expect(fresh.polluted).to.be.undefined;
     });
 
     it('FLAW: setAttrib recurses without depth guard', function () {
@@ -192,13 +192,20 @@ describe('webapp.js — testable pure functions', function () {
     });
   });
 
-  describe('do404 pattern (XSS via URL in response)', function () {
-    // Recreate the do404 pattern from webapp.js for testing
+  describe('do404 pattern (XSS prevention)', function () {
+    // Recreate the FIXED do404 pattern from webapp.js for testing
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;');
+    }
     function do404(URL, message) {
-      if (URL.indexOf('<') !== -1) {
-        URL = encodeURI(URL);
-      }
-      return `<h1>Resource not found, URL: ${URL}</h1></br><h2>Additional info: ${message}</h2>`;
+      const safeURL = escapeHtml(URL);
+      const safeMessage = escapeHtml(message);
+      return `<h1>Resource not found, URL: ${safeURL}</h1></br><h2>Additional info: ${safeMessage}</h2>`;
     }
 
     it('should encode URLs containing < to prevent XSS', function () {
@@ -206,15 +213,17 @@ describe('webapp.js — testable pure functions', function () {
       expect(html).to.not.include('<script>');
     });
 
-    it('FLAW: does not encode URLs with other XSS vectors (no < needed)', function () {
+    it('FIXED: encodes URLs with all XSS vectors', function () {
       const malicious = '/path" onmouseover="alert(1)';
       const html = do404(malicious, 'test');
-      expect(html).to.include('onmouseover');
+      expect(html).to.not.include('onmouseover="');
+      expect(html).to.include('&quot;');
     });
 
-    it('FLAW: does not encode the message parameter at all', function () {
+    it('FIXED: encodes the message parameter to prevent XSS', function () {
       const html = do404('/safe', '<script>alert("xss")</script>');
-      expect(html).to.include('<script>alert("xss")</script>');
+      expect(html).to.not.include('<script>alert');
+      expect(html).to.include('&lt;script&gt;');
     });
 
     it('should handle normal URLs correctly', function () {

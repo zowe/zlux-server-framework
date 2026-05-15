@@ -12,13 +12,13 @@ describe('util.js — deep architectural tests', function () {
     it('should parse https URL with port', function () {
       const result = getHostAndPort('https://example.com:7554/api');
       expect(result.host).to.equal('example.com');
-      expect(result.port).to.equal('7554');
+      expect(result.port).to.equal(7554);
     });
 
     it('should parse http URL with port', function () {
       const result = getHostAndPort('http://example.com:8080/path');
       expect(result.host).to.equal('example.com');
-      expect(result.port).to.equal('8080');
+      expect(result.port).to.equal(8080);
     });
 
     it('should default to 443 for https without port', function () {
@@ -40,33 +40,34 @@ describe('util.js — deep architectural tests', function () {
     it('should handle URL with no path', function () {
       const result = getHostAndPort('https://example.com:443');
       expect(result.host).to.equal('example.com');
-      expect(result.port).to.equal('443');
+      expect(result.port).to.equal(443);
     });
 
     it('should handle IPv6 address with port', function () {
       const result = getHostAndPort('https://[::1]:7554/path');
       expect(result.host).to.equal('::1');
-      expect(result.port).to.equal('7554');
+      expect(result.port).to.equal(7554);
     });
 
-    it('FLAW: port is returned as string, not number', function () {
+    it('FIXED: port is now returned as number', function () {
       const result = getHostAndPort('http://host:8080/path');
-      expect(typeof result.port).to.equal('string');
+      expect(typeof result.port).to.equal('number');
+      expect(result.port).to.equal(8080);
     });
 
-    it('FLAW: does not validate port is numeric', function () {
+    it('FIXED: non-numeric port is preserved as string (NaN guard)', function () {
       const result = getHostAndPort('http://host:notaport/path');
       expect(result.port).to.equal('notaport');
     });
 
     it('should handle URL with credentials', function () {
       const result = getHostAndPort('http://user:pass@host:3000/path');
-      expect(result.port).to.equal('3000');
+      expect(result.port).to.equal(3000);
     });
 
     it('should handle empty path after port', function () {
       const result = getHostAndPort('https://host:443/');
-      expect(result.port).to.equal('443');
+      expect(result.port).to.equal(443);
     });
   });
 
@@ -93,28 +94,33 @@ describe('util.js — deep architectural tests', function () {
       expect(obj.a.b.c).to.equal(1);
     });
 
-    it('FLAW: silently drops undefined values', function () {
+    it('FIXED: preserves undefined values via structuredClone', function () {
       const obj = { a: undefined, b: 1 };
       const cloned = util.clone(obj);
-      expect(cloned).to.not.have.property('a');
+      expect(cloned).to.have.property('a');
+      expect(cloned.a).to.be.undefined;
     });
 
-    it('FLAW: silently drops function values', function () {
+    it('NOTE: functions still dropped (structuredClone throws, falls back to JSON)', function () {
       const obj = { fn: () => {}, b: 1 };
       const cloned = util.clone(obj);
       expect(cloned).to.not.have.property('fn');
     });
 
-    it('FLAW: converts Date objects to strings', function () {
+    it('FIXED: preserves Date objects via structuredClone', function () {
       const obj = { d: new Date('2024-01-01') };
       const cloned = util.clone(obj);
-      expect(typeof cloned.d).to.equal('string');
+      expect(cloned.d).to.be.instanceOf(Date);
+      expect(cloned.d.toISOString()).to.equal(new Date('2024-01-01').toISOString());
     });
 
-    it('FLAW: throws on circular references', function () {
+    it('FIXED: handles circular references via structuredClone', function () {
       const obj = { a: 1 };
       obj.self = obj;
-      expect(() => util.clone(obj)).to.throw();
+      const cloned = util.clone(obj);
+      expect(cloned.a).to.equal(1);
+      expect(cloned.self).to.not.equal(obj);
+      expect(cloned.self.a).to.equal(1);
     });
 
     it('should handle arrays', function () {
@@ -168,13 +174,12 @@ describe('util.js — deep architectural tests', function () {
       expect(proxy.b).to.equal('hello');
     });
 
-    it('FLAW: set/delete are NOT blocked — proxy is not truly read-only', function () {
+    it('FIXED: set/delete ARE now blocked — proxy is truly read-only', function () {
       const obj = { a: 1 };
       const proxy = util.readOnlyProxy(obj);
-      proxy.a = 999;
-      expect(obj.a).to.equal(999);
-      delete proxy.a;
-      expect(obj.a).to.be.undefined;
+      expect(() => { proxy.a = 999; }).to.throw(TypeError);
+      expect(() => { delete proxy.a; }).to.throw(TypeError);
+      expect(obj.a).to.equal(1);
     });
   });
 
@@ -191,11 +196,11 @@ describe('util.js — deep architectural tests', function () {
       expect(obj.key).to.equal('default');
     });
 
-    it('FLAW: treats 0, empty string, false as missing (uses !value)', function () {
+    it('FIXED: correctly preserves 0, empty string, false (uses == null)', function () {
       const obj = { count: 0, flag: false, name: '' };
-      expect(util.getOrInit(obj, 'count', 99)).to.equal(99);
-      expect(util.getOrInit(obj, 'flag', true)).to.equal(true);
-      expect(util.getOrInit(obj, 'name', 'default')).to.equal('default');
+      expect(util.getOrInit(obj, 'count', 99)).to.equal(0);
+      expect(util.getOrInit(obj, 'flag', true)).to.equal(false);
+      expect(util.getOrInit(obj, 'name', 'default')).to.equal('');
     });
   });
 
@@ -223,10 +228,10 @@ describe('util.js — deep architectural tests', function () {
       expect(() => util.resolveRelativePaths(root, path.resolve, '/base')).to.not.throw();
     });
 
-    it('FLAW: no circular reference guard — will stack overflow', function () {
+    it('FIXED: circular reference guard prevents stack overflow', function () {
       const root = { a: 1 };
       root.self = root;
-      expect(() => util.resolveRelativePaths(root, path.resolve, '/base')).to.throw(RangeError);
+      expect(() => util.resolveRelativePaths(root, path.resolve, '/base')).to.not.throw();
     });
   });
 
@@ -387,10 +392,12 @@ describe('util.js — deep architectural tests', function () {
       expect(html).to.include('https://example.com');
     });
 
-    it('FLAW: does not escape URL — XSS if URL is attacker-controlled', function () {
+    it('FIXED: URL is now HTML-escaped — XSS is prevented', function () {
       const malicious = '"><script>alert(1)</script>';
       const html = util.getRemoteIframeTemplate(malicious);
-      expect(html).to.include('<script>alert(1)</script>');
+      expect(html).to.not.include('<script>');
+      expect(html).to.include('&lt;script&gt;');
+      expect(html).to.include('&quot;');
     });
   });
 });

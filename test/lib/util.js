@@ -68,13 +68,13 @@ describe('util', function () {
     it('should parse https URL', function () {
       var result = util.getHostAndPortFromUrl('https://example.com:7554/api');
       assert.strictEqual(result.host, 'example.com');
-      assert.strictEqual(result.port, '7554');
+      assert.strictEqual(result.port, 7554);
     });
 
     it('should parse http URL', function () {
       var result = util.getHostAndPortFromUrl('http://localhost:8080/path');
       assert.strictEqual(result.host, 'localhost');
-      assert.strictEqual(result.port, '8080');
+      assert.strictEqual(result.port, 8080);
     });
 
     it('should return default https port 443 when no port', function () {
@@ -97,13 +97,13 @@ describe('util', function () {
     it('should handle URL without path', function () {
       var result = util.getHostAndPortFromUrl('https://example.com:443');
       assert.strictEqual(result.host, 'example.com');
-      assert.strictEqual(result.port, '443');
+      assert.strictEqual(result.port, 443);
     });
 
     it('should handle IPv6 addresses', function () {
       var result = util.getHostAndPortFromUrl('https://[::1]:7554/api');
       assert.strictEqual(result.host, '::1');
-      assert.strictEqual(result.port, '7554');
+      assert.strictEqual(result.port, 7554);
     });
   });
 
