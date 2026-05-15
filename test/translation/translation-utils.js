@@ -9,9 +9,22 @@
 */
 
 'use strict';
+
+// Stub the global logger before requiring any library code so that
+// lib/util.js does not try to load the external zlux-shared repo.
+const noop = () => {};
+global.COM_RS_COMMON_LOGGER = {
+  makeComponentLogger: () => ({
+    info: noop, warn: noop, debug: noop, severe: noop, log: noop
+  })
+};
+
+const path = require('path');
+const fs = require('fs');
+const os = require('os');
 const chai = require('chai');
 const expect = chai.expect;
-const { pickLanguage } = require('../../lib/translation-utils');
+const { pickLanguage, getAcceptLanguageFromCookies, translate, loadTranslations } = require('../../lib/translation-utils');
 
 describe('translation-utils', function () {
   describe('pickLanguage', function () {
@@ -156,6 +169,138 @@ describe('translation-utils', function () {
 
     it('returns null when an entry is only whitespace after splitting on comma', function () {
       expect(pickLanguage(supported, 'en,   ,fr')).to.be.null;
+    });
+  });
+
+  describe('getAcceptLanguageFromCookies', function () {
+    const prefix = 'org.zowe.zlux.zlux-app-manager.preferences';
+    const langKey = `${prefix}.language`;
+
+    it('returns null when no language cookie is set', function () {
+      expect(getAcceptLanguageFromCookies({})).to.be.null;
+    });
+
+    it('returns the language as-is when it has no region subtag', function () {
+      const cookies = { [langKey]: 'fr' };
+      expect(getAcceptLanguageFromCookies(cookies)).to.equal('fr');
+    });
+
+    it('returns "lang-Region,lang" when cookie contains a region subtag', function () {
+      const cookies = { [langKey]: 'es-ES' };
+      expect(getAcceptLanguageFromCookies(cookies)).to.equal('es-ES,es');
+    });
+
+    it('returns null when the language cookie is an empty string', function () {
+      const cookies = { [langKey]: '' };
+      expect(getAcceptLanguageFromCookies(cookies)).to.be.null;
+    });
+  });
+
+  describe('translate', function () {
+    const translationMaps = {
+      'es-ES': {
+        'pluginName': 'Nombre del Plugin',
+        'pluginDesc': 'Descripción del Plugin'
+      },
+      'fr': {
+        'pluginName': 'Nom du Plugin'
+      }
+    };
+
+    it('returns the original pluginDef when acceptLanguage is null', function () {
+      const pluginDef = { webContent: { nameKey: 'pluginName', nameDefault: 'PluginName' } };
+      const result = translate(pluginDef, translationMaps, null);
+      expect(result).to.equal(pluginDef);
+    });
+
+    it('returns the original pluginDef when no translation matches', function () {
+      const pluginDef = { webContent: { nameKey: 'pluginName', nameDefault: 'PluginName' } };
+      const result = translate(pluginDef, translationMaps, 'ja');
+      expect(result).to.equal(pluginDef);
+    });
+
+    it('translates matching keys in webContent when a language matches', function () {
+      const pluginDef = { webContent: { nameKey: 'pluginName', nameDefault: 'PluginName' } };
+      const result = translate(pluginDef, translationMaps, 'es-ES');
+      expect(result.webContent.nameDefault).to.equal('Nombre del Plugin');
+    });
+
+    it('does not mutate the original pluginDef', function () {
+      const pluginDef = { webContent: { nameKey: 'pluginName', nameDefault: 'PluginName' } };
+      translate(pluginDef, translationMaps, 'es-ES');
+      expect(pluginDef.webContent.nameDefault).to.equal('PluginName');
+    });
+
+    it('handles nested objects in webContent', function () {
+      const pluginDef = {
+        webContent: {
+          sub: { descKey: 'pluginDesc', descDefault: 'Description' }
+        }
+      };
+      const result = translate(pluginDef, translationMaps, 'es-ES');
+      expect(result.webContent.sub.descDefault).to.equal('Descripción del Plugin');
+    });
+
+    it('leaves keys unchanged when translation key is not found in map', function () {
+      const pluginDef = { webContent: { titleKey: 'missingKey', titleDefault: 'Original' } };
+      const result = translate(pluginDef, translationMaps, 'es-ES');
+      expect(result.webContent.titleDefault).to.equal('Original');
+    });
+  });
+
+  describe('loadTranslations', function () {
+    let tmpDir;
+    let i18nDir;
+
+    beforeEach(function () {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'translation-test-'));
+      i18nDir = path.join(tmpDir, 'web', 'assets', 'i18n');
+      fs.mkdirSync(i18nDir, { recursive: true });
+    });
+
+    afterEach(function () {
+      // Recursive cleanup
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('returns an empty object when the i18n folder does not exist', function () {
+      const noI18nDir = fs.mkdtempSync(path.join(os.tmpdir(), 'no-i18n-'));
+      const result = loadTranslations(noI18nDir);
+      expect(result).to.deep.equal({});
+      fs.rmSync(noI18nDir, { recursive: true, force: true });
+    });
+
+    it('loads translation files matching the naming convention', function () {
+      const content = JSON.stringify({ hello: 'hola' });
+      fs.writeFileSync(path.join(i18nDir, 'pluginDefinition.i18n.es-ES.json'), content);
+      const result = loadTranslations(tmpDir);
+      expect(result['es-ES']).to.deep.equal({ hello: 'hola' });
+    });
+
+    it('loads multiple language files', function () {
+      fs.writeFileSync(path.join(i18nDir, 'pluginDefinition.i18n.en.json'), JSON.stringify({ k: 'v1' }));
+      fs.writeFileSync(path.join(i18nDir, 'pluginDefinition.i18n.fr.json'), JSON.stringify({ k: 'v2' }));
+      const result = loadTranslations(tmpDir);
+      expect(Object.keys(result)).to.have.lengthOf(2);
+      expect(result['en'].k).to.equal('v1');
+      expect(result['fr'].k).to.equal('v2');
+    });
+
+    it('ignores files that do not match the naming convention', function () {
+      fs.writeFileSync(path.join(i18nDir, 'other-file.json'), '{}');
+      fs.writeFileSync(path.join(i18nDir, 'pluginDefinition.i18n.de.json'), JSON.stringify({ x: 1 }));
+      const result = loadTranslations(tmpDir);
+      expect(Object.keys(result)).to.have.lengthOf(1);
+      expect(result['de']).to.deep.equal({ x: 1 });
+    });
+
+    it('skips files with invalid JSON gracefully', function () {
+      fs.writeFileSync(path.join(i18nDir, 'pluginDefinition.i18n.bad.json'), '{not valid json!!!}');
+      fs.writeFileSync(path.join(i18nDir, 'pluginDefinition.i18n.good.json'), JSON.stringify({ ok: true }));
+      const result = loadTranslations(tmpDir);
+      // The bad file should be skipped, good file should be loaded
+      expect(result['bad']).to.be.undefined;
+      expect(result['good']).to.deep.equal({ ok: true });
     });
   });
 });

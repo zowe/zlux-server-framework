@@ -34,8 +34,15 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc --watch",
-    "test:storage": "mocha --timeout 10000 ./test/storage/*.js",
-    "test:translation": "mocha ./test/translation/*.js"
+    "test:argumentParser": "c8 --all --reporter text --reporter html mocha ./test/argumentParser/*.js",
+    "test:encryption": "c8 --all --reporter text --reporter html mocha ./test/encryption/*.js",
+    "test:jsonUtils": "c8 --all --reporter text --reporter html mocha ./test/jsonUtils/*.js",
+    "test:mergeUtils": "c8 --all --reporter text --reporter html mocha ./test/mergeUtils/*.js",
+    "test:storage": "c8 --all --reporter text --reporter html mocha --timeout 10000 ./test/storage/*.js",
+    "test:translation": "c8 --all --reporter text --reporter html mocha ./test/translation/*.js",
+    "test:url": "c8 --all --reporter text --reporter html mocha ./test/url/*.js",
+    "test:util": "c8 --all --reporter text --reporter html mocha ./test/util/*.js",
+    "test": "c8 --all --reporter text --reporter html mocha ./test/translation/*.js ./test/url/*.js ./test/encryption/*.js ./test/mergeUtils/*.js ./test/argumentParser/*.js ./test/jsonUtils/*.js ./test/util/*.js"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "12.1.0",
@@ -65,6 +72,7 @@
     "@types/mime": "3.0.1",
     "@types/node": "~16.18.0",
     "@types/qs": "6.9.3",
+    "c8": "^10.1.3",
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
     "mocha": "^11.2.2",
