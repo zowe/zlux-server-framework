@@ -1,0 +1,10 @@
+{
+  "spec": [
+    "test/plugin-loader/**/*.js",
+    "test/webserver/**/*.js",
+    "test/unit/**/*.js"
+  ],
+  "timeout": 5000,
+  "reporter": "spec",
+  "exit": true
+}
