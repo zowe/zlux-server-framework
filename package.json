@@ -49,8 +49,6 @@
     "graceful-fs": "~4.2.11",
     "ipaddr.js": "~2.1.0",
     "node-forge": "1.4.0",
-    "normalize-url": "~7.0.0",
-    "require-from-string": "~2.0.2",
     "semver": "~7.6.0",
     "undici": "6.24.1",
     "ws": "^6.2.3",
@@ -66,7 +64,6 @@
     "@types/qs": "6.9.3",
     "bluebird": "3.7.2",
     "chai": "~4.2.0",
-    "chai-http": "~4.2.0",
     "mocha": "^11.2.2",
     "typescript": "~5.0.0"
   },
@@ -77,11 +74,6 @@
   "overrides": {
     "@rocketsoftware/eureka-js-client": {
       "@cypress/request": "^3.0.9"
-    },
-    "chai-http": {
-      "superagent": {
-        "form-data": "4.0.4"
-      }
     },
     "express": {
       "path-to-regexp": "0.1.13"

@@ -19,26 +19,6 @@ coreLogger.addDestination(coreLogger.makeDefaultDestination(true,false,false));
 let logger;
 
 exports.coreLogger = coreLogger;
-exports.setComponentLogger = function(componentLogger) {
-  logger = componentLogger;
-}
-
-function mkdirp(dir, options) {
-  return new Promise((resolve, reject) => {
-    if (dir == '.') {
-      resolve();
-    } else {
-      fs.mkdir(dir, Object.assign(options, {recursive: true}), (err)=> {
-        if (err) {
-          reject();
-        } else {
-          resolve();
-        }
-      });
-    }
-  });
-}
-exports.mkdirp = mkdirp;
 
 function validatePluginInDirectory(inputDir) {
   try {

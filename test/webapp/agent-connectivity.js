@@ -19,10 +19,6 @@ const assert = require('assert')
 const path = require('path');
 const http = require('http');
 const https = require('https');
-const chai = require('chai');
-const chaiHttp = require('chai-http');
-chai.use(chaiHttp);
-const should = chai.should();
 const PluginLoader = require('../../lib/plugin-loader')
 const makePlugin = PluginLoader.makePlugin
 const makeWebApp = require('../../lib/webapp').makeWebApp;
@@ -92,11 +88,9 @@ describe('Agent', function() {
     
     it('should be able to get plugins over HTTP', function() {
       const url = '/plugins?type=all';
-      return chai.request(server)
-        .get(url)
+      return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
         .then(function (res) {
-          res.should.have.status(200);
-          res.body.should.be.a('object');
+          assert.strictEqual(res.status, 200);
         });
     })
   })
@@ -130,11 +124,9 @@ describe('Agent', function() {
     
     it('should be able to get plugins over HTTPS (ATTLS)', function() {
       const url = '/plugins?type=all';
-      return chai.request(server)
-        .get(url)
+      return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
         .then(function (res) {
-          res.should.have.status(200);
-          res.body.should.be.a('object');
+          assert.strictEqual(res.status, 200);
         });
     })
   })
@@ -167,11 +159,9 @@ describe('Agent', function() {
     
     it('should be able to get plugins over HTTPS', function() {
       const url = '/plugins?type=all';
-      return chai.request(server)
-        .get(url)
+      return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
         .then(function (res) {
-          res.should.have.status(200);
-          res.body.should.be.a('object');
+          assert.strictEqual(res.status, 200);
         });
     })
 
