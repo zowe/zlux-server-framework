@@ -12,12 +12,7 @@
 
 // Stub the global logger before requiring any library code so that
 // lib/util.js does not try to load the external zlux-shared repo.
-const noop = () => {};
-global.COM_RS_COMMON_LOGGER = {
-  makeComponentLogger: () => ({
-    info: noop, warn: noop, debug: noop, severe: noop, log: noop
-  })
-};
+// Logger stub is provided by test/setup.js (loaded via mocha --require).
 
 const path = require('path');
 const fs = require('fs');

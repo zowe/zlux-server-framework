@@ -330,7 +330,8 @@ describe('util', function () {
   describe('timeout', function () {
     it('should return a promise', function () {
       var result = util.timeout(1);
-      assert.ok(result instanceof Promise);
+      // util.js uses bluebird Promise, so check thenable interface
+      assert.ok(result && typeof result.then === 'function');
     });
 
     it('should resolve after specified ms', function (done) {

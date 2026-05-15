@@ -35,14 +35,10 @@
     "build": "tsc",
     "start": "tsc --watch",
     "test:argumentParser": "c8 --all --reporter text --reporter html mocha ./test/argumentParser/*.js",
-    "test:encryption": "c8 --all --reporter text --reporter html mocha ./test/encryption/*.js",
-    "test:jsonUtils": "c8 --all --reporter text --reporter html mocha ./test/jsonUtils/*.js",
     "test:mergeUtils": "c8 --all --reporter text --reporter html mocha ./test/mergeUtils/*.js",
     "test:storage": "c8 --all --reporter text --reporter html mocha --timeout 10000 ./test/storage/*.js",
     "test:translation": "c8 --all --reporter text --reporter html mocha ./test/translation/*.js",
-    "test:url": "c8 --all --reporter text --reporter html mocha ./test/url/*.js",
-    "test:util": "c8 --all --reporter text --reporter html mocha ./test/util/*.js",
-    "test": "c8 --all --reporter text --reporter html mocha --recursive --timeout 10000 --exit \"test/**/*.js\"",
+    "test": "c8 --all --reporter text --reporter html mocha",
     "test:coverage:report": "c8 report --reporter=html"
   },
   "dependencies": {

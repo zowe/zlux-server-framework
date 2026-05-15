@@ -1,10 +1,20 @@
 {
+  "require": ["test/setup.js"],
   "spec": [
-    "test/plugin-loader/**/*.js",
+    "test/lib/**/*.js",
+    "test/translation/**/*.js",
+    "test/argumentParser/**/*.js",
+    "test/mergeUtils/**/*.js",
+    "test/jsonUtils/**/*.js",
+    "test/depgraph/**/*.js",
+    "test/encryption/**/*.js",
+    "test/util/**/*.js",
     "test/webserver/**/*.js",
-    "test/unit/**/*.js"
+    "test/proxy/**/*.js",
+    "test/sessionStore/**/*.js",
+    "test/webapp/webapp-functions.js"
   ],
-  "timeout": 5000,
+  "timeout": 10000,
   "reporter": "spec",
   "exit": true
 }

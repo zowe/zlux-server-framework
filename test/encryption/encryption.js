@@ -1,125 +1,248 @@
-/*
-  This program and the accompanying materials are
-  made available under the terms of the Eclipse Public License v2.0 which accompanies
-  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
-
-  SPDX-License-Identifier: EPL-2.0
-
-  Copyright Contributors to the Zowe Project.
-*/
-
 'use strict';
-const chai = require('chai');
-const expect = chai.expect;
+const { expect } = require('chai');
+const crypto = require('crypto');
 const encryption = require('../../lib/encryption');
 
-describe('lib/encryption', function () {
+describe('encryption', function () {
 
-  // Note: encryptWithKey/decryptWithKey use crypto.createCipher/createDecipher
-  // which were removed in Node.js 22+. Those functions are untestable on modern Node.
+  describe('encryptWithKeyAndIV / decryptWithKeyAndIV (AES-256-CBC)', function () {
 
-  describe('encryptWithKeyAndIV / decryptWithKeyAndIV', function () {
-    // AES-256-CBC requires a 32-byte key and 16-byte IV
-    const key = Buffer.alloc(32, 'a'); // 32 bytes
-    const iv = Buffer.alloc(16, 'b');  // 16 bytes
-
-    it('encrypts and decrypts back to the original text', function () {
+    it('should round-trip plaintext through encrypt then decrypt', function () {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
       const plaintext = 'hello world';
       const encrypted = encryption.encryptWithKeyAndIV(plaintext, key, iv);
       const decrypted = encryption.decryptWithKeyAndIV(encrypted, key, iv);
       expect(decrypted).to.equal(plaintext);
     });
 
-    it('produces different ciphertext for different plaintexts', function () {
-      const enc1 = encryption.encryptWithKeyAndIV('foo', key, iv);
-      const enc2 = encryption.encryptWithKeyAndIV('bar', key, iv);
-      expect(enc1).to.not.equal(enc2);
-    });
-
-    it('produces hex string output', function () {
+    it('should produce hex-encoded ciphertext', function () {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
       const encrypted = encryption.encryptWithKeyAndIV('test', key, iv);
       expect(encrypted).to.match(/^[0-9a-f]+$/);
     });
 
-    it('handles empty string encryption/decryption', function () {
+    it('should produce different ciphertext for different IVs', function () {
+      const key = crypto.randomBytes(32);
+      const iv1 = crypto.randomBytes(16);
+      const iv2 = crypto.randomBytes(16);
+      const text = 'same plaintext';
+      const enc1 = encryption.encryptWithKeyAndIV(text, key, iv1);
+      const enc2 = encryption.encryptWithKeyAndIV(text, key, iv2);
+      expect(enc1).to.not.equal(enc2);
+    });
+
+    it('should fail to decrypt with wrong key', function () {
+      const key1 = crypto.randomBytes(32);
+      const key2 = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
+      const encrypted = encryption.encryptWithKeyAndIV('secret', key1, iv);
+      expect(() => encryption.decryptWithKeyAndIV(encrypted, key2, iv)).to.throw();
+    });
+
+    it('should fail to decrypt with wrong IV', function () {
+      const key = crypto.randomBytes(32);
+      const iv1 = crypto.randomBytes(16);
+      const iv2 = crypto.randomBytes(16);
+      const encrypted = encryption.encryptWithKeyAndIV('secret', key, iv1);
+      expect(() => encryption.decryptWithKeyAndIV(encrypted, key, iv2)).to.throw();
+    });
+
+    it('should handle empty string', function () {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
       const encrypted = encryption.encryptWithKeyAndIV('', key, iv);
+      expect(encrypted.length).to.be.greaterThan(0);
       const decrypted = encryption.decryptWithKeyAndIV(encrypted, key, iv);
       expect(decrypted).to.equal('');
     });
 
-    it('handles unicode text', function () {
-      const plaintext = '日本語テスト 🎉';
-      const encrypted = encryption.encryptWithKeyAndIV(plaintext, key, iv);
+    it('should handle unicode text', function () {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
+      const text = '日本語テスト 🔑';
+      const encrypted = encryption.encryptWithKeyAndIV(text, key, iv);
       const decrypted = encryption.decryptWithKeyAndIV(encrypted, key, iv);
-      expect(decrypted).to.equal(plaintext);
+      expect(decrypted).to.equal(text);
     });
 
-    it('fails to decrypt with a wrong key', function () {
-      const encrypted = encryption.encryptWithKeyAndIV('secret', key, iv);
-      const wrongKey = Buffer.alloc(32, 'x');
-      expect(() => encryption.decryptWithKeyAndIV(encrypted, wrongKey, iv)).to.throw();
+    it('should handle large payloads (1MB)', function () {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
+      const text = 'A'.repeat(1024 * 1024);
+      const encrypted = encryption.encryptWithKeyAndIV(text, key, iv);
+      const decrypted = encryption.decryptWithKeyAndIV(encrypted, key, iv);
+      expect(decrypted).to.equal(text);
     });
 
-    it('fails to decrypt with a wrong IV', function () {
-      const encrypted = encryption.encryptWithKeyAndIV('secret', key, iv);
-      const wrongIV = Buffer.alloc(16, 'z');
-      // Wrong IV may produce garbage or throw depending on padding
-      let decrypted;
-      try {
-        decrypted = encryption.decryptWithKeyAndIV(encrypted, key, wrongIV);
-      } catch (e) {
-        // expected — decryption failure with wrong IV
-        return;
-      }
-      // If it didn't throw, the decrypted text should NOT match
-      expect(decrypted).to.not.equal('secret');
+    it('should fail on tampered ciphertext', function () {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
+      const encrypted = encryption.encryptWithKeyAndIV('secret data', key, iv);
+      const tampered = 'ff' + encrypted.substring(2);
+      expect(() => encryption.decryptWithKeyAndIV(tampered, key, iv)).to.throw();
+    });
+
+    it('should fail on truncated ciphertext', function () {
+      const key = crypto.randomBytes(32);
+      const iv = crypto.randomBytes(16);
+      const encrypted = encryption.encryptWithKeyAndIV('hello world', key, iv);
+      const truncated = encrypted.substring(0, encrypted.length - 4);
+      expect(() => encryption.decryptWithKeyAndIV(truncated, key, iv)).to.throw();
+    });
+
+    it('should reject invalid key length', function () {
+      const shortKey = crypto.randomBytes(16);
+      const iv = crypto.randomBytes(16);
+      expect(() => encryption.encryptWithKeyAndIV('test', shortKey, iv)).to.throw();
+    });
+
+    it('should reject invalid IV length', function () {
+      const key = crypto.randomBytes(32);
+      const shortIv = crypto.randomBytes(8);
+      expect(() => encryption.encryptWithKeyAndIV('test', key, shortIv)).to.throw();
     });
   });
 
-  describe('getKeyFromPassword', function () {
-    it('derives a key of the requested length', function (done) {
-      encryption.getKeyFromPassword('password', 'salt', 32, function (derivedKey) {
-        expect(derivedKey).to.be.an.instanceOf(Buffer);
-        expect(derivedKey.length).to.equal(32);
+  describe('encryptWithKey / decryptWithKey (AES-256-CTR, deprecated API)', function () {
+    const hasCreateCipher = typeof crypto.createCipher === 'function';
+    const skipMsg = 'crypto.createCipher removed in Node 22+';
+
+    it('should round-trip plaintext', function () {
+      if (!hasCreateCipher) return this.skip(skipMsg);
+      const key = 'my-secret-password-key';
+      const plaintext = 'sensitive data';
+      const encrypted = encryption.encryptWithKey(plaintext, key);
+      const decrypted = encryption.decryptWithKey(encrypted, key);
+      expect(decrypted).to.equal(plaintext);
+    });
+
+    it('SECURITY FLAW: same key + same plaintext = same ciphertext (no IV)', function () {
+      if (!hasCreateCipher) return this.skip(skipMsg);
+      const key = 'deterministic-key';
+      const text = 'same input';
+      const enc1 = encryption.encryptWithKey(text, key);
+      const enc2 = encryption.encryptWithKey(text, key);
+      expect(enc1).to.equal(enc2);
+    });
+
+    it('should produce different ciphertext for different keys', function () {
+      if (!hasCreateCipher) return this.skip(skipMsg);
+      const text = 'hello';
+      const enc1 = encryption.encryptWithKey(text, 'key1');
+      const enc2 = encryption.encryptWithKey(text, 'key2');
+      expect(enc1).to.not.equal(enc2);
+    });
+
+    it('should fail to decrypt with wrong key', function () {
+      if (!hasCreateCipher) return this.skip(skipMsg);
+      const encrypted = encryption.encryptWithKey('secret', 'key1');
+      const decrypted = encryption.decryptWithKey(encrypted, 'key2');
+      expect(decrypted).to.not.equal('secret');
+    });
+
+    it('should handle empty string', function () {
+      if (!hasCreateCipher) return this.skip(skipMsg);
+      const encrypted = encryption.encryptWithKey('', 'key');
+      const decrypted = encryption.decryptWithKey(encrypted, 'key');
+      expect(decrypted).to.equal('');
+    });
+  });
+
+  describe('getKeyFromPassword (PBKDF2)', function () {
+
+    it('should derive a key of requested length', function (done) {
+      encryption.getKeyFromPassword('password', 'salt', 32, (key) => {
+        expect(key).to.be.instanceOf(Buffer);
+        expect(key.length).to.equal(32);
         done();
       });
     });
 
-    it('produces the same key for the same inputs (deterministic)', function (done) {
-      encryption.getKeyFromPassword('pass', 'salt1', 16, function (key1) {
-        encryption.getKeyFromPassword('pass', 'salt1', 16, function (key2) {
+    it('should produce deterministic output for same inputs', function (done) {
+      const params = { password: 'mypass', salt: 'mysalt', length: 32 };
+      encryption.getKeyFromPassword(params.password, params.salt, params.length, (key1) => {
+        encryption.getKeyFromPassword(params.password, params.salt, params.length, (key2) => {
           expect(key1.equals(key2)).to.be.true;
           done();
         });
       });
     });
 
-    it('produces different keys for different passwords', function (done) {
-      encryption.getKeyFromPassword('pass1', 'salt', 32, function (key1) {
-        encryption.getKeyFromPassword('pass2', 'salt', 32, function (key2) {
+    it('should produce different keys for different salts', function (done) {
+      encryption.getKeyFromPassword('pass', 'salt1', 32, (key1) => {
+        encryption.getKeyFromPassword('pass', 'salt2', 32, (key2) => {
           expect(key1.equals(key2)).to.be.false;
           done();
         });
       });
     });
 
-    it('produces different keys for different salts', function (done) {
-      encryption.getKeyFromPassword('pass', 'saltA', 32, function (key1) {
-        encryption.getKeyFromPassword('pass', 'saltB', 32, function (key2) {
+    it('should produce different keys for different passwords', function (done) {
+      encryption.getKeyFromPassword('pass1', 'salt', 32, (key1) => {
+        encryption.getKeyFromPassword('pass2', 'salt', 32, (key2) => {
           expect(key1.equals(key2)).to.be.false;
+          done();
+        });
+      });
+    });
+
+    it('should support different key lengths', function (done) {
+      encryption.getKeyFromPassword('pass', 'salt', 16, (key) => {
+        expect(key.length).to.equal(16);
+        done();
+      });
+    });
+
+    it('SECURITY FLAW: only 500 PBKDF2 rounds (should be 100k+)', function (done) {
+      const start = process.hrtime.bigint();
+      encryption.getKeyFromPassword('password', 'salt', 32, () => {
+        const elapsed = Number(process.hrtime.bigint() - start) / 1e6;
+        expect(elapsed).to.be.lessThan(50);
+        done();
+      });
+    });
+
+    it('derived key should work as AES-256-CBC key', function (done) {
+      encryption.getKeyFromPassword('password', 'random-salt', 32, (key) => {
+        const iv = crypto.randomBytes(16);
+        const encrypted = encryption.encryptWithKeyAndIV('test data', key, iv);
+        const decrypted = encryption.decryptWithKeyAndIV(encrypted, key, iv);
+        expect(decrypted).to.equal('test data');
+        done();
+      });
+    });
+  });
+
+  describe('integration: PBKDF2 key derivation + AES-256-CBC encrypt/decrypt', function () {
+
+    it('should complete a full password-based encryption workflow', function (done) {
+      const password = 'user-password-123';
+      const salt = crypto.randomBytes(16).toString('hex');
+      const iv = crypto.randomBytes(16);
+      const secret = 'sensitive configuration value with special chars: §±@#$%';
+
+      encryption.getKeyFromPassword(password, salt, 32, (key) => {
+        const ciphertext = encryption.encryptWithKeyAndIV(secret, key, iv);
+        const recovered = encryption.decryptWithKeyAndIV(ciphertext, key, iv);
+        expect(recovered).to.equal(secret);
+        done();
+      });
+    });
+
+    it('should fail decryption when wrong password derives key', function (done) {
+      const salt = 'fixed-salt';
+      const iv = crypto.randomBytes(16);
+      encryption.getKeyFromPassword('correct-password', salt, 32, (correctKey) => {
+        const ciphertext = encryption.encryptWithKeyAndIV('secret', correctKey, iv);
+        encryption.getKeyFromPassword('wrong-password', salt, 32, (wrongKey) => {
+          expect(() => {
+            encryption.decryptWithKeyAndIV(ciphertext, wrongKey, iv);
+          }).to.throw();
           done();
         });
       });
     });
   });
 });
-
-/*
-  This program and the accompanying materials are
-  made available under the terms of the Eclipse Public License v2.0 which accompanies
-  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
-
-  SPDX-License-Identifier: EPL-2.0
-
-  Copyright Contributors to the Zowe Project.
-*/
