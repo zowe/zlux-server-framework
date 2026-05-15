@@ -42,7 +42,8 @@
     "test:translation": "c8 --all --reporter text --reporter html mocha ./test/translation/*.js",
     "test:url": "c8 --all --reporter text --reporter html mocha ./test/url/*.js",
     "test:util": "c8 --all --reporter text --reporter html mocha ./test/util/*.js",
-    "test": "c8 --all --reporter text --reporter html mocha ./test/translation/*.js ./test/url/*.js ./test/encryption/*.js ./test/mergeUtils/*.js ./test/argumentParser/*.js ./test/jsonUtils/*.js ./test/util/*.js"
+    "test": "c8 --all --reporter text --reporter html mocha --recursive --timeout 10000 --exit \"test/**/*.js\"",
+    "test:coverage:report": "c8 report --reporter=html"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "12.1.0",
@@ -76,6 +77,8 @@
     "chai": "~4.2.0",
     "chai-http": "~4.2.0",
     "mocha": "^11.2.2",
+    "nyc": "17.1.0",
+    "sinon": "21.0.3",
     "typescript": "~5.0.0"
   },
   "optionalDependencies": {
