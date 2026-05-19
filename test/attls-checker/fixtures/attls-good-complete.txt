@@ -1,0 +1,107 @@
+# attls-good-complete.txt
+#
+# GOOD: Complete AT-TLS coverage for a standard Zowe deployment.
+# ALL inbound ports (7552-7558) and infinispan ports are covered.
+# ALL required outbound connections are covered.
+# Uses wildcard jobname ZWE1* for simplicity.
+
+# ── Shared actions ────────────────────────────────────────────────────────────
+
+TTLSGroupAction ZoweServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweServerEnvAction
+{
+  HandshakeRole ServerWithClientAuth
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSEnvironmentAction ZoweClientEnvAction
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweServerConnAction
+{
+  HandshakeRole ServerWithClientAuth
+}
+
+TTLSConnectionAction ZoweClientConnAction
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Inbound: core API ML + ZAAS (ports 7552-7558) ────────────────────────────
+
+TTLSRule ZoweInboundMain
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: Caching Service infinispan (ports 7600-7601) ────────────────────
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname ZWE1CS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Outbound: all inter-service communication within Zowe ─────────────────────
+
+TTLSRule ZoweOutboundInternal
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7552-7601
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}
+
+# ── Outbound: Gateway and ZAAS to z/OSMF ────────────────────────────────────
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}

@@ -1,0 +1,140 @@
+# attls-bad-partial-shadow.txt
+#
+# BAD: A broad low-priority On rule covers all Zowe ports (7552-7558 + infinispan).
+# A separate high-priority Off rule disables AT-TLS for just the gateway (7554)
+# and ZAAS (7558) ports, effectively punching holes in the broad rule.
+#
+# Priority reminder: HIGHER numeric value = HIGHER priority.
+#   Priority 200 wins over Priority 100.
+#
+# The person writing this policy intended ZoweInboundBroad to protect everything.
+# But ZoweOffGatewayZaas (priority 200) silently overrides it for ports 7554+7558.
+#
+# Expected outcome:
+#   inbound:api-catalog    (7552) → ok      (only broad On rule matches)
+#   inbound:discovery      (7553) → ok      (only broad On rule matches)
+#   inbound:gateway        (7554) → warn    (Off rule at priority 200 shadows On rule)
+#   inbound:app-server     (7556) → warn    (Off rule has Jobname ZWE1SV — matches cluster STC)
+#   inbound:caching-service(7555) → ok      (only broad On rule matches)
+#   inbound:zaas           (7558) → warn    (Off rule at priority 200 shadows On rule)
+#   inbound:zss            (7557) → ok      (only broad On rule matches — ZWE1SZ not caught)
+
+TTLSGroupAction ZoweOnGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweOffGroup
+{
+  TTLSEnabled Off
+}
+
+TTLSEnvironmentAction ZoweServerEnv
+{
+  HandshakeRole ServerWithClientAuth
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweServerConn
+{
+  HandshakeRole ServerWithClientAuth
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Broad low-priority On rule: all Zowe inbound ports ───────────────────────
+# Priority 100 — intended to enable AT-TLS for everything Zowe-related.
+
+TTLSRule ZoweInboundBroad
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweOnGroup
+  TTLSEnvironmentActionRef ZoweServerEnv
+  TTLSConnectionActionRef ZoweServerConn
+}
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname ZWE1CS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweOnGroup
+  TTLSEnvironmentActionRef ZoweServerEnv
+  TTLSConnectionActionRef ZoweServerConn
+}
+
+# ── High-priority Off rule: disables AT-TLS for gateway and ZAAS ports ───────
+# Priority 200 — silently overrides ZoweInboundBroad for ports 7554 and 7558.
+# Also catches the cluster STC (ZWE1SV) on port 7556 (app-server).
+# Intended to exempt certain ports from AT-TLS, but the author may not have
+# realised this would break Zowe's inbound protection for those ports.
+
+TTLSRule ZoweOffGatewayZaasAppServer
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7554
+  LocalPortRange 7556
+  LocalPortRange 7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 200
+  TTLSGroupActionRef ZoweOffGroup
+}
+
+# ── Outbound: complete, separate from the inbound concern ────────────────────
+
+TTLSGroupAction ZoweClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweClientEnv
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweClientConn
+{
+  HandshakeRole Client
+}
+
+TTLSRule ZoweOutboundInternal
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7552-7601
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnv
+  TTLSConnectionActionRef ZoweClientConn
+}
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnv
+  TTLSConnectionActionRef ZoweClientConn
+}

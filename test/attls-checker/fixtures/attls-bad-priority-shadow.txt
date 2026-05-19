@@ -1,0 +1,128 @@
+# attls-bad-priority-shadow.txt
+#
+# BAD: A high-priority rule with TTLSEnabled Off shadows a lower-priority
+# rule with TTLSEnabled On for the inbound gateway port (7554).
+#
+# Priority ordering in AT-TLS: HIGHER numeric value = HIGHER priority.
+# So priority 200 wins over priority 100.
+#
+# The checker should report status='warn' for the gateway inbound connection
+# because the best-matching rule (priority 200) has TTLSEnabled Off — meaning
+# AT-TLS is effectively disabled for that connection despite a TTLSEnabled On
+# rule also existing.
+
+TTLSGroupAction ZoweOnGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweOffGroup
+{
+  TTLSEnabled Off
+}
+
+TTLSEnvironmentAction ZoweServerEnv
+{
+  HandshakeRole Server
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweServerConn
+{
+  HandshakeRole Server
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Good inbound rule (priority 100) for most Zowe ports ─────────────────────
+
+TTLSRule ZoweInboundMain
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweOnGroup
+  TTLSEnvironmentActionRef ZoweServerEnv
+  TTLSConnectionActionRef ZoweServerConn
+}
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname ZWE1CS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweOnGroup
+  TTLSEnvironmentActionRef ZoweServerEnv
+  TTLSConnectionActionRef ZoweServerConn
+}
+
+# ── Shadowing rule: higher priority (200) disables AT-TLS for gateway ─────────
+# This catches ZWE1AG on port 7554 with TTLSEnabled Off.
+# Because priority 200 > priority 100, this rule wins and AT-TLS will be
+# disabled for the gateway, even though ZoweInboundMain would have covered it.
+
+TTLSRule GatewayShadow
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7554
+  Jobname ZWE1AG
+  Direction Inbound
+  Priority 200
+  TTLSGroupActionRef ZoweOffGroup
+}
+
+# ── Outbound: complete (not the focus of this test) ──────────────────────────
+
+TTLSGroupAction ZoweClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweClientEnv
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweClientConn
+{
+  HandshakeRole Client
+}
+
+TTLSRule ZoweOutboundInternal
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7552-7601
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnv
+  TTLSConnectionActionRef ZoweClientConn
+}
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnv
+  TTLSConnectionActionRef ZoweClientConn
+}

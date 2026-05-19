@@ -1,0 +1,16 @@
+# attls-bad-empty.txt
+#
+# BAD: Contains only a TTLSGroupAction declaration — no TTLSRule declarations
+# at all.  The checker should report every required connection as status='miss'.
+
+TTLSGroupAction SomeGroupAction
+{
+  TTLSEnabled On
+}
+
+TTLSKeyringParms SomeKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# No TTLSRule declarations.  All Zowe connections will be unmatched.

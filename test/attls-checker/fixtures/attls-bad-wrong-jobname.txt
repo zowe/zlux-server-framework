@@ -1,0 +1,99 @@
+# attls-bad-wrong-jobname.txt
+#
+# BAD: Rules exist for the correct ports and directions but with a completely
+# wrong jobname pattern (MYCICS* instead of ZWE1*).  The checker should report
+# status='miss' for every Zowe connection because no rule matches the ZWE1*
+# jobname set.
+
+TTLSGroupAction WrongJobGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction WrongJobServerEnv
+{
+  HandshakeRole Server
+  TTLSKeyringParmsRef WrongKeyring
+}
+
+TTLSEnvironmentAction WrongJobClientEnv
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef WrongKeyring
+}
+
+TTLSConnectionAction WrongJobServerConn
+{
+  HandshakeRole Server
+}
+
+TTLSConnectionAction WrongJobClientConn
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms WrongKeyring
+{
+  Keyring MYCICS/CICS_RING
+}
+
+# ── Inbound: correct ports, WRONG jobname ────────────────────────────────────
+
+TTLSRule CicsInbound
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7558
+  Jobname MYCICS*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef WrongJobGroup
+  TTLSEnvironmentActionRef WrongJobServerEnv
+  TTLSConnectionActionRef WrongJobServerConn
+}
+
+TTLSRule CicsInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname MYCSRV
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef WrongJobGroup
+  TTLSEnvironmentActionRef WrongJobServerEnv
+  TTLSConnectionActionRef WrongJobServerConn
+}
+
+# ── Outbound: correct ports, WRONG jobname ───────────────────────────────────
+
+TTLSRule CicsOutbound
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7552-7601
+  Jobname MYCICS*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef WrongJobGroup
+  TTLSEnvironmentActionRef WrongJobClientEnv
+  TTLSConnectionActionRef WrongJobClientConn
+}
+
+TTLSRule CicsOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname MYCICS*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef WrongJobGroup
+  TTLSEnvironmentActionRef WrongJobClientEnv
+  TTLSConnectionActionRef WrongJobClientConn
+}
+
+# All the above rules are for CICS jobs, not Zowe (ZWE1*) jobs.
+# None will match any Zowe connection => all connections miss.

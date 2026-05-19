@@ -1,0 +1,140 @@
+# attls-bad-cluster-appserver.txt
+#
+# BAD: All port/jobname coverage is correct EXCEPT the inbound rule for
+# app-server (port 7556) uses "Jobname ZWE1DS" rather than "Jobname ZWE1SV"
+# (or the wildcard ZWE1*).
+#
+# When cluster mode is ENABLED (default, no ZLUX_NO_CLUSTER), the inbound
+# socket on port 7556 is owned by the parent STC job "ZWE1SV" (zowe.job.name).
+# A rule with "Jobname ZWE1DS" will NOT be applied to ZWE1SV, so the inbound
+# connection will be missed.
+#
+# When cluster mode is DISABLED (ZLUX_NO_CLUSTER=1), "ZWE1DS" holds the port
+# and the rule is correct — no miss.
+
+TTLSGroupAction ZoweServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweServerEnvAction
+{
+  HandshakeRole ServerWithClientAuth
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSEnvironmentAction ZoweClientEnvAction
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweServerConnAction
+{
+  HandshakeRole ServerWithClientAuth
+}
+
+TTLSConnectionAction ZoweClientConnAction
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Inbound: all APIML + ZAAS (ports 7552-7555, 7558) ────────────────────────
+
+TTLSRule ZoweInboundApiml
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7555
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+TTLSRule ZoweInboundZaas
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: app-server (7556) — WRONG: uses ZWE1DS, not ZWE1SV ──────────────
+# In cluster mode ZWE1SV holds the port; this rule with ZWE1DS will NOT match
+# ZWE1SV → miss when cluster is enabled, ok when cluster is disabled.
+
+TTLSRule ZoweInboundAppServer
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7556
+  Jobname ZWE1DS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: zss (7557) ───────────────────────────────────────────────────────
+
+TTLSRule ZoweInboundZss
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7557
+  Jobname ZWE1SZ
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Outbound ──────────────────────────────────────────────────────────────────
+
+TTLSRule ZoweOutboundInternal
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7552-7601
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}

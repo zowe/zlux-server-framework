@@ -1,0 +1,181 @@
+# attls-good-single-service.txt
+#
+# GOOD: Complete AT-TLS coverage for Zowe running in single-service deployment
+# mode (components.apiml.enabled: true).
+#
+# In single-service mode:
+#   - api-catalog, discovery, gateway, caching-service, and zaas all run inside
+#     the single ZWE1AG job.
+#   - Only discovery (7553) and gateway (7554) have externally-exposed inbound
+#     ports.  api-catalog (7552), caching-service (7555), and zaas (7558) are
+#     internal to the process and require NO separate inbound rules.
+#   - app-server (ZWE1DS, 7556) and zss (ZWE1SZ, 7557) are unaffected and still
+#     need their own inbound rules.
+#   - Infinispan (7600/7601) runs inside ZWE1AG and needs inbound/outbound rules.
+#   - Cross-APIML outbound connections (gw→zaas, zaas→gw, →caching, etc.) do
+#     NOT need rules because they are in-process in the single service.
+#   - Required outbound: ZWE1AG→discovery (HA), ZWE1AG→app-server,
+#     ZWE1AG→zss, ZWE1AG→z/OSMF, ZWE1AG→infinispan.
+
+TTLSGroupAction ZoweServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSGroupAction ZoweClientGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ZoweServerEnvAction
+{
+  HandshakeRole ServerWithClientAuth
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSEnvironmentAction ZoweClientEnvAction
+{
+  HandshakeRole Client
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ZoweServerConnAction
+{
+  HandshakeRole ServerWithClientAuth
+}
+
+TTLSConnectionAction ZoweClientConnAction
+{
+  HandshakeRole Client
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Inbound: discovery (7553) and gateway (7554) under ZWE1AG ─────────────────
+# Note: api-catalog (7552), caching-service (7555), zaas (7558) are internal
+# to the single-service process — NO inbound rules needed for those ports.
+
+TTLSRule ZoweInboundApiml
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7553-7554
+  Jobname ZWE1AG
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: app-server (ZWE1SV, 7556) — cluster mode: STC holds the port ────
+
+TTLSRule ZoweInboundAppServer
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7556
+  Jobname ZWE1SV
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: zss (ZWE1SZ, 7557) ──────────────────────────────────────────────
+
+TTLSRule ZoweInboundZss
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7557
+  Jobname ZWE1SZ
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Inbound: caching-service infinispan (ZWE1AG, 7600-7601) ──────────────────
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname ZWE1AG
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ZoweServerGroup
+  TTLSEnvironmentActionRef ZoweServerEnvAction
+  TTLSConnectionActionRef ZoweServerConnAction
+}
+
+# ── Outbound: ZWE1AG → discovery (7553) for HA replica ───────────────────────
+
+TTLSRule ZoweOutboundDiscovery
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7553
+  Jobname ZWE1AG
+  Direction Outbound
+  Priority 110
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}
+
+# ── Outbound: ZWE1AG → app-server (7556) and zss (7557) ──────────────────────
+
+TTLSRule ZoweOutboundAppZss
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7556-7557
+  Jobname ZWE1*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}
+
+# ── Outbound: ZWE1AG → infinispan (7600-7601) ────────────────────────────────
+
+TTLSRule ZoweOutboundInfinispan
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 7600-7601
+  Jobname ZWE1AG
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}
+
+# ── Outbound: ZWE1AG → z/OSMF (443) ─────────────────────────────────────────
+
+TTLSRule ZoweOutboundZosmf
+{
+  LocalAddr ALL
+  LocalPortRange 1024-65535
+  RemoteAddr ALL
+  RemotePortRange 443
+  Jobname ZWE1A*
+  Direction Outbound
+  Priority 100
+  TTLSGroupActionRef ZoweClientGroup
+  TTLSEnvironmentActionRef ZoweClientEnvAction
+  TTLSConnectionActionRef ZoweClientConnAction
+}

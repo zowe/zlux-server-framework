@@ -1,0 +1,50 @@
+# Zowe zowe.yaml fixture: non-standard job prefix and custom ports.
+# job.prefix = ZPRD means job names are ZPRD + AG, ZPRD + AZ, etc.
+# Used to verify that the checker uses the prefix correctly.
+
+zowe:
+  job:
+    name: ZPRDSV
+    prefix: ZPRD
+  certificate:
+    keystore:
+      type: JCERACFKS
+      file: "safkeyring://ZPRD/ZPRD_RING"
+      alias: localhost
+    truststore:
+      type: JCERACFKS
+      file: "safkeyring://ZPRD/ZPRD_RING"
+  network:
+    server:
+      tls:
+        attls: true
+    client:
+      tls:
+        attls: true
+
+zOSMF:
+  host: zosmf.example.com
+  port: 10443
+
+components:
+  gateway:
+    enabled: true
+    port: 8554
+  zaas:
+    enabled: true
+    port: 8558
+  api-catalog:
+    enabled: true
+    port: 8552
+  discovery:
+    enabled: true
+    port: 8553
+  caching-service:
+    enabled: true
+    port: 8555
+  app-server:
+    enabled: true
+    port: 8556
+  zss:
+    enabled: true
+    port: 8557

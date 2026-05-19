@@ -1,0 +1,58 @@
+# attls-bad-missing-outbound.txt
+#
+# BAD: All inbound rules are present but outbound rules are missing.
+# Specifically there are NO outbound rules at all.
+# When used with zowe-full-attls.yaml (client.attls=true), all outbound
+# connections (services calling each other + gateway->z/OSMF) will be missed.
+
+TTLSGroupAction ServerGroup
+{
+  TTLSEnabled On
+}
+
+TTLSEnvironmentAction ServerEnv
+{
+  HandshakeRole Server
+  TTLSKeyringParmsRef ZoweKeyring
+}
+
+TTLSConnectionAction ServerConn
+{
+  HandshakeRole Server
+}
+
+TTLSKeyringParms ZoweKeyring
+{
+  Keyring ZOWE/ZOWE_RING
+}
+
+# ── Inbound: complete coverage (all 7 components + infinispan) ────────────────
+
+TTLSRule ZoweInboundMain
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7552-7558
+  Jobname ZWE1*
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ServerGroup
+  TTLSEnvironmentActionRef ServerEnv
+  TTLSConnectionActionRef ServerConn
+}
+
+TTLSRule ZoweInboundInfinispan
+{
+  LocalAddr ALL
+  RemoteAddr ALL
+  LocalPortRange 7600-7601
+  Jobname ZWE1CS
+  Direction Inbound
+  Priority 100
+  TTLSGroupActionRef ServerGroup
+  TTLSEnvironmentActionRef ServerEnv
+  TTLSConnectionActionRef ServerConn
+}
+
+# ── NO outbound rules ─────────────────────────────────────────────────────────
+# When client.attls=true, all outbound connections will be unmatched (miss).
