@@ -3,7 +3,8 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
-- Enhancement: When not using a SAF keyring, the app-server can now use PKCS12 keystores so that the PEM option for Zowe certificates no longer needs to be specified. (#596)
+## 3.6.0
+- Enhancement: When not using a SAF keyring, the app-server can now use PKCS12 keystores so that the PEM option for Zowe certificates no longer needs to be specified. [(#596)](https://github.com/zowe/zlux-server-framework/pull/596)
 
 ## 3.5.0
 - Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#669)](https://github.com/zowe/zlux-server-framework/pull/669) 
