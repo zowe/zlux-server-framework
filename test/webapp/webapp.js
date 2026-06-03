@@ -97,7 +97,7 @@ describe('Agent', function() {
   })
 
   describe('connectivity-https-attls', function() {
-    webAppOptions.serverConfigagent = {
+    webAppOptions.serverConfig.agent = {
       host: 'localhost',
       http: { port: 31338, attls: true },
       https: { //likely not what is done in attls keyring config
