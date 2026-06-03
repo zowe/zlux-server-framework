@@ -75,11 +75,6 @@
       "@cypress/request": "3.0.10",
       "lodash": "4.18.1"
     },
-    "chai-http": {
-      "superagent": {
-        "form-data": "4.0.4"
-      }
-    },
     "swagger-parser": {
       "@apidevtools/swagger-parser": {
         "z-schema": {
