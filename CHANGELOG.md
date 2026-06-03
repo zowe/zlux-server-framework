@@ -4,9 +4,9 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.18.5
-- Enhancement: Upgraded old dependencies to new versions: axios, body-parser, @cypress/request, validator, and qs.
-- Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
-- Enhancement: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
+- Bugfix: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
+- Bugfix: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
+- Bugfix: Fixed error ZWED0149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
 
 ## 2.18.4
 - Bugfix: Fix TN3270 and VT terminals not appearing in the Zowe Desktop when using AT-TLS by adding a workaround for an AT-TLS CORS error between the gateway and App Server where CORS metadata has been added to the eureka registration ([#634](https://github.com/zowe/zlux-server-framework/pull/634))
@@ -62,7 +62,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 2.3.0
 
-- Bugfix: Proxies (zss, external services, and those made by router services) now default to the same HTTPS/TLS settings as the app-esrver.
+- Bugfix: Proxies (zss, external services, and those made by router services) now default to the same HTTPS/TLS settings as the app-server.
 
 ## 2.0.0
 
