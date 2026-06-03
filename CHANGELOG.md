@@ -7,8 +7,11 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 - Bugfix: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
 - Bugfix: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
 - Bugfix: Fixed error ZWED0149E from occurring when using AT-TLS. This error did not mean something was wrong, so the message is no longer printed in that condition to avoid confusion. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
+- Bugfix: App-server was not respecting property "components.app-server.zowe.network.client.tls.attls". Instead, property "zowe.network.client.tls.attls" was taking priority. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
 - Enhancement: The app-server can now use separate certificates for inbound server TLS and outbound client TLS connections. When `zowe.certificate.keystore.clientCertificateAlias` (keyring) or both `zowe.certificate.pem.clientCertificate` and `zowe.certificate.pem.clientKey` (PEM) are defined, those are used for all outbound client connections while the main certificate is used only for serving HTTPS. When not defined, behavior is unchanged. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
 - Enhancement: Improved TLS options: `getTlsOptions()` now returns client TLS options by default, while `getServerTlsOptions()` explicitly returns server TLS options. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
+
+
 
 
 ## 2.18.4
