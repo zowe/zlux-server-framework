@@ -6,6 +6,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 2.18.5
 - Enhancement: Upgraded old dependencies to new versions: axios, body-parser, @cypress/request, validator, and qs.
 - Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
+- Enhancement: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
 
 ## 2.18.4
 - Bugfix: Fix TN3270 and VT terminals not appearing in the Zowe Desktop when using AT-TLS by adding a workaround for an AT-TLS CORS error between the gateway and App Server where CORS metadata has been added to the eureka registration ([#634](https://github.com/zowe/zlux-server-framework/pull/634))
