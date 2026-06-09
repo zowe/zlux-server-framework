@@ -328,4 +328,127 @@ describe('sessionStore', function () {
       assert.strictEqual(sessionStore.sessions.size, 2, 'map should have 2 items');
     });
   });
+
+  describe('concurrent session operations', function () {
+    afterEach(function () {
+      sessionStore.sessions.clear();
+      sessionStore.sessionsQueue.splice(0, sessionStore.sessionsQueue.length);
+    });
+
+    it('should handle multiple set and get operations', function (done) {
+      var count = 0;
+      var total = 10;
+      for (var i = 0; i < total; i++) {
+        (function (idx) {
+          sessionStore.set('concurrent-' + idx, { cookie: { maxAge: 1000 }, idx: idx }, function (err) {
+            assert.strictEqual(err, null);
+            count++;
+            if (count === total) {
+              sessionStore.length(function (err, len) {
+                assert.strictEqual(len, total);
+                done();
+              });
+            }
+          });
+        })(i);
+      }
+    });
+
+    it('should handle set followed by immediate destroy', function (done) {
+      sessionStore.set('temp-sid', { cookie: { maxAge: 1000 } }, function (err) {
+        assert.strictEqual(err, null);
+        sessionStore.destroy('temp-sid', function (err) {
+          assert.strictEqual(err, null);
+          sessionStore.get('temp-sid', function (err, session) {
+            assert.strictEqual(session, undefined);
+            done();
+          });
+        });
+      });
+    });
+
+    it('should handle repeated touch calls', function (done) {
+      var session = { cookie: { maxAge: 5000 } };
+      sessionStore.addSession('touch-repeat', session);
+      var firstTouch;
+      sessionStore.touch('touch-repeat', session, function () {
+        firstTouch = session.lastTouch;
+        setTimeout(function () {
+          sessionStore.touch('touch-repeat', session, function () {
+            assert.ok(session.lastTouch >= firstTouch);
+            done();
+          });
+        }, 10);
+      });
+    });
+  });
+
+  describe('createSession', function () {
+    afterEach(function () {
+      sessionStore.sessions.clear();
+      sessionStore.sessionsQueue.splice(0, sessionStore.sessionsQueue.length);
+    });
+
+    it('should create a session with lastTouch', function () {
+      var req = {};
+      var sess = { cookie: { maxAge: 1000 } };
+      var result = sessionStore.createSession(req, sess);
+      assert.ok(result, 'should return a session');
+      assert.ok(typeof result.lastTouch === 'number', 'should have lastTouch');
+    });
+
+    it('should set lastTouch to approximately current time', function () {
+      var before = Date.now();
+      var req = {};
+      var sess = { cookie: { maxAge: 1000 } };
+      var result = sessionStore.createSession(req, sess);
+      var after = Date.now();
+      assert.ok(result.lastTouch >= before && result.lastTouch <= after);
+    });
+
+    it('should preserve existing maxAge', function () {
+      var req = {};
+      var sess = { cookie: { maxAge: 5000 } };
+      var result = sessionStore.createSession(req, sess);
+      assert.strictEqual(result.cookie.maxAge, 5000);
+    });
+  });
+
+  describe('error handling', function () {
+    it('should pass error to get callback when internal error occurs', function (done) {
+      // Temporarily break the sessions map to trigger error path
+      var originalGet = sessionStore.sessions.get;
+      sessionStore.sessions.get = function () { throw new Error('test error'); };
+      sessionStore.get('any-sid', function (err, session) {
+        sessionStore.sessions.get = originalGet;
+        assert.ok(err instanceof Error);
+        assert.strictEqual(session, null);
+        done();
+      });
+    });
+
+    it('should pass error to set callback when internal error occurs', function (done) {
+      var originalSet = sessionStore.sessions.set;
+      sessionStore.sessions.set = function () { throw new Error('test error'); };
+      sessionStore.set('any-sid', { cookie: {} }, function (err) {
+        sessionStore.sessions.set = originalSet;
+        assert.ok(err instanceof Error);
+        done();
+      });
+    });
+
+    it('should pass error to length callback when internal error occurs', function (done) {
+      var originalSize = Object.getOwnPropertyDescriptor(Map.prototype, 'size');
+      Object.defineProperty(sessionStore.sessions, 'size', {
+        get: function () { throw new Error('test error'); },
+        configurable: true
+      });
+      sessionStore.length(function (err, len) {
+        delete sessionStore.sessions.size; // restore
+        assert.ok(err instanceof Error);
+        assert.strictEqual(len, null);
+        done();
+      });
+    });
+  });
 });

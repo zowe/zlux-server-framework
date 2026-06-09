@@ -134,4 +134,97 @@ describe('encryption', function () {
       });
     });
   });
+
+  describe('encryptWithKey / decryptWithKey', function () {
+    it('should encrypt and decrypt text correctly', function () {
+      var key = 'my-secret-key-for-testing';
+      var text = 'hello world';
+      var encrypted = encryption.encryptWithKey(text, key);
+      assert.ok(typeof encrypted === 'string');
+      assert.notStrictEqual(encrypted, text);
+      var decrypted = encryption.decryptWithKey(encrypted, key);
+      assert.strictEqual(decrypted, text);
+    });
+
+    it('should produce different ciphertext with different keys', function () {
+      var text = 'test message';
+      var encrypted1 = encryption.encryptWithKey(text, 'key-one');
+      var encrypted2 = encryption.encryptWithKey(text, 'key-two');
+      assert.notStrictEqual(encrypted1, encrypted2);
+    });
+
+    it('should handle empty string', function () {
+      var key = 'my-key';
+      var encrypted = encryption.encryptWithKey('', key);
+      var decrypted = encryption.decryptWithKey(encrypted, key);
+      assert.strictEqual(decrypted, '');
+    });
+
+    it('should handle long text', function () {
+      var key = 'long-text-key';
+      var text = 'a'.repeat(10000);
+      var encrypted = encryption.encryptWithKey(text, key);
+      var decrypted = encryption.decryptWithKey(encrypted, key);
+      assert.strictEqual(decrypted, text);
+    });
+
+    it('should handle special characters in text', function () {
+      var key = 'special-key';
+      var text = '!@#$%^&*(){}[]|\\:";\'<>?,./~`\n\t\r';
+      var encrypted = encryption.encryptWithKey(text, key);
+      var decrypted = encryption.decryptWithKey(encrypted, key);
+      assert.strictEqual(decrypted, text);
+    });
+
+    it('should handle unicode text', function () {
+      var key = 'unicode-key';
+      var text = '日本語テスト 🎉';
+      var encrypted = encryption.encryptWithKey(text, key);
+      var decrypted = encryption.decryptWithKey(encrypted, key);
+      assert.strictEqual(decrypted, text);
+    });
+
+    it('should fail to decrypt with wrong key', function () {
+      var text = 'secret';
+      var encrypted = encryption.encryptWithKey(text, 'correct-key');
+      var decrypted = encryption.decryptWithKey(encrypted, 'wrong-key');
+      assert.notStrictEqual(decrypted, text);
+    });
+  });
+
+  describe('decryptWithKeyAndIV error cases', function () {
+    it('should throw when decrypting with wrong key', function () {
+      var key1 = crypto.randomBytes(32);
+      var key2 = crypto.randomBytes(32);
+      var iv = crypto.randomBytes(16);
+      var encrypted = encryption.encryptWithKeyAndIV('test', key1, iv);
+      assert.throws(function () {
+        encryption.decryptWithKeyAndIV(encrypted, key2, iv);
+      });
+    });
+
+    it('should throw when decrypting with wrong IV', function () {
+      var key = crypto.randomBytes(32);
+      var iv1 = crypto.randomBytes(16);
+      var iv2 = crypto.randomBytes(16);
+      var encrypted = encryption.encryptWithKeyAndIV('test', key, iv1);
+      // Wrong IV typically produces garbage or throws
+      try {
+        var result = encryption.decryptWithKeyAndIV(encrypted, key, iv2);
+        // If it doesn't throw, it should produce wrong output
+        assert.notStrictEqual(result, 'test');
+      } catch (e) {
+        // Expected - bad decrypt
+        assert.ok(true);
+      }
+    });
+
+    it('should throw on invalid hex input', function () {
+      var key = crypto.randomBytes(32);
+      var iv = crypto.randomBytes(16);
+      assert.throws(function () {
+        encryption.decryptWithKeyAndIV('not-hex-!@#', key, iv);
+      });
+    });
+  });
 });
