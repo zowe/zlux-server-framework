@@ -34,12 +34,12 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc --watch",
-    "test": "mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
+    "test": "mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\" \"test/utils/**/*.js\"",
     "test:all": "mocha --recursive --timeout 10000 --exit \"test/**/*.js\"",
-    "test:unit": "mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
+    "test:unit": "mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\" \"test/utils/**/*.js\"",
     "test:storage": "mocha --timeout 10000 --exit ./test/storage/*.js",
     "test:translation": "mocha ./test/translation/*.js",
-    "test:coverage": "c8 mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
+    "test:coverage": "c8 mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\" \"test/utils/**/*.js\"",
     "test:coverage:report": "c8 report --reporter=html"
   },
   "dependencies": {
