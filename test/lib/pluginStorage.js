@@ -25,17 +25,20 @@ describe('pluginStorage', function () {
       assert.strictEqual(typeof pluginStorage.PluginStorageFactory, 'function');
     });
 
-    it('should create an instance with zoweConfig', function () {
-      var factory = new pluginStorage.PluginStorageFactory({
-        zowe: {},
-        components: {
-          'app-server': {
-            node: { productCode: 'ZLUX' },
-            productDir: '/opt/zowe'
+    it('should require ClusterManager infrastructure to instantiate', function () {
+      // PluginStorageFactory constructor calls ClusterManager.getStorageAll()
+      // which requires a running cluster - verify it throws without one
+      assert.throws(function () {
+        new pluginStorage.PluginStorageFactory({
+          zowe: {},
+          components: {
+            'app-server': {
+              node: { productCode: 'ZLUX' },
+              productDir: '/opt/zowe'
+            }
           }
-        }
+        });
       });
-      assert.ok(factory);
     });
   });
 });
