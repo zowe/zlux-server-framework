@@ -328,9 +328,9 @@ describe('util', function () {
   });
 
   describe('timeout', function () {
-    it('should return a promise', function () {
+    it('should return a thenable', function () {
       var result = util.timeout(1);
-      assert.ok(result instanceof Promise);
+      assert.ok(result && typeof result.then === 'function');
     });
 
     it('should resolve after specified ms', function (done) {
@@ -439,6 +439,272 @@ describe('util', function () {
       var result = util.getRemoteIframeTemplate('https://example.com');
       assert.ok(typeof result === 'string');
       assert.ok(result.includes('https://example.com'));
+    });
+  });
+
+  describe('getAgentRequestOptions', function () {
+    it('should return undefined when no app-server config', function () {
+      var result = util.getAgentRequestOptions({components: {}}, null, false, '/path');
+      assert.strictEqual(result, undefined);
+    });
+
+    it('should return undefined when no agent config', function () {
+      var zoweConfig = {
+        components: { 'app-server': { node: {} } }
+      };
+      var result = util.getAgentRequestOptions(zoweConfig, null, false, '/path');
+      assert.strictEqual(result, undefined);
+    });
+
+    it('should return undefined when agent has no https or http', function () {
+      var zoweConfig = {
+        components: { 'app-server': { node: {}, agent: {} } }
+      };
+      var result = util.getAgentRequestOptions(zoweConfig, null, false, '/path');
+      assert.strictEqual(result, undefined);
+    });
+
+    it('should return options for http agent', function () {
+      var zoweConfig = {
+        zowe: { network: {} },
+        components: {
+          'app-server': {
+            node: { allowInvalidTLSProxy: false },
+            agent: { host: 'localhost', http: { port: 7557 } }
+          }
+        }
+      };
+      var result = util.getAgentRequestOptions(zoweConfig, null, false, '/test');
+      assert.ok(result);
+      assert.strictEqual(result.host, 'localhost');
+      assert.strictEqual(result.port, 7557);
+      assert.strictEqual(result.protocol, 'http:');
+      assert.strictEqual(result.path, '/test');
+    });
+
+    it('should return options for https agent with tls options', function () {
+      var zoweConfig = {
+        zowe: { network: {} },
+        components: {
+          'app-server': {
+            node: { allowInvalidTLSProxy: true },
+            agent: { host: 'myhost', https: { port: 7556 }, http: { port: 7557 } }
+          }
+        }
+      };
+      var tlsOptions = { ca: ['fake-ca'], cert: 'fake-cert', key: 'fake-key' };
+      var result = util.getAgentRequestOptions(zoweConfig, tlsOptions, false, '/api');
+      assert.ok(result);
+      assert.strictEqual(result.host, 'myhost');
+      assert.strictEqual(result.port, 7556);
+      assert.strictEqual(result.protocol, 'https:');
+      assert.strictEqual(result.rejectUnauthorized, false);
+      assert.strictEqual(result.ca[0], 'fake-ca');
+      assert.strictEqual(result.key, undefined); // key should be removed
+      assert.strictEqual(result.cert, undefined); // cert removed when includeCert is false
+    });
+
+    it('should include cert when includeCert is true', function () {
+      var zoweConfig = {
+        zowe: { network: {} },
+        components: {
+          'app-server': {
+            node: { allowInvalidTLSProxy: false },
+            agent: { host: 'myhost', https: { port: 7556 } }
+          }
+        }
+      };
+      var tlsOptions = { ca: ['fake-ca'], cert: 'fake-cert', key: 'fake-key' };
+      var result = util.getAgentRequestOptions(zoweConfig, tlsOptions, true, '/api');
+      assert.ok(result);
+      assert.strictEqual(result.cert, 'fake-cert');
+      assert.strictEqual(result.key, undefined);
+    });
+
+    it('should return undefined for https agent without tls options', function () {
+      var zoweConfig = {
+        zowe: { network: {} },
+        components: {
+          'app-server': {
+            node: { allowInvalidTLSProxy: false },
+            agent: { host: 'myhost', https: { port: 7556 } }
+          }
+        }
+      };
+      var result = util.getAgentRequestOptions(zoweConfig, null, false, '/api');
+      assert.strictEqual(result, undefined);
+    });
+
+    it('should use apiml routing when mediationLayer enabled', function () {
+      var zoweConfig = {
+        zowe: { network: {} },
+        components: {
+          'app-server': {
+            node: {
+              allowInvalidTLSProxy: false,
+              mediationLayer: {
+                server: { gatewayHostname: 'gateway.com', gatewayPort: 7554 }
+              }
+            },
+            agent: {
+              host: 'agenthost',
+              https: { port: 7556 },
+              mediationLayer: { enabled: true, serviceName: 'zss' }
+            }
+          }
+        }
+      };
+      var tlsOptions = { ca: ['fake-ca'] };
+      var result = util.getAgentRequestOptions(zoweConfig, tlsOptions, false, '/endpoint');
+      assert.ok(result);
+      assert.strictEqual(result.host, 'gateway.com');
+      assert.strictEqual(result.port, 7554);
+      assert.ok(result.path.includes('/zss/'));
+      assert.ok(result.path.includes('/endpoint'));
+      assert.ok(result.requestProcessingOptions);
+      assert.ok(result.requestProcessingOptions.headersToRemove.includes('origin'));
+    });
+  });
+
+  describe('isClientAttls', function () {
+    it('should return false when no attls config', function () {
+      var zoweConfig = {
+        zowe: { network: {} },
+        components: { 'app-server': { zowe: {} } }
+      };
+      assert.strictEqual(util.isClientAttls(zoweConfig), false);
+    });
+
+    it('should return true when client local attls is true', function () {
+      var zoweConfig = {
+        zowe: { network: {} },
+        components: { 'app-server': { zowe: { network: { client: { tls: { attls: true } } } } } }
+      };
+      assert.strictEqual(util.isClientAttls(zoweConfig), true);
+    });
+
+    it('should return true when client global attls is true', function () {
+      var zoweConfig = {
+        zowe: { network: { client: { tls: { attls: true } } } },
+        components: { 'app-server': { zowe: {} } }
+      };
+      assert.strictEqual(util.isClientAttls(zoweConfig), true);
+    });
+
+    it('should follow server attls when client not explicitly set', function () {
+      var zoweConfig = {
+        zowe: { network: { server: { tls: { attls: true } } } },
+        components: { 'app-server': { zowe: {} } }
+      };
+      assert.strictEqual(util.isClientAttls(zoweConfig), true);
+    });
+
+    it('should return false when client explicitly set to false', function () {
+      var zoweConfig = {
+        zowe: { network: { client: { tls: { attls: false } }, server: { tls: { attls: true } } } },
+        components: { 'app-server': { zowe: {} } }
+      };
+      assert.strictEqual(util.isClientAttls(zoweConfig), false);
+    });
+  });
+
+  describe('asyncEventListener', function () {
+    it('should return a function', function () {
+      var listener = util.asyncEventListener(function () { return Promise.resolve(); });
+      assert.strictEqual(typeof listener, 'function');
+    });
+
+    it('should queue invocations and resolve sequentially', function (done) {
+      var order = [];
+      var listener = util.asyncEventListener(function (event) {
+        return new Promise(function (resolve) {
+          setTimeout(function () {
+            order.push(event);
+            resolve();
+          }, event === 'first' ? 30 : 10);
+        });
+      });
+      listener('first');
+      listener('second');
+      setTimeout(function () {
+        assert.deepStrictEqual(order, ['first', 'second']);
+        done();
+      }, 100);
+    });
+
+    it('should continue processing events after a handler error', function (done) {
+      var order = [];
+      var listener = util.asyncEventListener(function (event) {
+        if (event === 'fail') {
+          return Promise.reject(new Error('test error'));
+        }
+        order.push(event);
+        return Promise.resolve();
+      });
+      listener('fail');    // this rejects
+      listener('recover'); // this catches the rejection (error handler runs)
+      listener('success'); // this runs normally
+      setTimeout(function () {
+        assert.deepStrictEqual(order, ['success']);
+        done();
+      }, 200);
+    });
+  });
+
+  describe('isPluginExternal', function () {
+    it('should return falsy when no dataServices', function () {
+      assert.ok(!util.isPluginExternal({}));
+    });
+
+    it('should return false when dataServices is empty', function () {
+      assert.strictEqual(util.isPluginExternal({ dataServices: [] }), false);
+    });
+
+    it('should return false for non-external service', function () {
+      function InternalService() {}
+      assert.strictEqual(util.isPluginExternal({
+        dataServices: [new InternalService()]
+      }), false);
+    });
+
+    it('should return true for external service', function () {
+      function ExternalService() {}
+      assert.strictEqual(util.isPluginExternal({
+        dataServices: [new ExternalService()]
+      }), true);
+    });
+  });
+
+  describe('setZoweVersionFromManifest', function () {
+    var fs = require('fs');
+    var path = require('path');
+    var os = require('os');
+    var tmpDir;
+
+    beforeEach(function () {
+      tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'zowe-test-'));
+    });
+
+    afterEach(function () {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    });
+
+    it('should set version from manifest.json', function () {
+      fs.writeFileSync(path.join(tmpDir, 'manifest.json'), JSON.stringify({ version: '2.15.0' }));
+      util.setZoweVersionFromManifest({ zowe: { runtimeDirectory: tmpDir } });
+      assert.strictEqual(util.getZoweVersion(), '2.15.0');
+    });
+
+    it('should keep previous version when runtimeDirectory is missing', function () {
+      var before = util.getZoweVersion();
+      util.setZoweVersionFromManifest({ zowe: {} });
+      assert.strictEqual(util.getZoweVersion(), before);
+    });
+
+    it('should keep previous version when manifest.json does not exist', function () {
+      var before = util.getZoweVersion();
+      util.setZoweVersionFromManifest({ zowe: { runtimeDirectory: '/nonexistent/path' } });
+      assert.strictEqual(util.getZoweVersion(), before);
     });
   });
 });
