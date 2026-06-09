@@ -17,7 +17,25 @@ describe('pluginStorage', function () {
   });
 
   it('should export expected interface', function () {
-    const exportType = typeof pluginStorage;
-    assert.ok(exportType === 'object' || exportType === 'function', 'should export object or function');
+    assert.strictEqual(typeof pluginStorage.PluginStorageFactory, 'function');
+  });
+
+  describe('PluginStorageFactory', function () {
+    it('should be a constructor', function () {
+      assert.strictEqual(typeof pluginStorage.PluginStorageFactory, 'function');
+    });
+
+    it('should create an instance with zoweConfig', function () {
+      var factory = new pluginStorage.PluginStorageFactory({
+        zowe: {},
+        components: {
+          'app-server': {
+            node: { productCode: 'ZLUX' },
+            productDir: '/opt/zowe'
+          }
+        }
+      });
+      assert.ok(factory);
+    });
   });
 });
