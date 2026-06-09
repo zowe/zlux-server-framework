@@ -193,7 +193,7 @@
 
   "ZWED0003W":"User=%s (%s): Session %s failed. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
-  "ZWED0005W":"",
+  "ZWED0005W":"Could not resolve agent request options for %s, skipping proxy setup",
   "ZWED0006W":"RBAC is disabled in the configuration. All authenticated users will have access to all services. Enable RBAC in the configuration to control users' access to individual services.",
   "ZWED0007W":"Dataservice authentication definition is not present in server configuration file, or malformed.\nCorrect the configuration file before restarting the server.",
   "ZWED0008W":"Error loading auth plugin %s: ",
