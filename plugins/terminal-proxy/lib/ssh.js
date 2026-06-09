@@ -11,11 +11,6 @@
 */
 
 const crypto = require("crypto");
-const nodeMajorIndex = process.versions.node.indexOf('.');
-const nodeVersion = Number(process.versions.node.substr(0,nodeMajorIndex));
-if (nodeVersion >= 12) {
-  var swcrypto = require("diffie-hellman/browser");
-}
 
 var clientVersion = 'SSH-2.0-UNP_1.1';
 var traceCrypto = false;
@@ -784,10 +779,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           sessionData.prime =  sshv2PDU.readSizedData();
           sessionData.generator = sshv2PDU.readSizedData();     
           sshLogger.debug('sessionData.generator');
-          var dh = nodeVersion >= 12
-              ? swcrypto.createDiffieHellman(sessionData.prime,sessionData.generator)
-              : crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
-               sshLogger.debug('made dh');
+          var dh = crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
+          sshLogger.debug('made dh');
           sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY;
           var msgCodeBuffer = Buffer.alloc(1);
           msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_INIT);
