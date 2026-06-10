@@ -34,11 +34,11 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc --watch",
-    "test:storage": "mocha --timeout 10000 ./test/storage/*.js"
+    "test:storage": "mocha --timeout 10000 ./test/storage/*.js",
+    "test:eureka": "mocha --timeout 30000 ./test/eureka/*.js"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "12.1.0",
-    "@rocketsoftware/eureka-js-client": "^4.5.9",
     "@rocketsoftware/express-ws": "^5.0.1",
     "accept-language-parser": "~1.5.0",
     "bluebird": "3.7.2",
@@ -75,16 +75,13 @@
     "keyring_js": "~1.1.0"
   },
   "overrides": {
-    "@rocketsoftware/eureka-js-client": {
-      "@cypress/request": "^3.0.9"
-    },
     "chai-http": {
       "superagent": {
         "form-data": "4.0.4"
       }
     },
     "express": {
-        "path-to-regexp": "0.1.13"
+      "path-to-regexp": "0.1.13"
     },
     "qs": "6.14.2"
   }

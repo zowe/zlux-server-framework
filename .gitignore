@@ -64,6 +64,7 @@ Thumbs.db
 .vscode
 
 # TS Output files
+lib/eureka-client.js
 utils/yamlConfig.js
 
 
