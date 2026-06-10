@@ -34,8 +34,13 @@
   "scripts": {
     "build": "tsc",
     "start": "tsc --watch",
-    "test:storage": "mocha --timeout 10000 ./test/storage/*.js",
-    "test:translation": "mocha ./test/translation/*.js"
+    "test": "mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
+    "test:all": "mocha --recursive --timeout 10000 --exit \"test/**/*.js\"",
+    "test:unit": "mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
+    "test:storage": "mocha --timeout 10000 --exit ./test/storage/*.js",
+    "test:translation": "mocha ./test/translation/*.js",
+    "test:coverage": "c8 mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
+    "test:coverage:report": "c8 report --reporter=html"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "12.1.0",
@@ -63,7 +68,10 @@
     "@types/node": "16.18.98",
     "@types/qs": "6.9.3",
     "chai": "4.2.0",
+    "chai-http": "4.2.1",
+    "c8": "10.1.3",
     "mocha": "11.2.2",
+    "sinon": "21.0.3",
     "typescript": "5.0.4"
   },
   "optionalDependencies": {

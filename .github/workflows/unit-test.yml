@@ -1,0 +1,80 @@
+name: Run Unit Tests
+
+on:
+  pull_request:
+    branches: ['**']
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [18, 20]
+
+    steps:
+      - name: Checkout zlux-server-framework (PR branch)
+        uses: actions/checkout@v4
+        with:
+          path: zlux-server-framework
+
+      - name: Determine target branch
+        id: branch
+        run: echo "name=${{ github.event.pull_request.base.ref }}" >> "$GITHUB_OUTPUT"
+
+      - name: Checkout zlux-shared
+        uses: actions/checkout@v4
+        with:
+          repository: zowe/zlux-shared
+          ref: ${{ steps.branch.outputs.name }}
+          path: zlux-shared
+
+      - name: Checkout zlux-platform
+        uses: actions/checkout@v4
+        with:
+          repository: zowe/zlux-platform
+          ref: ${{ steps.branch.outputs.name }}
+          path: zlux-platform
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+
+      - name: Rearrange directories as siblings
+        run: |
+          WORK_ROOT=${{ github.workspace }}/..
+          mv ${{ github.workspace }}/zlux-shared $WORK_ROOT/zlux-shared
+          mv ${{ github.workspace }}/zlux-platform $WORK_ROOT/zlux-platform
+          cp -r ${{ github.workspace }}/zlux-server-framework/* ${{ github.workspace }}/
+          cp -r ${{ github.workspace }}/zlux-server-framework/.[!.]* ${{ github.workspace }}/ 2>/dev/null || true
+          rm -rf ${{ github.workspace }}/zlux-server-framework
+
+      - name: Install zlux-server-framework dependencies
+        run: |
+          cd ${{ github.workspace }}
+          npm install
+
+      - name: Build zlux-shared logger
+        run: |
+          cd ${{ github.workspace }}/../zlux-shared/src/logging
+          npm install typescript
+          npx tsc logger.ts ../../../zlux-platform/interface/src/index.d.ts --module commonjs --target es6 --lib es6 --skipLibCheck --outDir .
+
+      - name: Build zlux-server-framework
+        run: |
+          cd ${{ github.workspace }}
+          npm run build
+
+      - name: Run tests with coverage
+        run: |
+          cd ${{ github.workspace }}
+          npm run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report-node-${{ matrix.node-version }}
+          path: ${{ github.workspace }}/coverage/
+          retention-days: 30
