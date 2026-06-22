@@ -10,27 +10,23 @@
 
 import * as https from 'https';
 import * as http from 'http';
-import axios from 'axios';
-import { AxiosInstance } from 'axios';
 
-let apimlClient: AxiosInstance;
+let apimlAgent: https.Agent;
+let apimlHost: string;
+let apimlPort: number;
 
 export function configure(settings: ApimlStorageSettings) {
+  apimlHost = settings.host;
+  apimlPort = settings.port;
   if (settings.isHttps) {
-    apimlClient = axios.create({
-      baseURL: `https://${settings.host}:${settings.port}`,
-      httpsAgent: new https.Agent(settings.tlsOptions)
-    });
+    apimlAgent = new https.Agent(Object.assign({}, settings.tlsOptions, { keepAlive: true }));
   } else {
-    apimlClient = axios.create({
-      baseURL: `https://${settings.host}:${settings.port}`,
-      httpAgent: new http.Agent()
-    });
+    apimlAgent = new https.Agent({ keepAlive: true });
   }
 }
 
 export function isConfigured(): boolean {
-  return apimlClient != null;
+  return apimlAgent != null;
 }
 
 export interface ApimlStorageSettings {
@@ -158,42 +154,68 @@ function apimlResponseGetMessageKey(response: ApimlResponse): string | undefined
   return undefined;
 }
 
+function collectResponseBody(res: http.IncomingMessage): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    res.on('data', (chunk: Buffer) => chunks.push(chunk));
+    res.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    res.on('error', reject);
+  });
+}
+
 async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
-  if (!apimlClient) {
+  if (!apimlAgent) {
     throw new ApimlStorageError('APIML_STORAGE_NOT_CONFIGURED');
   }
-  try {
-    const response = await apimlClient.request({
-      method: req.method,
-      url: req.path,
-      data: req.body,
-      headers: req.headers,
-    });
-    const apimlResponse: ApimlResponse = {
-      headers: response.headers as http.IncomingHttpHeaders,
-      statusCode: response.status,
-      json: response.data
-    };
-    return apimlResponse;
-  } catch (e) {
-    if (e.response) {
-      const response = e.response;
-      const apimlResponse: ApimlResponse = {
-        headers: response.headers,
-        statusCode: response.status,
-        json: response.data
-      };
-      const err = checkHttpResponse(apimlResponse);
-      if (err) {
-        throw err;
-      }
-      return apimlResponse;
-    } else if (e.request) {
-      throw new ApimlStorageError('APIML_STORAGE_CONNECTION_ERROR', e);
-    } else {
-      throw new ApimlStorageError('APIML_STORAGE_UNKNOWN_ERROR', e);
-    }
+  let bodyBuf: Buffer | undefined;
+  const headers: { [key: string]: string } = Object.assign({}, req.headers);
+  if (req.body != null) {
+    const bodyStr = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
+    bodyBuf = Buffer.from(bodyStr);
+    headers['Content-Type'] = 'application/json';
+    headers['Content-Length'] = bodyBuf.length.toString();
   }
+
+  return new Promise<ApimlResponse>((resolve, reject) => {
+    const httpReq = https.request({
+      hostname: apimlHost,
+      port: apimlPort,
+      path: req.path,
+      method: req.method,
+      headers: headers,
+      agent: apimlAgent
+    }, async (res) => {
+      try {
+        const rawBody = await collectResponseBody(res);
+        let json: any;
+        try {
+          json = JSON.parse(rawBody);
+        } catch (_e) {
+          json = undefined;
+        }
+        const apimlResponse: ApimlResponse = {
+          headers: res.headers,
+          statusCode: res.statusCode!,
+          json: json
+        };
+        const err = checkHttpResponse(apimlResponse);
+        if (err) {
+          reject(err);
+        } else {
+          resolve(apimlResponse);
+        }
+      } catch (e) {
+        reject(new ApimlStorageError('APIML_STORAGE_UNKNOWN_ERROR', e as Error));
+      }
+    });
+    httpReq.on('error', (e) => {
+      reject(new ApimlStorageError('APIML_STORAGE_UNKNOWN_ERROR', e));
+    });
+    if (bodyBuf != null) {
+      httpReq.write(bodyBuf);
+    }
+    httpReq.end();
+  });
 }
 
 function isCachingServiceEndpointNotFound(response: ApimlResponse): boolean {

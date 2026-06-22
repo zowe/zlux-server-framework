@@ -197,7 +197,6 @@ class ZssHandler {
         if (typeof response.headers['set-cookie'] === 'object') {
           for (const cookie of response.headers['set-cookie']) {
             const content = cookie.split(';')[0];
-            console.log('cookie=',cookie);
             let index = content.indexOf(this.zssCookieName);
             if (index >= 0) {
               serverCookie = content;
