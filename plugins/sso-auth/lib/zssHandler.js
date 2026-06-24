@@ -276,7 +276,7 @@ class ZssHandler {
   
   _makeProfileName(reqUrl, method) {
     //console.log("request.originalUrl", request.originalUrl)
-    const path = url.parse(reqUrl).pathname;
+    const path = new URL(reqUrl).pathname;
     //console.log("originalPath", originalPath)
     const resourceName = makeProfileNameForRequest(path, method, this.instanceID);
     //console.log("resourceName", resourceName)
