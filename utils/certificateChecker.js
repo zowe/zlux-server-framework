@@ -27,6 +27,7 @@ try {
   logger.warn('Could not load zcrypto library, SAF keyrings will be unavailable');
 }
 const forge = require('node-forge');
+const { readFileAsBinaryString } = require('../lib/util');
 
 const argParser = require('./argumentParser');
 
@@ -94,7 +95,7 @@ if (userInput.type == 'JCERACFKS') {
   cert = forge.pki.certificateFromPem(pem);
 } else if (userInput.type == 'PKCS12') {
   logger.debug('Checking PKCS12 for alias '+userInput.alias);
-  const p12Content = fs.readFileSync(userInput.certificate, 'binary');
+  const p12Content = readFileAsBinaryString(userInput.certificate);
   const p12Asn1 = forge.asn1.fromDer(p12Content);
   const p12 = forge.pkcs12.pkcs12FromAsn1(p12Asn1, false, process.env.ZWE_zowe_certificate_keystore_password);
   for (let i = 0; i < p12.safeContents.length; i++) {
