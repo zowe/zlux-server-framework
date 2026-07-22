@@ -153,7 +153,7 @@ const binToB64 =[0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4
                  0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D,0x6E,0x6F,0x70,0x71,0x72,0x73,0x74,0x75,0x76,
                  0x77,0x78,0x79,0x7A,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x2B,0x2F];
 
-function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, handlers) {
+function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, handlers, allowList) {
   websocket.on('error', (error) => {
     this.logger.warn("ZWED0129W", error); //this.logger.warn("websocket error", error);
     this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'websocket error occurred');
@@ -161,6 +161,7 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
   websocket.on('close',(code,reason)=>{this.handleWebsocketClosed(code,reason);});
 
   this.handlers = handlers;
+  this.allowList = allowList || null;
   this.host;
   this.hostPort;
   this.hostSocket;
@@ -404,6 +405,7 @@ TerminalWebsocketProxy.prototype.wsSend = function(websocket,string) {
 
 const WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR = 4999;
 const WEBSOCKET_REASON_TERMPROXY_GOING_AWAY = 4000;
+const WEBSOCKET_REASON_TERMPROXY_FORBIDDEN = 4003;
 
 TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
   var t = this;
@@ -537,6 +539,11 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
 
   
   if (host && port) {
+    if (t.allowList && t.allowList.length > 0 && !t.allowList.includes(host)) {
+      t.logger.warn('ZWED0144W', host, t.identifierString()); //t.logger.warn('Host '+host+' rejected, not in allowList. '+t.identifierString());
+      t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden: host not in allowList');
+      return;
+    }
     this.host = host;
     this.port = port;
     
@@ -744,6 +751,9 @@ exports.tn3270WebsocketRouter = function(context) {
     handlers can come from /lib for now.
   */
   let handlers = scanAndImportHandlers(context.logger, context.plugin.server.config.all);
+  const allowList = (context.plugin.server.config.all && context.plugin.server.config.all.components
+    && context.plugin.server.config.all.components['tn3270-ng2'])
+    ? context.plugin.server.config.all.components['tn3270-ng2'].allowList || null : null;
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
@@ -763,7 +773,7 @@ exports.tn3270WebsocketRouter = function(context) {
       next();
     });
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(tn3270MessageConfig,req.ip,context,ws,handlers);
+      new TerminalWebsocketProxy(tn3270MessageConfig,req.ip,context,ws,handlers,allowList);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);
@@ -795,6 +805,9 @@ exports.tn5250WebsocketRouter = function(context) {
 };
 exports.vtWebsocketRouter = function(context) {
   let handlers = scanAndImportHandlers(context.logger);
+  const allowList = (context.plugin.server.config.all && context.plugin.server.config.all.components
+    && context.plugin.server.config.all.components['vt-ng2'])
+    ? context.plugin.server.config.all.components['vt-ng2'].allowList || null : null;
   ssh.setLogger(context.logger);
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
@@ -812,7 +825,7 @@ exports.vtWebsocketRouter = function(context) {
       next();
     });
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(vtMessageConfig,req.ip,context,ws,handlers);
+      new TerminalWebsocketProxy(vtMessageConfig,req.ip,context,ws,handlers,allowList);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);

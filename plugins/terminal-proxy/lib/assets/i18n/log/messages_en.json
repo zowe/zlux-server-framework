@@ -53,5 +53,6 @@
   "ZWED0142W":"Error: Host not found",
   "ZWED0143W":"Host communication error=%s",
   "ZWED0144W":"Error when reading file=%s. Error=%s",
-  "ZWED0145W":"Could not load a handler from file %s"
+  "ZWED0145W":"Could not load a handler from file %s",
+  "ZWED0181W":"Host %s rejected, not in allowList. %s"
 }
