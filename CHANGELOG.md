@@ -4,7 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
-- Moved `trivial-auth` and `internal-auth` authentication plugins to `devPlugins/` directory. These plugins are development/troubleshooting tools that should not ship in production distributions.
+- Moved `trivial-auth` and `internal-auth` authentication plugins to `devPlugins/` directory. These plugins are development/troubleshooting tools that should not ship in production distributions. [(#700)](https://github.com/zowe/zlux-server-framework/pull/700) 
 
 ## 3.5.0
 - Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#669)](https://github.com/zowe/zlux-server-framework/pull/669) 
