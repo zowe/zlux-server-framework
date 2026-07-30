@@ -190,6 +190,7 @@
   "ZWED0303I": "Plugin %s will not be loaded because no dataservices requested it",
   "ZWED0304I": "Using client certificate: %s",
   "ZWED0305I": "Using separate certificates for server TLS and client TLS connections",
+  "ZWED0306I": "Referrer fall-through: re-dispatching to service %s for url=%s",
 
   "ZWED0003W":"User=%s (%s): Session %s failed. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
