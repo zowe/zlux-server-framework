@@ -2557,7 +2557,12 @@ function ConfigService(context) {
       respondWithJsonError(response,"ZWED0089E - Requested user scope without providing username",HTTP_STATUS_BAD_REQUEST);
       return;
     }
-    if (!rbacEnabled
+    /* GET and HEAD are served by the route above and should never arrive here, but the check is
+       stated rather than inferred from route order so that reads keep working if these routes are
+       ever reordered. Note this is a list of the read methods, not of the write methods: anything
+       dispatchByMethod might gain later counts as a write until it is named here. */
+    const isReadMethod = (request.method === 'GET') || (request.method === 'HEAD');
+    if (!isReadMethod && !rbacEnabled
         && (request.scope == CONFIG_SCOPE_SITE || request.scope == CONFIG_SCOPE_INSTANCE)) {
       logger.warn(`ZWED0129W`, request.username, request.method, request.resourceURL); //logger.warn(`Denied write to a shared configuration scope because RBAC is disabled. `
                   //+`User=${request.username}, Method=${request.method}, Resource=${request.resourceURL}`);
