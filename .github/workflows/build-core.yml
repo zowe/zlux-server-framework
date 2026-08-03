@@ -9,7 +9,6 @@ on:
 
 permissions:
   statuses: write
-  contents: read
   contents: write
 
 jobs:
