@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
+- Enhancement: Terminal proxy now supports per-component `allowList` configuration under `components.tn3270-ng2.allowList` and `components.vt-ng2.allowList` in `zowe.yaml`. When defined, only connections to listed hostnames are permitted; connections to unlisted hosts are rejected with websocket close code 4003 (Forbidden). [(#702)](https://github.com/zowe/zlux-server-framework/pull/702) 
 - Moved `trivial-auth` and `internal-auth` authentication plugins to `devPlugins/` directory. These plugins are development/troubleshooting tools that should not ship in production distributions. [(#700)](https://github.com/zowe/zlux-server-framework/pull/700) 
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#705)](https://github.com/zowe/zlux-server-framework/pull/705) 
 
