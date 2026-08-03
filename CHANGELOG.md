@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.18.6
+- Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#706)](https://github.com/zowe/zlux-server-framework/pull/706)
+
 ## 2.18.5
 - Bugfix: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
 - Bugfix: The app server no longer prints codes ZWED0036I, 54I, 55I, 62I-68I. These are now only shown in bootstrap or install debug logs, to clean up the job log. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
