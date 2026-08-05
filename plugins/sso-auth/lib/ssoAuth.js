@@ -305,7 +305,7 @@ SsoAuthenticator.prototype = {
       this.apimlHandler.addProxyAuthorizations(req1, req2Options, sessionState, this.usingSso);
     }
     if (this.usingZss && !this.usingSso) {
-      this.zssHandler.addProxyAuthorizations(req1, req2Options, sessionState);
+      this.zssHandler.addProxyAuthorizations(req1, req2Options);
     }
   },
 

@@ -13,7 +13,6 @@ const ipaddr = require('ipaddr.js');
 const url = require('url');
 const zluxUtil = require('../../../lib/util.js');
 const makeProfileNameForRequest = require('./safprofile').makeProfileNameForRequest;
-const DEFAULT_CLASS = "ZOWE";
 const ZSS_SESSION_TIMEOUT_HEADER = "session-expires-seconds";
 const DEFAULT_EXPIRATION_MS = 3600000 //hour;
 const HTTP_STATUS_PRECONDITION_REQUIRED = 428;
@@ -32,7 +31,6 @@ class ZssHandler {
       const result = { authenticated: false, authorized: false };
       options = options || {};
       try {
-        const { syncOnly } = options;
         let bypassUrls = [
           '/login',
           '/logout',
@@ -74,18 +72,8 @@ class ZssHandler {
           }
           return result;
         }
-        const resourceName = this._makeProfileName(request.originalUrl, 
+        const resourceName = this._makeProfileName(request.originalUrl,
                                                    request.method);
-        if (syncOnly) {
-          // can't do anything further: the user is authenticated but we can't 
-          // make an actual RBAC check
-          this.logger.info(`Can't make a call to the OS agent for access check. ` +
-                   `Allowing ${sessionState.username} access to ${resourceName} ` +
-                   'unconditinally');
-          result.authorized = true;
-          this.setCookieFromRequest(request, sessionState);
-          return result;
-        }
         this.logger.debug(`Sending isAuthorized request for ${sessionState.username}`);
         const httpResponse = yield this._callAgent(request.zluxData, 
                                                    sessionState.username,  resourceName);
@@ -188,7 +176,7 @@ class ZssHandler {
       this.logger.debug(`Sending login request for ${request.body && request.body.username ? request.body.username : sessionState.username}`);
       request.zluxData.webApp.callRootService("login", options).then((response) => {
         this.logger.debug(`Login rc=`,response.statusCode);
-        if (response.statusCode == HTTP_STATUS_PRECONDITION_REQUIRED) {
+        if (response.statusCode === HTTP_STATUS_PRECONDITION_REQUIRED) {
           sessionState.authenticated = false;
           this.cleanupSession(sessionState);
           resolve({ success: false, reason: 'Expired Password', cookies: this.deleteClientCookie()});
@@ -213,7 +201,7 @@ class ZssHandler {
           let expiresSec = response.headers[ZSS_SESSION_TIMEOUT_HEADER];
           let expiresMs = DEFAULT_EXPIRATION_MS;
           if (expiresSec) {
-            expiresMs = expiresSec == -1 ? expiresSec : Number(expiresSec)*1000;
+            expiresMs = expiresSec === -1 ? expiresSec : Number(expiresSec)*1000;
           }
           resolve({ success: true, username: sessionState.username, expms: expiresMs,
                     cookies: [{name:this.zssCookieName, value:cookieValue, options: {httpOnly: true, secure: true, sameSite: true, encode: String}}]});
@@ -239,7 +227,7 @@ class ZssHandler {
     }
   }
 
-  addProxyAuthorizations(req1, req2Options, sessionState) {
+  addProxyAuthorizations(req1, req2Options) {
     if (req1.cookies && req1.cookies[this.zssCookieName]) {
       req2Options.headers['cookie'] = req1.headers['cookie'];
     }
@@ -266,7 +254,7 @@ class ZssHandler {
   
   _allowIfLoopback(request, result) {
     const requestIP = ipaddr.process(request.ip);
-    if (requestIP.range() == "loopback") {
+    if (requestIP.range() === "loopback") {
       result.authorized = true;
     } else {
       this.logger.warn(`Access to /saf-auth blocked, caller:  ${request.ip}`)
@@ -278,14 +266,13 @@ class ZssHandler {
     //console.log("request.originalUrl", request.originalUrl)
     const path = url.parse(reqUrl).pathname;
     //console.log("originalPath", originalPath)
-    const resourceName = makeProfileNameForRequest(path, method, this.instanceID);
     //console.log("resourceName", resourceName)
-    return resourceName;
+    return makeProfileNameForRequest(path, method, this.instanceID);
   }
   
   _callAgent(zluxData, userName, resourceName) {
     //console.log("resourceName", resourceName)
-    userName = encodeURIComponent(userName);
+    encodeURIComponent(userName);
     resourceName = encodeURI(resourceName);
     resourceName = resourceName.replace(/%/g,':');
     const path = `${resourceName}/READ`;
