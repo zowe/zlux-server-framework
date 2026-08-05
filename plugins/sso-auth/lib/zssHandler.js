@@ -269,7 +269,7 @@ class ZssHandler {
     return makeProfileNameForRequest(path, method, this.instanceID);
   }
   
-  _callAgent(zluxData, userName, resourceName) {
+  _callAgent(zluxData, resourceName) {
     //console.log("resourceName", resourceName)
     resourceName = encodeURI(resourceName);
     resourceName = resourceName.replace(/%/g,':');
