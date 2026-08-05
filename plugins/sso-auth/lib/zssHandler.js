@@ -75,8 +75,7 @@ class ZssHandler {
         const resourceName = this._makeProfileName(request.originalUrl,
                                                    request.method);
         this.logger.debug(`Sending isAuthorized request for ${sessionState.username}`);
-        const httpResponse = yield this._callAgent(request.zluxData, 
-                                                   sessionState.username,  resourceName);
+        const httpResponse = yield this._callAgent(request.zluxData, resourceName);
         this._processAgentResponse(httpResponse, result, sessionState.username);
         return result;
       } catch (e) {
@@ -272,7 +271,6 @@ class ZssHandler {
   
   _callAgent(zluxData, userName, resourceName) {
     //console.log("resourceName", resourceName)
-    encodeURIComponent(userName);
     resourceName = encodeURI(resourceName);
     resourceName = resourceName.replace(/%/g,':');
     const path = `${resourceName}/READ`;
