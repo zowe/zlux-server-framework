@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
+- Security: Fixed a WebSocket authorization bypass in the ZSS auth handler. When RBAC was enabled, WebSocket dataservice requests skipped the SAF authorization check and were granted to any authenticated user regardless of their SAF profile permissions. The SAF check is now enforced for WebSocket requests.
 - Enhancement: The `/server/environment` response now includes `agent.host`, exposing the effective ZSS/agent hostname (the same value previously returned by the `/server/proxies` endpoint, including the APIML gateway hostname override when agent mediation layer is enabled). This allows plugins to retrieve the agent host through the authenticated `ZoweZLUX.environment.getAgentHost()` API.
 - Bugfix: Removed the unauthenticated `/server/proxies` endpoint. Its only consumers (the TN3270 and VT terminal apps) have been updated to use `ZoweZLUX.environment.getAgentHost()` instead.
 - Moved `trivial-auth` and `internal-auth` authentication plugins to `devPlugins/` directory. These plugins are development/troubleshooting tools that should not ship in production distributions. [(#700)](https://github.com/zowe/zlux-server-framework/pull/700) 
