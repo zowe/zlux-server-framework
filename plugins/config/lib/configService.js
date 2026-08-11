@@ -36,6 +36,7 @@ const AGGREGATION_POLICY_MERGE = 2;
 const HTTP_STATUS_BAD_REQUEST = 400;
 const HTTP_STATUS_NO_CONTENT = 204;
 const HTTP_STATUS_NOT_FOUND = 404;
+const HTTP_STATUS_FORBIDDEN = 403;
 const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
 const HTTP_STATUS_METHOD_NOT_FOUND = 405;
 const HTTP_STATUS_NOT_IMPLEMENTED = 501;
@@ -2404,6 +2405,9 @@ function ConfigService(context) {
   accessLogger = context.makeSublogger('access');
   this.pluginDefs = context.plugin.server.state.pluginMap;
   const nonuserDirectories = makeConfigurationDirectoriesStruct(this.directoryConfig,this.productConfig.productCode,null);
+  const rbacEnabled = !!(this.directoryConfig
+    && this.directoryConfig.dataserviceAuthentication
+    && this.directoryConfig.dataserviceAuthentication.rbac);
 
   //req.session should contain authData???
   //const authPluginSession = getAuthPluginSession(req, authPluginID);
@@ -2548,6 +2552,10 @@ function ConfigService(context) {
     if (request.scope == CONFIG_SCOPE_USER && !request.username) {
       respondWithJsonError(response,"ZWED0089E - Requested user scope without providing username",HTTP_STATUS_BAD_REQUEST);
       return;
+    }
+    if (!rbacEnabled && (request.scope == CONFIG_SCOPE_SITE || request.scope == CONFIG_SCOPE_INSTANCE)) {
+      respondWithJsonError(response,"ZWED0145E - Modifying instance or site scope configuration requires RBAC to be enabled",HTTP_STATUS_FORBIDDEN,request.resourceURL);
+      return;s
     }
 
     let parts = getResourcePartsOrFail(request,response);
