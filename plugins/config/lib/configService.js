@@ -2564,10 +2564,10 @@ function ConfigService(context) {
     const isReadMethod = (request.method === 'GET') || (request.method === 'HEAD');
     if (!isReadMethod && !rbacEnabled
         && (request.scope == CONFIG_SCOPE_SITE || request.scope == CONFIG_SCOPE_INSTANCE)) {
-      logger.warn(`ZWED0129W`, request.username, request.method, request.resourceURL); //logger.warn(`Denied write to a shared configuration scope because RBAC is disabled. `
+      logger.warn(`ZWED0181W`, request.username, request.method, request.resourceURL); //logger.warn(`Denied write to a shared configuration scope because RBAC is disabled. `
                   //+`User=${request.username}, Method=${request.method}, Resource=${request.resourceURL}`);
       respondWithJsonError(response,
-                           "ZWED0145E - Modifying site or instance scope requires "
+                           "ZWED0160E - Modifying site or instance scope requires "
                            + "components.app-server.dataserviceAuthentication.rbac to be enabled",
                            HTTP_STATUS_FORBIDDEN,request.resourceURL);
       return;
