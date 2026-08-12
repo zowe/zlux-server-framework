@@ -4,8 +4,8 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
-- Enhancement: The `/server/environment` response now includes `agent.host`, exposing the effective ZSS/agent hostname (the same value previously returned by the `/server/proxies` endpoint, including the APIML gateway hostname override when agent mediation layer is enabled). This allows plugins to retrieve the agent host through the authenticated `ZoweZLUX.environment.getAgentHost()` API. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
-- Bugfix: Removed the unauthenticated `/server/proxies` endpoint. Its only consumers (the TN3270 and VT terminal apps) have been updated to use `ZoweZLUX.environment.getAgentHost()` instead. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
+- Enhancement: The `/server/environment` response now includes `agent.host`. This allows plugins to retrieve the agent hostname through the authenticated `ZoweZLUX.environment.getAgentHost()` API. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
+- Bugfix: Removed the unauthenticated `/server/proxies` endpoint, which has been replaced with the `/server/environment` values. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
 - Moved `trivial-auth` and `internal-auth` authentication plugins to `devPlugins/` directory. These plugins are development/troubleshooting tools that should not ship in production distributions. [(#700)](https://github.com/zowe/zlux-server-framework/pull/700) 
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#705)](https://github.com/zowe/zlux-server-framework/pull/705) 
 
