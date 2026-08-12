@@ -2555,7 +2555,7 @@ function ConfigService(context) {
     }
     if (!rbacEnabled && (request.scope == CONFIG_SCOPE_SITE || request.scope == CONFIG_SCOPE_INSTANCE)) {
       respondWithJsonError(response,"ZWED0145E - Modifying instance or site scope configuration requires RBAC to be enabled",HTTP_STATUS_FORBIDDEN,request.resourceURL);
-      return;s
+      return;
     }
 
     let parts = getResourcePartsOrFail(request,response);
