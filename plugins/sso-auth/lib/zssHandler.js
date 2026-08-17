@@ -264,11 +264,11 @@ class ZssHandler {
   }
   
   _makeProfileName(reqUrl, method) {
-    //console.log("request.originalUrl", request.originalUrl)
-    const path = url.parse(reqUrl).pathname;
-    //console.log("originalPath", originalPath)
+    let path = url.parse(reqUrl).pathname;
+    if (path.endsWith('/.websocket')) {
+      path = path.slice(0, -'/.websocket'.length);
+    }
     const resourceName = makeProfileNameForRequest(path, method, this.instanceID);
-    //console.log("resourceName", resourceName)
     return resourceName;
   }
   

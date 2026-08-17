@@ -147,4 +147,37 @@ describe('zssHandler', function () {
     assert.strictEqual(result.authenticated, false);
     assert.strictEqual(result.authorized, false);
   });
+
+  // A real express-ws upgrade arrives as '<service>/_current/.websocket'. The
+  // SAF resource must be the service's normal GET resource, not a malformed
+  // '<service>.GET..WEBSOCKET' that no admin profile would match.
+  const UPGRADE_URL =
+    '/ZLUX/plugins/org.zowe.terminal.proxy/services/tn3270data/_current/.websocket';
+  const REST_GET_URL =
+    '/ZLUX/plugins/org.zowe.terminal.proxy/services/tn3270data/_current/';
+
+  function resourceQueriedFor(originalUrl) {
+    const handler = makeHandler();
+    const saf = sinon.stub().resolves({
+      statusCode: 200,
+      body: JSON.stringify({ authorized: true })
+    });
+    const request = makeRequest(saf, originalUrl);
+    return handler.authorized(request, { authenticated: true, username: 'TESTUSER' }, {
+      syncOnly: originalUrl.endsWith('.websocket'),
+      bypassAuthorizatonCheck: false
+    }).then(() => saf.firstCall.args[1]);
+  }
+
+  it('maps a WebSocket upgrade to the service GET resource (strips .websocket)', async function () {
+    const resource = await resourceQueriedFor(UPGRADE_URL);
+    assert.strictEqual(resource,
+      'ZLUX.TESTINSTANCE.SVC.ORG_ZOWE_TERMINAL_PROXY.TN3270DATA.GET/READ');
+  });
+
+  it('authorizes a WebSocket upgrade against the same resource as the REST GET', async function () {
+    const wsResource = await resourceQueriedFor(UPGRADE_URL);
+    const restResource = await resourceQueriedFor(REST_GET_URL);
+    assert.strictEqual(wsResource, restResource);
+  });
 });
