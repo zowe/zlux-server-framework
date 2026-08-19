@@ -4,6 +4,8 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
+
+- Enhancement: Verify RBAC is enabled for instance and site scope plugin configuration updating. [(#704)](https://github.com/zowe/zlux-server-framework/pull/704)
 - Enhancement: The `/server/environment` response now includes `agent.host`. This allows plugins to retrieve the agent hostname through the authenticated `ZoweZLUX.environment.getAgentHost()` API. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
 - Bugfix: Removed the unauthenticated `/server/proxies` endpoint, which has been replaced with the `/server/environment` values. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
 - Moved `trivial-auth` and `internal-auth` authentication plugins to `devPlugins/` directory. These plugins are development/troubleshooting tools that should not ship in production distributions. [(#700)](https://github.com/zowe/zlux-server-framework/pull/700) 
