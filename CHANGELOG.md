@@ -5,7 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 3.6.0
 
-- Security: RBAC is now enforced for WebSocket dataservices. Previously, when RBAC was enabled, WebSocket handshakes short-circuited the authorization check and allowed any authenticated user to reach every WebSocket-based dataservice (e.g. terminal-proxy, ws proxies, plugin ws routers) regardless of SAF profile permissions. The ZSS auth handler now performs the same SAF/RBAC check for WebSocket requests as it does for REST requests, and the WebSocket is closed if the user is not authorized.
+- Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#710)](https://github.com/zowe/zlux-server-framework/pull/710)
 - Enhancement: Verify RBAC is enabled for instance and site scope plugin configuration updating. [(#704)](https://github.com/zowe/zlux-server-framework/pull/704)
 - Enhancement: The `/server/environment` response now includes `agent.host`. This allows plugins to retrieve the agent hostname through the authenticated `ZoweZLUX.environment.getAgentHost()` API. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
 - Bugfix: Removed the unauthenticated `/server/proxies` endpoint, which has been replaced with the `/server/environment` values. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
