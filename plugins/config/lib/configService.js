@@ -37,7 +37,6 @@ const HTTP_STATUS_BAD_REQUEST = 400;
 const HTTP_STATUS_NO_CONTENT = 204;
 const HTTP_STATUS_FORBIDDEN = 403;
 const HTTP_STATUS_NOT_FOUND = 404;
-const HTTP_STATUS_FORBIDDEN = 403;
 const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
 const HTTP_STATUS_METHOD_NOT_FOUND = 405;
 const HTTP_STATUS_NOT_IMPLEMENTED = 501;
@@ -2406,9 +2405,6 @@ function ConfigService(context) {
   accessLogger = context.makeSublogger('access');
   this.pluginDefs = context.plugin.server.state.pluginMap;
   const nonuserDirectories = makeConfigurationDirectoriesStruct(this.directoryConfig,this.productConfig.productCode,null);
-  const rbacEnabled = !!(this.directoryConfig
-    && this.directoryConfig.dataserviceAuthentication
-    && this.directoryConfig.dataserviceAuthentication.rbac);
 
   /* Writes to the site and instance scopes affect every user of the server, so they are only
      permitted when RBAC is on to authorize them. Without RBAC the auth middleware passes
