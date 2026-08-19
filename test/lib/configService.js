@@ -95,7 +95,7 @@ describe('configService scope authorization', function () {
       .set('Content-Type', 'application/json')
       .send('{}');
     expect(res).to.have.status(403);
-    expect(JSON.stringify(res.body)).to.include('ZWED0145E');
+    expect(JSON.stringify(res.body)).to.include('ZWED0160E');
   });
 
   it('rejects DELETE to site scope with 403 when RBAC is disabled', async function () {
@@ -103,7 +103,7 @@ describe('configService scope authorization', function () {
     const res = await chai.request(app)
       .delete(`/${PLUGIN_ID}/site/settings?name=foo`);
     expect(res).to.have.status(403);
-    expect(JSON.stringify(res.body)).to.include('ZWED0145E');
+    expect(JSON.stringify(res.body)).to.include('ZWED0160E');
   });
 
   it('does not block user scope writes when RBAC is disabled', async function () {
@@ -113,7 +113,7 @@ describe('configService scope authorization', function () {
       .set('Content-Type', 'application/json')
       .send('{}');
     const combined = (res.text || '') + JSON.stringify(res.body || {});
-    expect(combined).to.not.include('ZWED0145E');
+    expect(combined).to.not.include('ZWED0160E');
   });
 
   it('does not block instance scope writes when RBAC is enabled', async function () {
@@ -123,6 +123,6 @@ describe('configService scope authorization', function () {
       .set('Content-Type', 'application/json')
       .send('{}');
     const combined = (res.text || '') + JSON.stringify(res.body || {});
-    expect(combined).to.not.include('ZWED0145E');
+    expect(combined).to.not.include('ZWED0160E');
   });
 });
