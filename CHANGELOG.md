@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 3.6.0
 
+- Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
 - Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#710)](https://github.com/zowe/zlux-server-framework/pull/710)
 - Enhancement: Verify RBAC is enabled for instance and site scope plugin configuration updating. [(#704)](https://github.com/zowe/zlux-server-framework/pull/704)
 - Enhancement: The `/server/environment` response now includes `agent.host`. This allows plugins to retrieve the agent hostname through the authenticated `ZoweZLUX.environment.getAgentHost()` API. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
