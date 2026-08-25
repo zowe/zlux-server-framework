@@ -330,7 +330,45 @@ paths:
               Member membername could not be deleted
             DYNALLOC failure:
               DYNALLOC failed with RC = rc, DYN RC = rc, RSN = rsn, dsn={dataset}, (site)
-      
+  '/datasetCopy/{dataset}':
+    post:
+      summary: Copy a dataset and paste as a new one
+      tags:
+        - Dataset
+      parameters:
+        - name: dataset
+          in: path
+          description: Source dataset name
+          required: true
+          type: string
+        - name: newDataset
+          in: query
+          description: Target dataset name
+          required: true
+          type: string
+      produces:
+        - application/json
+      responses:
+        '201':
+          description: Successfully Copied Dataset
+          schema:
+            type: string
+        '400':
+          description: Invalid dataset path
+          schema:
+            type: string
+          examples:
+            Invalid dataset path:
+              Source dataset does not exist
+        '500':
+          description: Internal Server Error
+          schema:
+            type: string
+          examples:
+            DD Allocation Error:
+              Unable to allocate a DD for ACB
+            Unalloc error:
+              "error: ds unalloc dsn={dataset} dd=ddname, rc=rc sysRC=rc, sysRSN=rsn"
   '/VSAMdatasetContents/{dataset}':
     get:
       summary: Get a VSAM dataset
