@@ -85,6 +85,7 @@
         }
       }
     },
-    "qs": "6.15.2"
+    "qs": "6.15.2",
+    "@apidevtools/json-schema-ref-parser": "15.3.6"
   }
 }
