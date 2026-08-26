@@ -6,7 +6,6 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 2.18.7
 - Security: Fix is to upgrade the json-schema-ref-parser to 15.3.6.
 
-
 ## 2.18.6
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#706)](https://github.com/zowe/zlux-server-framework/pull/706)
 
