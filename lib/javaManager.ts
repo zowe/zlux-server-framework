@@ -9,7 +9,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-import * as BBPromise from 'bluebird';
 import * as path from 'path';
 import { TomcatManager } from './tomcatManager';
 import { Path, JavaConfig, WarConfig, AppServer, HttpsConfig, TomcatConfig, TomcatShutdown, TomcatHttps, JavaServerManager, ServerRef, JavaGroup, JavaDefinition } from './javaTypes';

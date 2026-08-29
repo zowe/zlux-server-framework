@@ -9,7 +9,6 @@
 */
 
 const fs = require('fs');
-const Promise = require('bluebird');
 const ipaddr = require('ipaddr.js');
 const url = require('url');
 const zssHandlerFactory = require('./zssHandler');

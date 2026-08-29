@@ -8,7 +8,6 @@
   Copyright Contributors to the Zowe Project.
 */
 
-const Promise = require('bluebird');
 const https = require('https');
 const http = require('http');
 const fs = require('fs');

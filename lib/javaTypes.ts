@@ -10,7 +10,6 @@
 */
 
 
-import * as Promise from 'bluebird';
 export type Path = string;
 
 

@@ -11,7 +11,6 @@
 */
 
 'use strict';
-import * as BBPromise from 'bluebird';
 import * as constants from './unp-constants';
 import * as configService from '../plugins/config/lib/configService';
 import * as zluxUtil from './util';
@@ -45,6 +44,7 @@ class AuthManager{
 
   //The dataserviceAuthentication section of server configuration
   config: any = null;
+  configuration: any;
 
   handlers: Record<string, any> = {};
   defaultType: string = null;
@@ -103,7 +103,7 @@ class AuthManager{
   }
   
   
-  loadAuthenticators = BBPromise.coroutine(function*(config, tlsOptions, startupPlugins) {
+  async loadAuthenticators(config, tlsOptions, startupPlugins) {
     const componentConfig = config.components['app-server'];
     const requestedCategories = this.getRequestedAuthCategories(startupPlugins, componentConfig);
 
@@ -112,7 +112,7 @@ class AuthManager{
     const isHaMode = zluxUtil.isHaMode();
     while ((plugin = this.pendingPlugins.pop()) !== undefined) {
       try {
-        const authenticationHandler:any = yield plugin.authenticationModule(
+        const authenticationHandler:any = await plugin.authenticationModule(
                                               plugin,
                                               this.configuration,
                                               componentConfig,
@@ -178,7 +178,7 @@ class AuthManager{
         authLog.warn('ZWED0008W', plugin.identifier, e); //authLog.warn(`error loading auth plugin ${plugin.identifier}: ` + e);
       }
     }
-  })
+  }
   
   /*
     scans the authJSON to see what plugins were requested but not present. 
