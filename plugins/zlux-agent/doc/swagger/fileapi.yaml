@@ -503,11 +503,46 @@ paths:
           required: false
           default: base64
           type: string
+        - name: sourceEncoding
+          in: query
+          required: false
+          type: string
+          description: >
+            Source encoding of the file on the server. Accepts a charset name
+            (e.g. "IBM-1047", "UTF-8", "ISO-8859-1", or any IANA IBM codepage
+            name in "IBM-NNNN" format), a decimal CCSID integer string (e.g.
+            "1047"), the sentinel "binary" to stream raw bytes without
+            conversion, or "auto" (equivalent to omitting the parameter) to use
+            the file's tagged CCSID — falling back to the server's native
+            codepage for untagged files. If omitted, "auto" is assumed.
+        - name: targetEncoding
+          in: query
+          required: false
+          type: string
+          description: >
+            Target encoding to deliver to the client. Accepts the same values
+            as sourceEncoding. If "binary" or omitted/"auto", the server selects
+            an appropriate web encoding automatically (ISO-8859-1 for
+            single-byte source CCSIDs, UTF-8 for multi-byte source CCSIDs).
+            If either sourceEncoding or targetEncoding is "binary", raw bytes
+            are streamed without any conversion.
       responses:
         '200':
           description: successful operation
           schema:
             type: string
+        '400':
+          description: Bad Request — unrecognised or invalid encoding value
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+          examples:
+            Invalid Source Encoding:
+              {error: Unsupported or unrecognised sourceEncoding value.}
+            Invalid Target Encoding:
+              {error: Unsupported or unrecognised targetEncoding value.}
         '404':
           description: file could not be opened or does not exist
           schema:
@@ -545,14 +580,22 @@ paths:
           required: true
         - name: sourceEncoding
           in: query
-          description: the source encoding of the file (UTF-8 or ISO-8859-1 or IBM-1047)
           type: string
-          required: true
+          required: false
+          description: >
+            Source encoding of the uploaded content. Accepts a charset name
+            (e.g. "IBM-1047", "UTF-8", "ISO-8859-1", or any IANA IBM codepage
+            name in "IBM-NNNN" format) or a decimal CCSID integer string
+            (e.g. "1047"). Required unless the server can infer the encoding
+            from the file tag.
         - name: targetEncoding
           in: query
-          description: the target encoding of the file (UTF-8 or ISO-8859-1 or IBM-1047)
           type: string
-          required: true
+          required: false
+          description: >
+            Target encoding to write to the file on the server. Accepts the
+            same values as sourceEncoding. Required unless the server can infer
+            the encoding from the file tag.
         - name: lastChunk
           in: query
           description: whether or not this is the last chunk of the file
@@ -596,7 +639,7 @@ paths:
             Encoding Missing:
               {error: Source encoding or target encoding are missing.}
             Invalid Encoding:
-              {error: Unsupported encodings requested. Please review the swagger documentation.}
+              {error: Unsupported or unrecognised encoding value.}
             Invalid Session ID:
               {error: Session identifier is invalid.}
             Last Chunk Missing:
