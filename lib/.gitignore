@@ -54,6 +54,7 @@ proxy.conf.json
 Thumbs.db
 
 # TS Output files
+apiml.js
 auth-manager.js
 jarManager.js
 javaManager.js
