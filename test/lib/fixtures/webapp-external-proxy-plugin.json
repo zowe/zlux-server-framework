@@ -1,0 +1,16 @@
+{
+  "identifier": "org.zowe.proxyfallbacktest",
+  "apiVersion": "1.0.0",
+  "pluginVersion": "1.0.0",
+  "pluginType": "application",
+  "dataServices": [
+    {
+      "type": "external",
+      "name": "extsvc",
+      "version": "1.0.0",
+      "host": "127.0.0.1",
+      "port": 0,
+      "urlPrefix": "/"
+    }
+  ]
+}
