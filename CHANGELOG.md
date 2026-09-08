@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 3.6.0
 
+- Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#718)](https://github.com/zowe/zlux-server-framework/pull/718)
 - Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
 - Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#710)](https://github.com/zowe/zlux-server-framework/pull/710)
 - Enhancement: Verify RBAC is enabled for instance and site scope plugin configuration updating. [(#704)](https://github.com/zowe/zlux-server-framework/pull/704)
