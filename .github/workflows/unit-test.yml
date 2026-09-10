@@ -61,6 +61,12 @@ jobs:
           npm install typescript
           npx tsc logger.ts ../../../zlux-platform/interface/src/index.d.ts --module commonjs --target es6 --lib es6 --skipLibCheck --outDir .
 
+      - name: Build zlux-shared obfuscator
+        run: |
+          cd ${{ github.workspace }}/../zlux-shared/src/obfuscator
+          npm install
+          npm run build
+
       - name: Build zlux-server-framework
         run: |
           cd ${{ github.workspace }}
