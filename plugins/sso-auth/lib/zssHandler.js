@@ -32,7 +32,6 @@ class ZssHandler {
       const result = { authenticated: false, authorized: false };
       options = options || {};
       try {
-        const { syncOnly } = options;
         let bypassUrls = [
           '/login',
           '/logout',
@@ -76,16 +75,6 @@ class ZssHandler {
         }
         const resourceName = this._makeProfileName(request.originalUrl, 
                                                    request.method);
-        if (syncOnly) {
-          // can't do anything further: the user is authenticated but we can't 
-          // make an actual RBAC check
-          this.logger.info(`Can't make a call to the OS agent for access check. ` +
-                   `Allowing ${sessionState.username} access to ${resourceName} ` +
-                   'unconditinally');
-          result.authorized = true;
-          this.setCookieFromRequest(request, sessionState);
-          return result;
-        }
         this.logger.debug(`Sending isAuthorized request for ${sessionState.username}`);
         const httpResponse = yield this._callAgent(request.zluxData, 
                                                    sessionState.username,  resourceName);
@@ -275,11 +264,11 @@ class ZssHandler {
   }
   
   _makeProfileName(reqUrl, method) {
-    //console.log("request.originalUrl", request.originalUrl)
-    const path = url.parse(reqUrl).pathname;
-    //console.log("originalPath", originalPath)
+    let path = url.parse(reqUrl).pathname;
+    if (path.endsWith('/.websocket')) {
+      path = path.slice(0, -'/.websocket'.length);
+    }
     const resourceName = makeProfileNameForRequest(path, method, this.instanceID);
-    //console.log("resourceName", resourceName)
     return resourceName;
   }
   
