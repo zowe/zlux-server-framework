@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.18.6
+- Security: RBAC is now enforced for WebSocket dataservices, which use the 'GET' method for SAF profiles. Previously WebSocket upgrade requests could bypass the RBAC authorization check. [(#PR)](https://github.com/zowe/zlux-server-framework/pull/PR)
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#706)](https://github.com/zowe/zlux-server-framework/pull/706)
 
