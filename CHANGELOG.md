@@ -5,6 +5,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 
 ## 3.6.0
 
+- Enhancement: Terminal proxy now supports per-component `allowList` configuration under `components.tn3270-ng2.allowList` and `components.vt-ng2.allowList` in `zowe.yaml`. When defined, only connections to listed hostnames are permitted; connections to unlisted hosts are rejected with websocket close code 4003 (Forbidden).
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#718)](https://github.com/zowe/zlux-server-framework/pull/718)
 - Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
 - Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#710)](https://github.com/zowe/zlux-server-framework/pull/710)
