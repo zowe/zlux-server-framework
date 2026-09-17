@@ -17,6 +17,7 @@ const tls = require('tls');
 const crypto = require('crypto');
 const fs = require('fs');
 const pathModule = require('path');
+const zluxUtil = require('../../../lib/util.js');
 const ssh = require('./ssh');
 const SSH_MESSAGE = ssh.MESSAGE;
 
@@ -510,6 +511,24 @@ var incrementCounters = function(t) {
 
 TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
   var t = this;
+
+  if (host && port) {
+    zluxUtil.isHostAllowed(t.allowList, host).then(function(allowed) {
+      if (allowed) {
+        t._doConnect(host, port, ws, security);
+      } else {
+        t.logger.warn('ZWED0181W', host, t.identifierString()); //t.logger.warn('Host '+host+' rejected, not in allowList. '+t.identifierString());
+        t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden');
+      }
+    }).catch(function(e) {
+      t.logger.warn('ZWED0182W', host, e.message); //t.logger.warn('AllowList check failed for host '+host+', rejecting. Error='+e.message);
+      t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden');
+    });
+  }
+};
+
+TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security) {
+  var t = this;
   var connectOptions = null;
   t.websocket = ws;
 
@@ -536,14 +555,6 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
     return undefined;
   };
 
-
-  
-  if (host && port) {
-    if (t.allowList && t.allowList.length > 0 && !t.allowList.includes(host)) {
-      t.logger.warn('ZWED0144W', host, t.identifierString()); //t.logger.warn('Host '+host+' rejected, not in allowList. '+t.identifierString());
-      t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden: host not in allowList');
-      return;
-    }
     this.host = host;
     this.port = port;
     
@@ -649,7 +660,6 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
       t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);
     }
 
-  }
 };
 
 var tn3270MessageConfig = {
@@ -772,8 +782,11 @@ exports.tn3270WebsocketRouter = function(context) {
       context.logger.info('ZWED0106I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);      
       next();
     });
+    const tn3270RawAllowList = (context.plugin.server.config.all && context.plugin.server.config.all.components && context.plugin.server.config.all.components['tn3270-ng2'])
+      ? context.plugin.server.config.all.components['tn3270-ng2'].allowList || null : null;
+    const tn3270AllowList = zluxUtil.prepareAllowList(tn3270RawAllowList);
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(tn3270MessageConfig,req.ip,context,ws,handlers,allowList);
+      new TerminalWebsocketProxy(tn3270MessageConfig,req.ip,context,ws,handlers,tn3270AllowList);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);
@@ -824,8 +837,11 @@ exports.vtWebsocketRouter = function(context) {
       context.logger.info('ZWED0108I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
     });
+    const vtRawAllowList = (context.plugin.server.config.all && context.plugin.server.config.all.components && context.plugin.server.config.all.components['vt-ng2'])
+      ? context.plugin.server.config.all.components['vt-ng2'].allowList || null : null;
+    const vtAllowList = zluxUtil.prepareAllowList(vtRawAllowList);
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(vtMessageConfig,req.ip,context,ws,handlers,allowList);
+      new TerminalWebsocketProxy(vtMessageConfig,req.ip,context,ws,handlers,vtAllowList);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);
