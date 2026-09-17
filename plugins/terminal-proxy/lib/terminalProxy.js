@@ -555,6 +555,7 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security)
     return undefined;
   };
 
+  if (host && port) {
     this.host = host;
     this.port = port;
     
@@ -659,7 +660,7 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security)
       //t.logger.warn(errorMessage);
       t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);
     }
-
+  }
 };
 
 var tn3270MessageConfig = {
