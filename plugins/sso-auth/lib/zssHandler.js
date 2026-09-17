@@ -53,20 +53,6 @@ class ZssHandler {
         result.authenticated = true;
         request.username = sessionState.username;
 
-        let noSafCheckUrls = [
-          '/unixfile',
-          '/datasetContents',
-          '/VSAMdatasetContents',
-          '/datasetMetadata',
-          '/omvs',
-          '/security-mgmt'
-        ]
-        if (noSafCheckUrls.some(matchesPrefix)) {
-          result.authorized = true;
-          this.setCookieFromRequest(request, sessionState);
-          return result;
-        }
-
         if (options.bypassAuthorizatonCheck) {
           result.authorized = true;
           this.setCookieFromRequest(request, sessionState);
