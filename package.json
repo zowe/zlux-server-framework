@@ -50,6 +50,7 @@
     "body-parser": "1.20.3",
     "cookie-parser": "1.4.7",
     "express": "4.21.2",
+    "express-rate-limit": "7.4.1",
     "express-session": "1.18.2",
     "express-static-gzip": "2.1.7",
     "graceful-fs": "4.2.11",
