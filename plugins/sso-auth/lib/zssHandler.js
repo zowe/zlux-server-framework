@@ -32,29 +32,27 @@ class ZssHandler {
       const result = { authenticated: false, authorized: false };
       options = options || {};
       try {
-        let bypassUrls = [
+        const pathname = url.parse(request.originalUrl).pathname;
+        const matchesPrefix = (prefix) => pathname === prefix || pathname.startsWith(prefix + '/');
+
+        // these URLs have requiresAuth:false in the rootServices config, so no session can be required yet
+        let noSessionRequiredUrls = [
           '/login',
           '/logout',
-          '/password',
-          '/unixfile',
-          '/datasetContents',
-          '/VSAMdatasetContents',
-          '/datasetMetadata',
-          '/omvs',
-          '/security-mgmt'
+          '/password'
         ]
-        for(let i = 0; i < bypassUrls.length; i++){
-          if(request.originalUrl.startsWith(bypassUrls[i])){
-            result.authorized = true;
-            this.setCookieFromRequest(request, sessionState);
-            return result;
-          }
+        if (noSessionRequiredUrls.some(matchesPrefix)) {
+          result.authorized = true;
+          this.setCookieFromRequest(request, sessionState);
+          return result;
         }
+
         if (!sessionState.authenticated) {
           return result;
         }
         result.authenticated = true;
         request.username = sessionState.username;
+
         if (options.bypassAuthorizatonCheck) {
           result.authorized = true;
           this.setCookieFromRequest(request, sessionState);
