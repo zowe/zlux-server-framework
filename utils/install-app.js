@@ -99,17 +99,56 @@ function cleanup() {
   logger.warn(`ZWED0147W`); //logger.warn(`Cleanup not yet implemented`);
 }
 
+//Plugin identifiers are reverse-DNS-style names (e.g. "org.zowe.configjs").
+//This must reject path separators and '..' so that an identifier read from an
+//untrusted pluginDefinition.json cannot be used to write files outside of the
+//intended plugins/config directories.
+const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
+
+function isSafeIdentifier(identifier) {
+  return typeof identifier === 'string'
+    && SAFE_IDENTIFIER_PATTERN.test(identifier)
+    && !identifier.includes('..');
+}
+
+//Resolves `segments` under `baseDir` and verifies the result is still within
+//`baseDir`, refusing to return a path that a crafted segment escaped to.
+function resolveWithinDir(baseDir, ...segments) {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(base, ...segments);
+  if (target !== base && !target.startsWith(base + path.sep)) {
+    return null;
+  }
+  return target;
+}
+
 function addToServer(appDir, installDir) {
   try {
     let pluginDefinition = JSON.parse(fs.readFileSync(path.join(appDir,'pluginDefinition.json')));
+    if (!isSafeIdentifier(pluginDefinition.identifier)) {
+      const errMsg = `Could not register App (dir=${appDir}): plugin identifier is missing or invalid`;
+      if(calledViaCLI){
+        packagingUtils.endWithMessage(errMsg);
+      }
+      logger.warn(`ZWED0149W`, appDir, 'invalid plugin identifier');
+      return {success: false, message: errMsg};
+    }
     logger.info(`ZWED0109I`, pluginDefinition.identifier); //logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
     let locatorJSONString =
         `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir.replace(/\\/g,'\\\\')}"\n}`;
     let destination;
     if(calledViaCLI){
-      destination = path.join(pluginsDir, pluginDefinition.identifier+'.json');
+      destination = resolveWithinDir(pluginsDir, pluginDefinition.identifier+'.json');
     } else {
-      destination = path.join(installDir, pluginDefinition.identifier+'.json');
+      destination = resolveWithinDir(installDir, pluginDefinition.identifier+'.json');
+    }
+    if (!destination) {
+      const errMsg = `Could not register App (dir=${appDir}): plugin identifier resolves outside of the plugins directory`;
+      if(calledViaCLI){
+        packagingUtils.endWithMessage(errMsg);
+      }
+      logger.warn(`ZWED0149W`, appDir, 'plugin identifier resolves outside plugins directory');
+      return {success: false, message: errMsg};
     }
     logger.debug('ZWED0286I', destination, locatorJSONString); //logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
     fs.writeFile(destination, locatorJSONString, {mode: FILE_WRITE_MODE}, (err)=> {
