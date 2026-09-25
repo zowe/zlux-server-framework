@@ -190,6 +190,7 @@
   "ZWED0303I": "Plugin %s will not be loaded because no dataservices requested it",
   "ZWED0304I": "Using client certificate: %s",
   "ZWED0305I": "Using separate certificates for server TLS and client TLS connections",
+  "ZWED0306I": "Could not resolve host %s for allowList check",
 
   "ZWED0003W":"User=%s (%s): Session %s failed. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
@@ -310,6 +311,7 @@
   "ZWED0178W":"Skipping authentication plugin %s because it's not HA compatible",
   "ZWED0179W":"Unable to retrieve the list of certificate authorities from the keyring=%s owner=%s Error: %s",
   "ZWED0180W":"Failed to query discovery server (%s:%s) for agent access: %s",
+  "ZWED0183W":"Skipping invalid allowList subnet entry: %s",
 
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
