@@ -6,6 +6,7 @@ This repo is part of the app-server Zowe Component, and the change logs here may
 ## 2.18.6
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#706)](https://github.com/zowe/zlux-server-framework/pull/706)
+- Enhancement: Terminal proxy now supports per-component `allowList` configuration under `components.tn3270-ng2.allowList` and `components.vt-ng2.allowList` in `zowe.yaml`. When defined, only connections to listed hostnames are permitted; connections to unlisted hosts are rejected with websocket close code 4003 (Forbidden). [(#702)](https://github.com/zowe/zlux-server-framework/pull/702)
 
 ## 2.18.5
 - Bugfix: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
