@@ -191,7 +191,8 @@
   "ZWED0304I": "Using client certificate: %s",
   "ZWED0305I": "Using separate certificates for server TLS and client TLS connections",
   "ZWED0306I": "Could not resolve host %s for allowList check",
-
+  "ZWED0307I":"Installing proxy at %s -> %s://%s:%d",
+  
   "ZWED0003W":"User=%s (%s): Session %s failed. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
   "ZWED0005W":"",
@@ -313,7 +314,12 @@
   "ZWED0180W":"Failed to query discovery server (%s:%s) for agent access: %s",
   "ZWED0183W":"Skipping invalid allowList subnet entry: %s",
   "ZWED0184W":"IPv6 address %s is unavailable on this system, retrying with IPv4 fallback %s on port %s",
-
+  "ZWED0185W":"No auth middleware supplied. Refusing to install unauthenticated proxy at %s.",
+  "ZWED0186W":"Login rate limit read failed for key=${key}, allowing attempt. Error=%s",
+  "ZWED0187W":"Login rate limit write failed for key=${key}. Error=%s",
+  "ZWED0188W":"Failed to record token revocation. Error=%s",
+  "ZWED0189W":"Failed to check token revocation, allowing. Error=%s",
+  
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
   "ZWED0003E":"Loopback configuration not valid,%s\nLoopback calls will fail!",
@@ -386,5 +392,16 @@
   "ZWED0156E":"RESERVED: Could not register default plugins into app-server",
   "ZWED0157E":"RESERVED: Could not register default plugin %s into app-server",
   "ZWED0158E":"Could not listen on address %s:%s. Insufficient permissions to perform port bind.",
-  "ZWED0159E":"Could not read zowe manifest, version unknown"
+  "ZWED0159E":"Could not read zowe manifest, version unknown",
+  "ZWED0161E":"Failed to retrieve JWK Set: %s",
+  "ZWED0162E":"ApplicationName missing or invalid",
+  "ZWED0163E":"No handler available",
+  "ZWED0164E":"No handler available",
+  "ZWED0165E":"No handler available",
+  "ZWED0166E":"PassTicket generation failed: %s",
+  "ZWED0167E":"No authentication token present",
+  "ZWED0168E":"Token invalid",
+  "ZWED0169E":"Token invalid",
+  "ZWED0170E":"Cannot handle message",
+  "ZWED0171E":"TLS key/certificate not available. JWTs cannot be generated, shutting down."
 }

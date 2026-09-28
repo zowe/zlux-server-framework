@@ -1,6 +1,7 @@
 const assert = require('assert');
 const http = require('http');
 const net = require('net');
+const util = require('../../lib/util');
 
 describe('proxy', function () {
   let proxy;
@@ -147,6 +148,63 @@ describe('proxy', function () {
         writableRes.on('finish', function () {
           assert.strictEqual(authCalled, true);
           targetServer.close();
+          done();
+        });
+
+        handler(mockReq, writableRes);
+      });
+    });
+
+    it('should redact sensitive and unknown header values in debug logs', function (done) {
+      var targetServer = http.createServer(function (req, res) {
+        res.writeHead(200);
+        res.end('ok');
+      });
+
+      targetServer.listen(0, '127.0.0.1', function () {
+        var port = targetServer.address().port;
+        var loggedArguments = [];
+        var originalDebug = util.loggers.proxyLogger.debug;
+        util.loggers.proxyLogger.debug = function () {
+          loggedArguments.push(Array.from(arguments));
+        };
+        var handler = proxy.makeSimpleProxy('127.0.0.1', port, {
+          urlPrefix: '',
+          isHttps: false,
+          addProxyAuthorizations: null,
+          processProxiedHeaders: null,
+          allowInvalidTLSProxy: false
+        });
+
+        var mockReq = new http.IncomingMessage();
+        mockReq.method = 'GET';
+        mockReq.url = '/logging-test';
+        mockReq.headers = {
+          host: 'localhost:3000',
+          authorization: 'Bearer secret-jwt',
+          cookie: 'LtpaToken2=secret-ltpa',
+          'content-type': 'application/json',
+          'x-custom-credential': 'secret-custom-value'
+        };
+        mockReq.protocol = 'http';
+        mockReq.get = function (header) {
+          return this.headers[header.toLowerCase()];
+        };
+
+        var { Writable } = require('stream');
+        var writableRes = new Writable({
+          write: function (chunk, enc, cb) { cb(); }
+        });
+        writableRes.status = function () { return writableRes; };
+        writableRes.set = function () {};
+        writableRes.on('finish', function () {
+          util.loggers.proxyLogger.debug = originalDebug;
+          targetServer.close();
+          const logs = JSON.stringify(loggedArguments);
+          assert.strictEqual(logs.includes('secret-jwt'), false);
+          assert.strictEqual(logs.includes('secret-ltpa'), false);
+          assert.strictEqual(logs.includes('secret-custom-value'), false);
+          assert.strictEqual(logs.includes('application/json'), true);
           done();
         });
 

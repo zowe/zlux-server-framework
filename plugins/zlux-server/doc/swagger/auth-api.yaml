@@ -1,0 +1,316 @@
+#  This program and the accompanying materials are
+#  made available under the terms of the Eclipse Public License v2.0 which accompanies
+#  this distribution, and is available at https://www.eclipse.org/legal/epl-v20.html
+#
+#  SPDX-License-Identifier: EPL-2.0
+#
+#  Copyright Contributors to the Zowe Project.
+
+swagger: "2.0"
+info:
+  description: "Authentication and session management API for the Zowe App Server (zlux). Provides login, logout, session refresh, password reset, status queries, and PassTicket generation."
+  version: "1.0.0"
+  title: "Zowe App Server Authentication API"
+  license:
+    name: "EPL-2.0"
+host: "localhost"
+basePath: /
+tags:
+- name: "auth"
+  description: "Authentication and session management"
+schemes:
+- "https"
+- "http"
+paths:
+  /auth:
+    post:
+      tags:
+      - "auth"
+      summary: "Login"
+      description: "Authenticates the user with the configured authentication handler(s). On success, establishes a server-side session and sets session cookies."
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Login credentials"
+        required: true
+        schema:
+          $ref: "#/definitions/LoginRequest"
+      responses:
+        200:
+          description: "Authentication successful"
+          schema:
+            $ref: "#/definitions/AuthResult"
+        401:
+          description: "Authentication failed"
+          schema:
+            $ref: "#/definitions/AuthResult"
+        428:
+          description: "Password expired - must change password before proceeding"
+          schema:
+            $ref: "#/definitions/AuthResult"
+        500:
+          description: "Internal server error during authentication"
+    get:
+      tags:
+      - "auth"
+      summary: "Get authentication status"
+      description: "Returns the current authentication status for each loaded auth handler without performing any login or refresh."
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Status retrieved"
+          schema:
+            $ref: "#/definitions/StatusResult"
+  /auth-refresh:
+    get:
+      tags:
+      - "auth"
+      summary: "Refresh session"
+      description: "Refreshes the current session. If the session is still valid, extends its expiration. If it has expired, returns a failure result."
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Session refreshed successfully"
+          schema:
+            $ref: "#/definitions/AuthResult"
+        401:
+          description: "Session expired or invalid"
+          schema:
+            $ref: "#/definitions/AuthResult"
+  /auth-logout:
+    post:
+      tags:
+      - "auth"
+      summary: "Logout"
+      description: "Terminates the current session, clears session cookies, and notifies auth handlers to clean up."
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Logout successful"
+          schema:
+            $ref: "#/definitions/AuthResult"
+        500:
+          description: "Logout failed"
+          schema:
+            $ref: "#/definitions/AuthResult"
+    get:
+      tags:
+      - "auth"
+      summary: "Logout (GET)"
+      description: "Same as POST /auth-logout. Provided for convenience."
+      produces:
+      - "application/json"
+      responses:
+        200:
+          description: "Logout successful"
+          schema:
+            $ref: "#/definitions/AuthResult"
+        500:
+          description: "Logout failed"
+          schema:
+            $ref: "#/definitions/AuthResult"
+  /auth-password:
+    post:
+      tags:
+      - "auth"
+      summary: "Reset password"
+      description: "Initiates a password reset via the specified authentication service handler. Requires the handler to advertise canResetPassword capability."
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "Password reset request"
+        required: true
+        schema:
+          $ref: "#/definitions/PasswordResetRequest"
+      responses:
+        200:
+          description: "Password reset successful"
+          schema:
+            $ref: "#/definitions/PasswordResetResponse"
+        400:
+          description: "Authentication service for password reset not found"
+          schema:
+            $ref: "#/definitions/PasswordResetResponse"
+        500:
+          description: "Password reset failed"
+          schema:
+            $ref: "#/definitions/PasswordResetResponse"
+  /auth-ticket:
+    post:
+      tags:
+      - "auth"
+      summary: "Generate PassTicket"
+      description: "Generates a RACF PassTicket for the authenticated user and the specified application name. Requires an active authenticated session and a PassTicket-capable auth plugin (ZSS). The applicationName must correspond to a PTKTDATA profile in RACF."
+      consumes:
+      - "application/json"
+      produces:
+      - "application/json"
+      parameters:
+      - in: "body"
+        name: "body"
+        description: "PassTicket request"
+        required: true
+        schema:
+          $ref: "#/definitions/PassTicketRequest"
+      responses:
+        200:
+          description: "PassTicket generated successfully"
+          schema:
+            $ref: "#/definitions/PassTicketResponse"
+        400:
+          description: "applicationName missing or invalid"
+          schema:
+            $ref: "#/definitions/ErrorObject"
+        401:
+          description: "Not authenticated"
+        501:
+          description: "No PassTicket-capable auth plugin registered"
+          schema:
+            $ref: "#/definitions/ErrorObject"
+        500:
+          description: "PassTicket generation failed"
+          schema:
+            $ref: "#/definitions/ErrorObject"
+      security:
+      - sessionCookie: []
+securityDefinitions:
+  sessionCookie:
+    type: "apiKey"
+    name: "connect.sid"
+    in: "cookie"
+    description: "Express session cookie set during login"
+definitions:
+  LoginRequest:
+    type: "object"
+    required:
+    - "username"
+    - "password"
+    properties:
+      username:
+        type: "string"
+        description: "The z/OS user ID"
+        example: "IBMUSER"
+      password:
+        type: "string"
+        description: "The user's password"
+        format: "password"
+      categories:
+        type: "array"
+        description: "Optional list of auth categories to authenticate against (e.g. saf, apiml). If omitted, all handlers are used."
+        items:
+          type: "string"
+  AuthResult:
+    type: "object"
+    properties:
+      success:
+        type: "boolean"
+        description: "Overall authentication result"
+      categories:
+        type: "object"
+        description: "Per-category authentication results"
+        additionalProperties:
+          $ref: "#/definitions/CategoryResult"
+      expms:
+        type: "integer"
+        description: "Session expiration in milliseconds from now"
+      defaultCategory:
+        type: "string"
+        description: "The default authentication category"
+  StatusResult:
+    type: "object"
+    properties:
+      authenticated:
+        type: "boolean"
+        description: "Overall authentication status"
+      categories:
+        type: "object"
+        description: "Per-category authentication status"
+        additionalProperties:
+          $ref: "#/definitions/CategoryResult"
+  CategoryResult:
+    type: "object"
+    properties:
+      success:
+        type: "boolean"
+        description: "Whether this category has at least one successful plugin"
+      plugins:
+        type: "object"
+        description: "Per-plugin results within this category"
+        additionalProperties:
+          type: "object"
+  PasswordResetRequest:
+    type: "object"
+    required:
+    - "serviceHandler"
+    properties:
+      serviceHandler:
+        type: "string"
+        description: "The plugin identifier of the auth service to handle the reset"
+        example: "org.zowe.zlux.auth.ssoAuth"
+      username:
+        type: "string"
+      password:
+        type: "string"
+        format: "password"
+      newPassword:
+        type: "string"
+        format: "password"
+  PasswordResetResponse:
+    type: "object"
+    properties:
+      success:
+        type: "boolean"
+      response:
+        type: "string"
+        description: "Status message from the auth handler"
+  PassTicketRequest:
+    type: "object"
+    required:
+    - "applicationName"
+    properties:
+      applicationName:
+        type: "string"
+        description: "RACF application name (APPLID), 1-8 alphanumeric characters"
+        minLength: 1
+        maxLength: 8
+        pattern: "^[A-Za-z0-9@#$]{1,8}$"
+        example: "MYAPP"
+      serviceHandler:
+        type: "string"
+        description: "Optional plugin identifier of the auth service to handle the request. If omitted, the default auth handler is used."
+        example: "org.zowe.zlux.auth.ssoAuth"
+  PassTicketResponse:
+    type: "object"
+    properties:
+      userId:
+        type: "string"
+        description: "The user ID for which the PassTicket was generated"
+        example: "IBMUSER"
+      applicationName:
+        type: "string"
+        description: "The application name used for generation"
+        example: "MYAPP"
+      ticket:
+        type: "string"
+        description: "The generated 8-character PassTicket"
+        example: "ABCD1234"
+  ErrorObject:
+    type: "object"
+    properties:
+      error:
+        type: "string"
+        description: "Error message"
+        example: "ZWED0211E - applicationName missing or invalid"
