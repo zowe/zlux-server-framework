@@ -105,8 +105,11 @@ function cleanup() {
 //intended plugins/config directories.
 const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
 
+const MAX_IDENTIFIER_LENGTH = 255 - '.json'.length;
+
 function isSafeIdentifier(identifier) {
   return typeof identifier === 'string'
+    && identifier.length <= MAX_IDENTIFIER_LENGTH
     && SAFE_IDENTIFIER_PATTERN.test(identifier)
     && !identifier.includes('..');
 }
