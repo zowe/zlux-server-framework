@@ -386,5 +386,7 @@
   "ZWED0156E":"RESERVED: Could not register default plugins into app-server",
   "ZWED0157E":"RESERVED: Could not register default plugin %s into app-server",
   "ZWED0158E":"Could not listen on address %s:%s. Insufficient permissions to perform port bind.",
-  "ZWED0159E":"Could not read zowe manifest, version unknown"
+  "ZWED0159E":"Could not read zowe manifest, version unknown",
+  "ZWED0160E":"Could not parse the agent response from %s. Error: %s",
+  "ZWED0161E":"Could not reach the agent at %s. Error: %s"
 }
