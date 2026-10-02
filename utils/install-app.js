@@ -103,13 +103,10 @@ function cleanup() {
 //This must reject path separators and '..' so that an identifier read from an
 //untrusted pluginDefinition.json cannot be used to write files outside of the
 //intended plugins/config directories.
-const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z0-9_][A-Za-z0-9_.-]*$/;
-
-const MAX_IDENTIFIER_LENGTH = 255 - '.json'.length;
+const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z]{2,6}(\\.[A-Za-z0-9-]{1,62}[A-Za-z0-9])+$/;
 
 function isSafeIdentifier(identifier) {
   return typeof identifier === 'string'
-    && identifier.length <= MAX_IDENTIFIER_LENGTH
     && SAFE_IDENTIFIER_PATTERN.test(identifier)
     && !identifier.includes('..');
 }
