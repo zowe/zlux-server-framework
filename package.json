@@ -43,11 +43,11 @@
     "test:coverage:report": "c8 report --reporter=html"
   },
   "dependencies": {
-    "@apidevtools/swagger-parser": "12.1.0",
+    "@apidevtools/swagger-parser": "13.0.0",
     "@rocketsoftware/eureka-js-client": "4.5.9",
     "@rocketsoftware/express-ws": "5.0.1",
     "bluebird": "3.7.2",
-    "body-parser": "1.20.3",
+    "body-parser": "1.20.8",
     "cookie-parser": "1.4.7",
     "express": "4.21.2",
     "express-session": "1.18.2",
