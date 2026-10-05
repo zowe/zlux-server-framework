@@ -4,6 +4,8 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
+- Bugfix: Proxy dataservices no longer deliver a truncated response body as if it were complete. When the proxied service's response ends early, the client connection is now aborted and the failure is logged instead of returning a partial body under the original 2xx status. The proxy also cancels the request to the service when the client disconnects, and no longer forwards hop-by-hop headers from the service's response. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
+- Bugfix: The server's HTTP keep-alive timeout now defaults to 90 seconds rather than the Node.js default of 5 seconds, which could cause intermittently truncated or failed responses when a pooled client such as the API Gateway reused a socket the server was concurrently closing. Configurable via `components.app-server.node.keepAliveTimeout`. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#718)](https://github.com/zowe/zlux-server-framework/pull/718)
 - Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
 - Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#710)](https://github.com/zowe/zlux-server-framework/pull/710)
