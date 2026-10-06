@@ -80,6 +80,7 @@
   },
   "overrides": {
     "@rocketsoftware/eureka-js-client": {
+      "js-yaml": "4.3.2",
       "@cypress/request": "^3.0.9"
     },
     "express": {
@@ -89,7 +90,11 @@
       "ws": "7.5.13"
     },
     "qs": "6.16.0",
-    "js-yaml": "4.3.2",
-    "@apidevtools/json-schema-ref-parser": "15.5.2"
+    "@apidevtools/swagger-parser": {
+      "@apidevtools/json-schema-ref-parser": "15.5.2"
+    },
+    "@apidevtools/json-schema-ref-parser": {
+      "js-yaml": "5.4.3"
+    }
   }
 }
