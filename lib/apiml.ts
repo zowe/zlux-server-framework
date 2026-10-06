@@ -102,7 +102,6 @@ class ApimlConnector {
   vipAddress: string;
   isClientAttls: boolean;
   discoveryHost: string;
-  discoveryPort: number;
   hostName: string;
   port: number;
   gatewayPort: number;
@@ -179,7 +178,7 @@ class ApimlConnector {
       const issueRequest = () => {
         const options = optionsArray[optionsIndex];
         if (Date.now() > end) {
-          log.warn(`ZWED0045W`, this.discoveryHost, this.discoveryPort);
+          log.warn(`ZWED0045W`, this.discoveryHost, this.port);
           return reject(new Error(`Call timeout when fetching agent status from APIML`));
         }
         

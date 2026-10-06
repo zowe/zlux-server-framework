@@ -31,7 +31,6 @@ describe('apiml', function () {
         hostName: 'localhost',
         port: 7556,
         discoveryUrls: ['https://localhost:7553/eureka/'],
-        discoveryPort: 7553,
         catalogPort: 7552,
         gatewayPort: 7554,
         tlsOptions: { rejectUnauthorized: false },
@@ -42,7 +41,6 @@ describe('apiml', function () {
       assert.ok(connector);
       assert.strictEqual(connector.hostName, 'localhost');
       assert.strictEqual(connector.port, 7556);
-      assert.strictEqual(connector.discoveryPort, 7553);
       assert.strictEqual(connector.catalogPort, 7552);
       assert.strictEqual(connector.gatewayPort, 7554);
       assert.strictEqual(connector.isClientAttls, false);
