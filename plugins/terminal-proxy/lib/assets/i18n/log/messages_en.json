@@ -55,5 +55,7 @@
   "ZWED0144W":"Error when reading file=%s. Error=%s",
   "ZWED0145W":"Could not load a handler from file %s",
   "ZWED0181W":"Host %s rejected, not in allowList. %s",
-  "ZWED0182W":"AllowList check failed for host %s, rejecting. Error=%s"
+  "ZWED0182W":"AllowList check failed for host %s, rejecting. Error=%s",
+  "ZWED0308W":"Port %s on host %s rejected, not in allowedPorts. %s",
+  "ZWED0309W":"Client requested to skip TLS certificate validation, but allowInvalidCertificates is not enabled for this terminal type. Validating the certificate. %s"
 }
