@@ -3,6 +3,18 @@
 All notable changes to the Zlux Server Framework package will be documented in this file.
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 3.6.0
+- Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#718)](https://github.com/zowe/zlux-server-framework/pull/718)
+- Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
+- Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#710)](https://github.com/zowe/zlux-server-framework/pull/710)
+- Enhancement: Verify RBAC is enabled for instance and site scope plugin configuration updating. [(#704)](https://github.com/zowe/zlux-server-framework/pull/704)
+- Enhancement: The `/server/environment` response now includes `agent.host`. This allows plugins to retrieve the agent hostname through the authenticated `ZoweZLUX.environment.getAgentHost()` API. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
+- Bugfix: Removed the unauthenticated `/server/proxies` endpoint, which has been replaced with the `/server/environment` values. [(#703)](https://github.com/zowe/zlux-server-framework/pull/703) 
+- Moved `trivial-auth` and `internal-auth` authentication plugins to `devPlugins/` directory. These plugins are development/troubleshooting tools that should not ship in production distributions. [(#700)](https://github.com/zowe/zlux-server-framework/pull/700) 
+- Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#705)](https://github.com/zowe/zlux-server-framework/pull/705) 
+- Enhancement: Terminal proxy now supports per-component `allowList` configuration under `components.tn3270-ng2.allowList` and `components.vt-ng2.allowList` in `zowe.yaml`. When defined, only connections to listed hostnames are permitted; connections to unlisted hosts are rejected with websocket close code 4003 (Forbidden). [(#702)](https://github.com/zowe/zlux-server-framework/pull/702) 
+
+
 ## 3.5.0
 - Enhancement: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#669)](https://github.com/zowe/zlux-server-framework/pull/669) 
 - Enhancement: The app-server can now use separate certificates for inbound server TLS and outbound client TLS connections. When `zowe.certificate.keystore.clientCertificateAlias` (keyring) or both `zowe.certificate.pem.clientCertificate` and `zowe.certificate.pem.clientKey` (PEM) are defined, those are used for all outbound client connections while the main certificate is used only for serving HTTPS. When not defined, behavior is unchanged. [(#674)](https://github.com/zowe/zlux-server-framework/pull/674)

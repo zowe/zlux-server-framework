@@ -8,9 +8,9 @@
 
 swagger: "2.0"
 info:
-  description: "These are the Swagger documents on dynamic app server configuration for the Zowe desktop, used to control the plugin and services lifecycle. You can find more documentation about Zowe at [https://docs.zowe.org/stable/]."
+  description: "These are the Swagger documents for the Zowe desktop app server APIs, used to query server state, configuration, and installed plugins. You can find more documentation about Zowe at [https://docs.zowe.org/stable/]."
   version: "1.0.0"
-  title: "Zowe plugin and services lifecycle"
+  title: "Zowe app server APIs"
   license:
     name: "EPL-2.0"
 host: "localhost"
@@ -22,7 +22,7 @@ tags:
     description: "Find out more"
     url: "https://github.com/zowe/zlux-app-server"
 - name: "plugins"
-  description: "Plugin lifecycle changes"
+  description: "Plugin listing"
 
 schemes:
 - "https"
@@ -333,55 +333,6 @@ paths:
               $ref: "#/definitions/pluginsDefinition"
         401:
           description: "Unauthorized"
-    put:
-      tags:
-      - "plugins"
-      summary: "(Cluster only) Add a plugin (or upgrade an existing one) to the server via 'location'"
-      description: "(Cluster only) Add a plugin (or upgrade an existing one) to the server via 'location'"
-      produces:
-      - "application/json"
-      parameters:
-      - in: "query"
-        name: "plugin location"
-        description: "Location in the local file system"
-        type: "string"
-        required: true
-      responses:
-        200:
-          description: "Successfully installed '${installResponse.message}'. Reloading server, please wait a moment."
-        400:
-          description: "Failed to install plugin.  Error: ${installResponse.message}\n\nOR\n\nPath query must be a directory.\n\nOR\n\nName queries not yet supported.\n\nOR\n\n"
-        401:
-          description: "Unauthorized"
-        500:
-          description: "Could not complete new plugin scan."
-        506:
-          description: "Set dataserviceAuthentication.rbac to true in server configuration"
-      
-  /plugins/:id:
-    delete:
-      tags:
-      - "plugins"
-      summary: "(Cluster only) Deletes a plugin 'identifier' and reloads the server"
-      description: "(Cluster only) Deletes a plugin 'identifier' and reloads the server"
-      produces:
-      - "application/json"
-      parameters:
-      - name: "Plugin identifier"
-        in: "query"
-        type: "string"
-        required: true
-      responses:
-        200:
-          description: "Deleting plugin 'identifier'. Reloading server, please wait a moment."
-        400:
-          description: "${fullPath} does not exist.\n\nOR\n\nImproper access permissions for path '${fullPath}'\n\nOR\n\n${err}"
-        401:
-          description: "Unauthorized"
-        500:
-          description: "Cannot reload server unless cluster mode is in use."
-        506:
-          description: "Set dataserviceAuthentication.rbac to true in server configuration"
           
       
 definitions:
