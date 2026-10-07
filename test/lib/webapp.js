@@ -27,6 +27,93 @@ describe('webapp', function () {
     assert.ok(exportType === 'object' || exportType === 'function', 'should export object or function');
   });
 
+  describe('/server/environment', function () {
+    let server;
+
+    afterEach(function (done) {
+      server.close(done);
+    });
+
+    it('returns the effective agent host and app-server gateway fallback in RBAC mode', async function () {
+      const zoweConfig = {
+        zowe: {
+          cookieIdentifier: 'test',
+          externalDomains: ['desktop.example.com']
+        },
+        zOSMF: {
+          host: 'zosmf.example.com',
+          port: 10443
+        },
+        components: {
+          gateway: { enabled: false },
+          discovery: { enabled: false },
+          'app-server': {
+            productDir: __dirname,
+            checkReferrer: {},
+            dataserviceAuthentication: { rbac: true, defaultAuthentication: 'fallback' },
+            enablePasswordChange: true,
+            agent: {
+              mediationLayer: { enabled: false }
+            },
+            node: {
+              productCode: 'ZLUX',
+              http: { port: 31390, ipAddresses: ['127.0.0.1'] },
+              https: {},
+              checkReferrer: {},
+              mediationLayer: {
+                enabled: false,
+                server: {
+                  hostname: 'discovery.example.com',
+                  gatewayHostname: 'gateway.example.com',
+                  gatewayPort: 7554
+                }
+              },
+              allowInvalidTLSProxy: true
+            }
+          }
+        }
+      };
+      const auth = {
+        doLogin() {},
+        doPasswordReset() {},
+        doPassTicket() {},
+        getStatus() {},
+        doLogout() {},
+        refreshStatus() {},
+        semiAuthenticatedMiddleware(req, res, next) { next(); },
+        middleware(req, res, next) { next(); },
+        addProxyAuthorizations() {},
+        processProxiedHeaders(req, headers) { return headers; }
+      };
+      const app = webapp.makeWebApp({
+        zoweConfig,
+        port: 12336,
+        isHttps: false,
+        proxiedHost: 'zss.example.com',
+        proxiedPort: 12337,
+        clientTlsOptions: {},
+        auth
+      });
+      app.installRootServices();
+      server = http.createServer(app.expressApp);
+      await new Promise((resolve, reject) => {
+        server.once('error', reject);
+        server.listen(0, '127.0.0.1', resolve);
+      });
+
+      const response = await fetch(`http://127.0.0.1:${server.address().port}/server/environment`);
+      const body = await response.json();
+
+      assert.strictEqual(response.status, 200);
+      assert.strictEqual(body.agent.host, 'zss.example.com');
+      assert.strictEqual(body.userEnvironment.ZWED_node_mediationLayer_enabled, 'true');
+      assert.strictEqual(body.userEnvironment.ZWED_node_mediationLayer_server_hostname, 'desktop.example.com');
+      assert.strictEqual(body.userEnvironment.ZWED_node_mediationLayer_server_gatewayHostname, 'desktop.example.com');
+      assert.strictEqual(body.userEnvironment.ZWED_node_mediationLayer_server_gatewayPort, '12336');
+      assert.strictEqual(body.userEnvironment.GATEWAY_PORT, '12336');
+    });
+  });
+
   describe('installErrorHanders() referer-based proxy fallback', function () {
     const productCode = 'XXX';
     const pluginId = externalProxyPluginDef.identifier;
@@ -96,7 +183,7 @@ describe('webapp', function () {
           proxiedHost: 'localhost',
           proxiedPort: 1,
           auth: {
-            doLogin() {}, doPasswordReset() {}, getStatus() {}, doLogout() {}, refreshStatus() {},
+            doLogin() {}, doPasswordReset() {}, doPassTicket() {}, getStatus() {}, doLogout() {}, refreshStatus() {},
             semiAuthenticatedMiddleware(r, re, next) { next(); },
             addProxyAuthorizations() {},
             processProxiedHeaders(req, headers) { return headers; },

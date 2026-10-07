@@ -180,4 +180,56 @@ describe('zssHandler', function () {
     const restResource = await resourceQueriedFor(REST_GET_URL);
     assert.strictEqual(wsResource, restResource);
   });
+
+  // Regression tests: addProxyAuthorizations must forward only cookies ZSS itself
+  // recognizes, never the client's raw Cookie header (see apiml.ts's ZSS fallback proxy).
+  describe('addProxyAuthorizations', function () {
+    const TOKEN_NAME = 'apimlAuthenticationToken';
+
+    it('forwards only the tracked ZSS session cookie, not the client raw Cookie header', function () {
+      const handler = makeHandler();
+      const sessionState = { zssCookies: 'jedHTTPSession.7557=abc123' };
+      const req1 = {
+        cookies: { 'jedHTTPSession.7557': 'abc123', unrelatedThirdPartyCookie: 'attacker-set-value' },
+        headers: { cookie: 'jedHTTPSession.7557=abc123; unrelatedThirdPartyCookie=attacker-set-value' }
+      };
+      const req2Options = { headers: {} };
+
+      handler.addProxyAuthorizations(req1, req2Options, sessionState);
+
+      assert.strictEqual(req2Options.headers['cookie'], 'jedHTTPSession.7557=abc123');
+    });
+
+    it('also forwards the apimlAuthenticationToken cookie when present, alongside the ZSS cookie', function () {
+      const handler = makeHandler();
+      const sessionState = { zssCookies: 'jedHTTPSession.7557=abc123' };
+      const req1 = { cookies: { [TOKEN_NAME]: 'jwt-value' }, headers: {} };
+      const req2Options = { headers: {} };
+
+      handler.addProxyAuthorizations(req1, req2Options, sessionState);
+
+      assert.strictEqual(req2Options.headers['cookie'], 'jedHTTPSession.7557=abc123; apimlAuthenticationToken=jwt-value');
+    });
+
+    it('forwards only the apimlAuthenticationToken cookie when no ZSS session cookie is tracked', function () {
+      const handler = makeHandler();
+      const sessionState = {};
+      const req1 = { cookies: { [TOKEN_NAME]: 'jwt-value' }, headers: {} };
+      const req2Options = { headers: {} };
+
+      handler.addProxyAuthorizations(req1, req2Options, sessionState);
+
+      assert.strictEqual(req2Options.headers['cookie'], 'apimlAuthenticationToken=jwt-value');
+    });
+
+    it('sets no cookie header when neither credential is present', function () {
+      const handler = makeHandler();
+      const req1 = { cookies: {}, headers: {} };
+      const req2Options = { headers: {} };
+
+      handler.addProxyAuthorizations(req1, req2Options, {});
+
+      assert.strictEqual(req2Options.headers['cookie'], undefined);
+    });
+  });
 });

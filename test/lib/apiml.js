@@ -1,4 +1,5 @@
 const assert = require('assert');
+const sinon = require('sinon');
 
 describe('apiml', function () {
   let apiml;
@@ -30,7 +31,6 @@ describe('apiml', function () {
         hostName: 'localhost',
         port: 7556,
         discoveryUrls: ['https://localhost:7553/eureka/'],
-        discoveryPort: 7553,
         catalogPort: 7552,
         gatewayPort: 7554,
         tlsOptions: { rejectUnauthorized: false },
@@ -41,7 +41,6 @@ describe('apiml', function () {
       assert.ok(connector);
       assert.strictEqual(connector.hostName, 'localhost');
       assert.strictEqual(connector.port, 7556);
-      assert.strictEqual(connector.discoveryPort, 7553);
       assert.strictEqual(connector.catalogPort, 7552);
       assert.strictEqual(connector.gatewayPort, 7554);
       assert.strictEqual(connector.isClientAttls, false);
@@ -409,6 +408,141 @@ describe('apiml', function () {
       var token = header + '.' + payload + '.sig';
       var userId = apiml.getUserId(token);
       assert.strictEqual(userId, 'a');
+    });
+  });
+
+  describe('gateway auth logout response', function () {
+    it('returns 204 when best-effort credential invalidation is incomplete', function () {
+      var response = {
+        status: sinon.stub(),
+        end: sinon.spy()
+      };
+      response.status.returns(response);
+      var auth = {
+        doLogout(req, res, formatter) {
+          formatter.sendLogoutResult(res, { success: false });
+        }
+      };
+      var handlers = apiml.createGatewayAuthHandlers(auth);
+
+      handlers.logout({}, response);
+
+      assert.strictEqual(response.status.calledOnceWithExactly(204), true);
+      assert.strictEqual(response.end.calledOnce, true);
+    });
+  });
+
+  describe('gateway auth key routes', function () {
+    it('resolves the JWK plugin after routes are installed', async function () {
+      var routes = {};
+      var expressApp = {
+        get(path, handler) {
+          routes[path] = handler;
+        }
+      };
+      var zoweConfig = {
+        components: { 'app-server': { node: { mediationLayer: { enabled: false } } } },
+        zOSMF: { host: 'zosmf.example.com', port: 1443 }
+      };
+      var jwkPlugin;
+      apiml.installGatewayAuthKeysRoutes(expressApp, zoweConfig, function () {
+        return jwkPlugin;
+      });
+      jwkPlugin = {
+        getJwkSet() {
+          return Promise.resolve({ keys: [{ kid: 'loaded-later' }] });
+        }
+      };
+      var response = {
+        status: sinon.stub(),
+        json: sinon.spy()
+      };
+      response.status.returns(response);
+
+      await routes['/gateway/api/v1/auth/keys/public/current']({}, response);
+
+      assert.strictEqual(response.status.calledOnceWithExactly(200), true);
+      assert.strictEqual(response.json.calledOnceWithExactly({ keys: [{ kid: 'loaded-later' }] }), true);
+    });
+  });
+
+  describe('installZosmfProxy / installZssProxy auth gating', function () {
+    // isApimlAvailable() short-circuits false as soon as mediationLayer.enabled is falsy,
+    // which is enough to exercise the fallback-proxy install path below.
+    var zoweConfig = {
+      zowe: {},
+      components: { 'app-server': { node: { mediationLayer: { enabled: false } }, agent: { host: 'zss.example.com', https: { port: 8544 } } } },
+      zOSMF: { host: 'zosmf.example.com', port: 1443 }
+    };
+    var fakeAuth = { addProxyAuthorizations: function () {}, processProxiedHeaders: function (req, headers) { return headers; } };
+
+    it('installZosmfProxy does not mount a route when no authMiddleware is supplied', function () {
+      var expressApp = { use: sinon.spy() };
+      apiml.installZosmfProxy(expressApp, zoweConfig, {}, fakeAuth, undefined);
+      assert.strictEqual(expressApp.use.called, false);
+    });
+
+    it('installZssProxy does not mount a route when no authMiddleware is supplied', function () {
+      var expressApp = { use: sinon.spy() };
+      apiml.installZssProxy(expressApp, zoweConfig, {}, fakeAuth, undefined);
+      assert.strictEqual(expressApp.use.called, false);
+    });
+
+    it('installZosmfProxy runs authMiddleware before the proxy handler', function () {
+      var expressApp = { use: sinon.spy() };
+      var authMiddleware = function (req, res, next) { next(); };
+      apiml.installZosmfProxy(expressApp, zoweConfig, {}, fakeAuth, authMiddleware);
+      assert.strictEqual(expressApp.use.calledOnce, true);
+      var args = expressApp.use.firstCall.args;
+      assert.strictEqual(args[0], apiml.ZOSMF_PROXY_PATH);
+      var router = args[1];
+      assert.ok(router.stack.length >= 2, 'router should have both the auth gate and the proxy handler');
+      assert.strictEqual(router.stack[0].handle, authMiddleware, 'authMiddleware must run before the proxy handler');
+    });
+
+    it('installZssProxy runs authMiddleware before the proxy handler', function () {
+      var expressApp = { use: sinon.spy() };
+      var authMiddleware = function (req, res, next) { next(); };
+      apiml.installZssProxy(expressApp, zoweConfig, {}, fakeAuth, authMiddleware);
+      assert.strictEqual(expressApp.use.calledOnce, true);
+      var args = expressApp.use.firstCall.args;
+      assert.strictEqual(args[0], apiml.ZSS_PROXY_PATH);
+      var router = args[1];
+      assert.ok(router.stack.length >= 2, 'router should have both the auth gate and the proxy handler');
+      assert.strictEqual(router.stack[0].handle, authMiddleware, 'authMiddleware must run before the proxy handler');
+    });
+  });
+
+  describe('installZosmfProxy / installZssProxy inbound header allow-lists', function () {
+    var zoweConfig = {
+      zowe: {},
+      components: { 'app-server': { node: { mediationLayer: { enabled: false } }, agent: { host: 'zss.example.com', https: { port: 8544 } } } },
+      zOSMF: { host: 'zosmf.example.com', port: 1443 }
+    };
+    var fakeAuth = { addProxyAuthorizations: function () {}, processProxiedHeaders: function (req, headers) { return headers; } };
+    var authMiddleware = function (req, res, next) { next(); };
+    var makeSimpleProxyStub;
+
+    beforeEach(function () {
+      // apiml.js calls proxy.makeSimpleProxy via a property lookup on the shared,
+      // cached module export, so stubbing it here is visible to apiml.js's internal call.
+      makeSimpleProxyStub = sinon.stub(require('../../lib/proxy'), 'makeSimpleProxy').returns(function () {});
+    });
+
+    afterEach(function () {
+      makeSimpleProxyStub.restore();
+    });
+
+    it('installZosmfProxy strips authorization and cookie from the client request before forwarding', function () {
+      apiml.installZosmfProxy({ use: sinon.spy() }, zoweConfig, {}, fakeAuth, authMiddleware);
+      var options = makeSimpleProxyStub.firstCall.args[2];
+      assert.deepStrictEqual(options.requestProcessingOptions.headersToRemove.sort(), ['authorization', 'cookie']);
+    });
+
+    it('installZssProxy strips authorization but preserves cookie for reconstruction by addProxyAuthorizations', function () {
+      apiml.installZssProxy({ use: sinon.spy() }, zoweConfig, {}, fakeAuth, authMiddleware);
+      var options = makeSimpleProxyStub.firstCall.args[2];
+      assert.deepStrictEqual(options.requestProcessingOptions.headersToRemove, ['authorization']);
     });
   });
 });
