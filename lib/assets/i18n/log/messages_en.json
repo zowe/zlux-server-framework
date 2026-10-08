@@ -319,6 +319,7 @@
   "ZWED0187W":"Login rate limit write failed for key=${key}. Error=%s",
   "ZWED0188W":"Failed to record token revocation. Error=%s",
   "ZWED0189W":"Failed to check token revocation, allowing. Error=%s",
+  "ZWED0190W": "Skipping invalid allowedPorts entry: %s",
   
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",

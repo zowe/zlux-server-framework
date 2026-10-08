@@ -50,6 +50,31 @@ const WS_CLOSE_MESSAGE_LENGTH_LIMIT = 123;
 const SECURITY_BAD_CERTIFICATE_PROMPT = 1;
 const SECURITY_BAD_CERTIFICATE_ALLOW = 0;
 
+//Ports a terminal client may reach when components.<name>.allowedPorts is not configured: SSH, telnet, telnet over TLS
+const DEFAULT_ALLOWED_PORTS = [22, 23, 992];
+
+/*
+  The server-side rules for where a terminal websocket may connect to. Nothing the client sends can widen them.
+  Configured per terminal type under components.<componentName> in zowe.yaml:
+    allowList                 hostnames, *.wildcards and CIDR subnets. Unset: only public addresses are reachable.
+                              ["*"] lifts the restriction.
+    allowedPorts              ports or "low-high" ranges. Unset: DEFAULT_ALLOWED_PORTS.
+    allowInvalidCertificates  true lets a client skip TLS certificate validation (badCert=0). Unset: never.
+*/
+function createDestinationPolicy(componentConfig) {
+  const config = componentConfig || {};
+  return {
+    allowList: zluxUtil.prepareAllowList(config.allowList),
+    allowedPorts: zluxUtil.preparePortList(config.allowedPorts, DEFAULT_ALLOWED_PORTS),
+    allowInvalidCertificates: config.allowInvalidCertificates === true
+  };
+}
+
+function getComponentConfig(context, componentName) {
+  const all = context.plugin.server.config.all;
+  return (all && all.components && all.components[componentName]) || null;
+}
+
 var utf8ArrayToB64 = function(data) {
   var out = [];
   var start = 0;
@@ -154,7 +179,7 @@ const binToB64 =[0x41,0x42,0x43,0x44,0x45,0x46,0x47,0x48,0x49,0x4A,0x4B,0x4C,0x4
                  0x67,0x68,0x69,0x6A,0x6B,0x6C,0x6D,0x6E,0x6F,0x70,0x71,0x72,0x73,0x74,0x75,0x76,
                  0x77,0x78,0x79,0x7A,0x30,0x31,0x32,0x33,0x34,0x35,0x36,0x37,0x38,0x39,0x2B,0x2F];
 
-function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, handlers, allowList) {
+function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, handlers, policy) {
   websocket.on('error', (error) => {
     this.logger.warn("ZWED0129W", error); //this.logger.warn("websocket error", error);
     this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR, 'websocket error occurred');
@@ -162,7 +187,8 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
   websocket.on('close',(code,reason)=>{this.handleWebsocketClosed(code,reason);});
 
   this.handlers = handlers;
-  this.allowList = allowList || null;
+  //a proxy built without a policy gets the restrictive defaults, never an open one
+  this.policy = policy || createDestinationPolicy(null);
   this.host;
   this.hostPort;
   this.hostSocket;
@@ -249,7 +275,7 @@ TerminalWebsocketProxy.prototype.handleWebsocketClosed = function(code, reason) 
     try {
       this.hostSocket.destroy();//kill the host socket too
     } catch (e) {
-      this.logger.warn("ZWED0132W", his.identifierString(), e.message); //this.logger.warn(this.identifierString()+' Error when destroying host socket. e='+e.message);
+      this.logger.warn("ZWED0132W", this.identifierString(), e.message); //this.logger.warn(this.identifierString()+' Error when destroying host socket. e='+e.message);
     }
   }
   this.hostConnected = false;
@@ -513,9 +539,15 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
   var t = this;
 
   if (host && port) {
-    zluxUtil.isHostAllowed(t.allowList, host).then(function(allowed) {
-      if (allowed) {
-        t._doConnect(host, port, ws, security);
+    var validPort = zluxUtil.normalizePort(port);
+    if (validPort === null || !zluxUtil.isPortAllowed(t.policy.allowedPorts, validPort)) {
+      t.logger.warn('ZWED0308W', port, host, t.identifierString()); //t.logger.warn('Port '+port+' on host '+host+' rejected, not in allowedPorts. '+t.identifierString());
+      t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden');
+      return;
+    }
+    zluxUtil.checkHostAccess(t.policy.allowList, host).then(function(access) {
+      if (access.allowed) {
+        t._doConnect(host, validPort, ws, security, access.addresses);
       } else {
         t.logger.warn('ZWED0181W', host, t.identifierString()); //t.logger.warn('Host '+host+' rejected, not in allowList. '+t.identifierString());
         t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden');
@@ -527,7 +559,8 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
   }
 };
 
-TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security) {
+//addresses: the IPs the host check approved. When present, the socket may only connect to those.
+TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security, addresses) {
   var t = this;
   var connectOptions = null;
   t.websocket = ws;
@@ -544,14 +577,13 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security)
     }
     fingerprint = fingerprint.substring(0,fingerprint.length-1);
     t.logger.debug("ZWED0280I", t.identifierString(), fingerprint); //t.logger.debug(t.identifierString()+' Checking if certificate is OK. Fingerprint='+fingerprint);
-    if (security.badCert != SECURITY_BAD_CERTIFICATE_ALLOW) {
-      t.awaitingCertificateVerification = true;
-      ws.send(JSON.stringify({
-        t: 'CERT_PROMPT',
-        fp: fingerprint,
-        o: certificate
-      }));
-    }
+    //only installed when certificates are being validated, so the user is always asked
+    t.awaitingCertificateVerification = true;
+    ws.send(JSON.stringify({
+      t: 'CERT_PROMPT',
+      fp: fingerprint,
+      o: certificate
+    }));
     return undefined;
   };
 
@@ -566,7 +598,12 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security)
     else if (security && security.t === 'tls') {
       t.usingTLS = true;
       t.securitySettings = security;
-      var rejectUnauthorized = ((typeof security.badCert == 'number') && security.badCert == SECURITY_BAD_CERTIFICATE_ALLOW) ? false : true;
+      //badCert is only a request from the client. It is honored only if the server config allows invalid certificates.
+      var clientAllowsBadCert = (typeof security.badCert == 'number') && security.badCert === SECURITY_BAD_CERTIFICATE_ALLOW;
+      if (clientAllowsBadCert && !t.policy.allowInvalidCertificates) {
+        t.logger.warn('ZWED0309W', t.identifierString()); //t.logger.warn('Client requested to skip TLS certificate validation, but allowInvalidCertificates is not enabled. '+t.identifierString());
+      }
+      var rejectUnauthorized = !(clientAllowsBadCert && t.policy.allowInvalidCertificates);
       connectOptions = {
         rejectUnauthorized: rejectUnauthorized//True casues rejection of certs if the CA cannot handle them. For example, self-signed exceptions are thrown
       };
@@ -584,8 +621,10 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security)
         if (securityObjects.crl) {
           connectOptions.crl = securityObjects.crl;
         }
-      }      
+      }
     }
+    //connect to the addresses that passed the host check, not to whatever the name resolves to now
+    var pinnedLookup = (addresses && addresses.length > 0) ? zluxUtil.makePinnedLookup(addresses) : undefined;
     if (!t.usingTLS) {
       this.hostSocket = net.Socket();
     }
@@ -633,13 +672,16 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security)
       try {
         if (t.usingTLS) {
           t.logger.debug('ZWED0283I'); //t.logger.debug('Attempting TLS connect');
-          this.hostSocket = tls.connect(port,host,connectOptions,connectHandler);
+          connectOptions.port = port;
+          connectOptions.host = host;
+          connectOptions.lookup = pinnedLookup;
+          this.hostSocket = tls.connect(connectOptions,connectHandler);
           this.hostSocket.on('error',errorHandler);
         }
         else {
           t.logger.debug('ZWED0284I'); //t.logger.debug('Attempting SSH or telnet connect');
           this.hostSocket.on('error',errorHandler);
-          this.hostSocket.connect(port, host, connectHandler);
+          this.hostSocket.connect({port: port, host: host, lookup: pinnedLookup}, connectHandler);
         }
       } catch (e) {
         var errorMessage = 'Error durring connection='+e.message;
@@ -762,9 +804,6 @@ exports.tn3270WebsocketRouter = function(context) {
     handlers can come from /lib for now.
   */
   let handlers = scanAndImportHandlers(context.logger, context.plugin.server.config.all);
-  const allowList = (context.plugin.server.config.all && context.plugin.server.config.all.components
-    && context.plugin.server.config.all.components['tn3270-ng2'])
-    ? context.plugin.server.config.all.components['tn3270-ng2'].allowList || null : null;
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
       createSecurityObjects(context.tlsOptions);
@@ -783,11 +822,9 @@ exports.tn3270WebsocketRouter = function(context) {
       context.logger.info('ZWED0106I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);      
       next();
     });
-    const tn3270RawAllowList = (context.plugin.server.config.all && context.plugin.server.config.all.components && context.plugin.server.config.all.components['tn3270-ng2'])
-      ? context.plugin.server.config.all.components['tn3270-ng2'].allowList || null : null;
-    const tn3270AllowList = zluxUtil.prepareAllowList(tn3270RawAllowList);
+    const tn3270Policy = createDestinationPolicy(getComponentConfig(context, 'tn3270-ng2'));
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(tn3270MessageConfig,req.ip,context,ws,handlers,tn3270AllowList);
+      new TerminalWebsocketProxy(tn3270MessageConfig,req.ip,context,ws,handlers,tn3270Policy);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);
@@ -810,8 +847,9 @@ exports.tn5250WebsocketRouter = function(context) {
       context.logger.info('ZWED0107I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
     });
+    const tn5250Policy = createDestinationPolicy(getComponentConfig(context, 'tn5250-ng2'));
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(tn5250MessageConfig,req.ip,context,ws,handlers);
+      new TerminalWebsocketProxy(tn5250MessageConfig,req.ip,context,ws,handlers,tn5250Policy);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);
@@ -819,9 +857,6 @@ exports.tn5250WebsocketRouter = function(context) {
 };
 exports.vtWebsocketRouter = function(context) {
   let handlers = scanAndImportHandlers(context.logger);
-  const allowList = (context.plugin.server.config.all && context.plugin.server.config.all.components
-    && context.plugin.server.config.all.components['vt-ng2'])
-    ? context.plugin.server.config.all.components['vt-ng2'].allowList || null : null;
   ssh.setLogger(context.logger);
   return new Promise(function(resolve, reject) {
     if (!TerminalWebsocketProxy.securityObjects) {
@@ -838,11 +873,9 @@ exports.vtWebsocketRouter = function(context) {
       context.logger.info('ZWED0108I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
     });
-    const vtRawAllowList = (context.plugin.server.config.all && context.plugin.server.config.all.components && context.plugin.server.config.all.components['vt-ng2'])
-      ? context.plugin.server.config.all.components['vt-ng2'].allowList || null : null;
-    const vtAllowList = zluxUtil.prepareAllowList(vtRawAllowList);
+    const vtPolicy = createDestinationPolicy(getComponentConfig(context, 'vt-ng2'));
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(vtMessageConfig,req.ip,context,ws,handlers,vtAllowList);
+      new TerminalWebsocketProxy(vtMessageConfig,req.ip,context,ws,handlers,vtPolicy);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);
