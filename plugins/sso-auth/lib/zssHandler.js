@@ -13,6 +13,7 @@ const ipaddr = require('ipaddr.js');
 const url = require('url');
 const zluxUtil = require('../../../lib/util.js');
 const makeProfileNameForRequest = require('./safprofile').makeProfileNameForRequest;
+const { TOKEN_NAME } = require('./localJwt');
 const DEFAULT_CLASS = "ZOWE";
 const ZSS_SESSION_TIMEOUT_HEADER = "session-expires-seconds";
 const DEFAULT_EXPIRATION_MS = 3600000 //hour;
@@ -41,7 +42,8 @@ class ZssHandler {
           '/VSAMdatasetContents',
           '/datasetMetadata',
           '/omvs',
-          '/security-mgmt'
+          '/security-mgmt',
+          '/passticket'
         ]
         const pathname = url.parse(request.originalUrl).pathname;
         const matchesPrefix = (prefix) => pathname === prefix || pathname.startsWith(prefix + '/');
@@ -231,9 +233,18 @@ class ZssHandler {
     }
   }
 
+  // Forwards only the cookies ZSS itself recognizes (its own session cookie and/or
+  // the apimlAuthenticationToken JWT), never the client's raw Cookie header.
   addProxyAuthorizations(req1, req2Options, sessionState) {
-    if (req1.cookies && req1.cookies[this.zssCookieName]) {
-      req2Options.headers['cookie'] = req1.headers['cookie'];
+    const parts = [];
+    if (sessionState.zssCookies) {
+      parts.push(sessionState.zssCookies);
+    }
+    if (req1.cookies && req1.cookies[TOKEN_NAME]) {
+      parts.push(`${TOKEN_NAME}=${req1.cookies[TOKEN_NAME]}`);
+    }
+    if (parts.length > 0) {
+      req2Options.headers['cookie'] = parts.join('; ');
     }
   }
 
@@ -251,6 +262,36 @@ class ZssHandler {
           resolve({ success: false, responseCode: response.statusCode, response: JSON.parse(response.body)['status'] });
         }
       }).catch((e) =>  {
+        reject(e);
+      });
+    });
+  }
+
+  requestPassTicket(request, sessionState, applicationName) {
+    return new Promise((resolve, reject) => {
+      let options = {
+        method: 'POST',
+        body: { applicationName }
+      };
+      this.logger.debug(`Requesting passticket for applid=${applicationName}`);
+      request.zluxData.webApp.callRootService("passticket", options).then((response) => {
+        if (response.statusCode === 200) {
+          const body = JSON.parse(response.body);
+          resolve({
+            userId: body.userId,
+            applicationName: body.applicationName,
+            ticket: body.ticket
+          });
+        } else {
+          let errorMessage;
+          try {
+            errorMessage = JSON.parse(response.body).error;
+          } catch (e) {
+            errorMessage = response.body;
+          }
+          reject(new Error(`ZWED0212E - PassTicket generation failed: ${errorMessage}`));
+        }
+      }).catch((e) => {
         reject(e);
       });
     });
