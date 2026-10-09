@@ -306,3 +306,111 @@ describe('webauth login rate limiting', function () {
     assert.strictEqual(handler.callCount, RATE_LIMIT_CONF.maxAttempts + 5);
   });
 });
+
+// A failed login used to initialise req.session.zlux.expirationTime, which is what
+// the authorization middleware checks to decide whether a session is still valid.
+// That let a caller who had only sent a failed login pass the session gate.
+describe('webauth session envelope', function () {
+  let webauth;
+  let savedClusterManager;
+  let isConfiguredStub;
+
+  before(function () {
+    savedClusterManager = process.clusterManager;
+    delete process.clusterManager;
+    isConfiguredStub = sinon.stub(apimlStorage, 'isConfigured').returns(false);
+    try {
+      webauth = require('../../lib/webauth');
+    } catch (e) {
+      console.warn('Could not load webauth module:', e.message);
+      this.skip();
+    }
+  });
+
+  after(function () {
+    if (savedClusterManager !== undefined) {
+      process.clusterManager = savedClusterManager;
+    }
+    isConfiguredStub.restore();
+  });
+
+  const SESSION_TIMEOUT_MS = 3600000;
+  const RATE_LIMIT_DISABLED = { enabled: false };
+
+  function makeHandler(succeeds) {
+    return {
+      pluginID: 'testAuth',
+      pluginDef: { authenticationCategory: 'test' },
+      getStatus: () => ({ authenticated: false }),
+      authenticate() {
+        return Promise.resolve(succeeds
+          ? { success: true, username: 'ALICE', expms: 100000 }
+          : { success: false, reason: 'BadCredentials' });
+      },
+      getCapabilities: () => ({})
+    };
+  }
+
+  function makeAuthManager(handler) {
+    return {
+      getAllHandlers: () => [handler],
+      getAuthHandlerForService: () => null,
+      getBestAuthenticationHandler: () => handler,
+      sessionTimeoutMs: SESSION_TIMEOUT_MS,
+      defaultType: 'test',
+      isRbacEnabled: () => false
+    };
+  }
+
+  function makeReq() {
+    return {
+      ip: '10.0.0.1',
+      body: { username: 'alice', password: 'whatever' },
+      session: { id: 'test-session-' + Math.random() },
+      zluxData: { webApp: { authServiceHandleMaps: {} }, plugin: {} }
+    };
+  }
+
+  function makeRes() {
+    return {
+      _status: null,
+      _json: null,
+      status(code) { this._status = code; return this; },
+      json(obj) { this._json = obj; return this; },
+      send() { return this; },
+      set() { return this; },
+      end() { return this; }
+    };
+  }
+
+  it('does not create the session envelope after a failed login', async function () {
+    const auth = webauth(makeAuthManager(makeHandler(false)), 'cookie', true, RATE_LIMIT_DISABLED);
+    const req = makeReq();
+    const res = makeRes();
+    await auth.doLogin(req, res);
+    assert.strictEqual(res._status, 401);
+    assert.strictEqual(req.session.zlux, undefined,
+      'a failed login must not leave a session envelope that the session gate would accept');
+  });
+
+  it('does not create the session envelope after repeated failed logins', async function () {
+    const auth = webauth(makeAuthManager(makeHandler(false)), 'cookie', true, RATE_LIMIT_DISABLED);
+    const req = makeReq();
+    for (let i = 0; i < 3; i++) {
+      await auth.doLogin(req, makeRes());
+    }
+    assert.strictEqual(req.session.zlux, undefined);
+  });
+
+  it('creates the session envelope with a future expiration after a successful login', async function () {
+    const auth = webauth(makeAuthManager(makeHandler(true)), 'cookie', true, RATE_LIMIT_DISABLED);
+    const req = makeReq();
+    const res = makeRes();
+    const before = Date.now();
+    await auth.doLogin(req, res);
+    assert.strictEqual(res._status, 200);
+    assert.ok(req.session.zlux, 'a successful login must create the session envelope');
+    assert.ok(req.session.zlux.expirationTime > before,
+      'expirationTime must be set in the future');
+  });
+});
