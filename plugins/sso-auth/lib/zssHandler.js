@@ -45,18 +45,21 @@ class ZssHandler {
           '/security-mgmt',
           '/passticket'
         ]
-        for(let i = 0; i < bypassUrls.length; i++){
-          if(request.originalUrl.startsWith(bypassUrls[i])){
-            result.authorized = true;
-            this.setCookieFromRequest(request, sessionState);
-            return result;
-          }
+        const pathname = url.parse(request.originalUrl).pathname;
+        const matchesPrefix = (prefix) => pathname === prefix || pathname.startsWith(prefix + '/');
+
+        if (bypassUrls.some(matchesPrefix)) {
+          result.authorized = true;
+          this.setCookieFromRequest(request, sessionState);
+          return result;
         }
+
         if (!sessionState.authenticated) {
           return result;
         }
         result.authenticated = true;
         request.username = sessionState.username;
+
         if (options.bypassAuthorizatonCheck) {
           result.authorized = true;
           this.setCookieFromRequest(request, sessionState);
