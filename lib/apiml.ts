@@ -8,6 +8,7 @@
   Copyright Contributors to the Zowe Project.
 */
 import * as BBPromise from 'bluebird';
+import { EurekaClient } from './eureka-client';
 import * as zluxUtil from './util';
 import * as http from 'node:http';
 import * as https from 'node:https';
@@ -49,12 +50,12 @@ const MEDIATION_LAYER_EUREKA_DEFAULTS = {
 };
 
 
-const MEDIATION_LAYER_INSTANCE_DEFAULTS = (zluxProto, zluxHostname, zluxPort) => {
+const MEDIATION_LAYER_INSTANCE_DEFAULTS = (zluxProto: string, zluxHostname: string, zluxPort: number) => {
   const ipv6CompatHostname = zluxHostname.includes(':') ? '[' + zluxHostname + ']' : zluxHostname;
   
   return {
     
-  instanceId: "localhost:zowe-zlux:8543",
+  instanceId: "localhost:zowe-zlux:7556",
   app: "zlux",
   hostName: "localhost",
   ipAddr: "127.0.0.1", 
@@ -101,7 +102,6 @@ class ApimlConnector {
   isApiCatalogClientAttls: boolean;
   vipAddress: string;
   isClientAttls: boolean;
-  discoveryHost: string;
   hostName: string;
   port: number;
   gatewayPort: number;
@@ -109,10 +109,9 @@ class ApimlConnector {
   tlsOptions: any;
   traceTls: boolean;
   discoveryUrls: string[];
-  eurekaClient: any;
+  eurekaClient: EurekaClient;
   eurekaOverrides: Record<string, any>;
   ipAddr: string;
-
 
   constructor({ hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
     Object.assign(this, { hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
@@ -166,65 +165,36 @@ class ApimlConnector {
     }
   })
 
-  checkAgent(timeout, serviceName) {
+  checkAgent(timeout: number, serviceName: string) {
     let timer = timeout ? timeout : DEFAULT_AGENT_CHECK_TIMEOUT;
     const end = Date.now() + timer;
-    
+
     return new BBPromise((resolve, reject) => {
-      const optionsArray = this.getRequestOptionsArray('GET', `/eureka/apps/${serviceName}`);
-      let optionsIndex = 0;
-      let retryCount = 0;
-      
       const issueRequest = () => {
-        const options = optionsArray[optionsIndex];
         if (Date.now() > end) {
-          log.warn(`ZWED0045W`, this.discoveryHost, this.port);
+          log.warn(`ZWED0045W`, this.hostName, this.port);
           return reject(new Error(`Call timeout when fetching agent status from APIML`));
         }
-        
-        let data = [];
 
-        let httpModule: typeof http | typeof https = this.isClientAttls ? http : https;
-        
-        const req = httpModule.request(options, (res) => {
-          res.on('data', (chunk) => data.push(chunk));
-          res.on('end', () => {
-            log.debug(`Query rc=`,res.statusCode);
-            if (res.statusCode == 200) {
-              resolve();
-            } else {
-              let dataJson;
-              try {
-                if (data.length > 0) {
-                  dataJson = JSON.parse(Buffer.concat(data).toString());
-                }
-              } catch (e) {
-                //leave undefined
-              }
-              log.debug(`Could not find agent on APIML. Trying again in ${AGENT_CHECK_RECONNECT_DELAY}ms. Code=${res.statusCode}. Body=${dataJson}`);
-              setTimeout(issueRequest, AGENT_CHECK_RECONNECT_DELAY);
-            }
-          });
-        });
-        req.setTimeout(timer,()=> {
-          reject(new Error(`Call timeout when fetching agent status from APIML`));
-        });
-        req.on('error', (error) => {
-          retryCount++;
-          if (retryCount >= 10) {
-            log.warn("ZWED0180W", options.host, options.port, error.message);
+        this.eurekaClient.getInstancesByAppId(serviceName, (error, application) => {
+          if (error) {
+            log.warn("ZWED0180W", 'discovery', '', error.message);
+            setTimeout(issueRequest, AGENT_CHECK_RECONNECT_DELAY);
+            return;
           }
-          //
-          optionsIndex = (optionsIndex+1) % optionsArray.length;
-          setTimeout(issueRequest, AGENT_CHECK_RECONNECT_DELAY);
+          if (application && application.application) {
+            resolve();
+          } else {
+            log.debug(`Could not find agent on APIML. Trying again in ${AGENT_CHECK_RECONNECT_DELAY}ms.`);
+            setTimeout(issueRequest, AGENT_CHECK_RECONNECT_DELAY);
+          }
         });
-        req.end();
       };
-      
+
       issueRequest();
     });
   }
-  
+
   private _makeMainInstanceProperties(overrides?) {
     const protocolObject = {
       // http port is specified no matter what
@@ -250,25 +220,27 @@ class ApimlConnector {
     const ipv6CompatHostname = this.hostName.includes(':') ? '[' + this.hostName + ']' : this.hostName;
     const instance = Object.assign({}, MEDIATION_LAYER_INSTANCE_DEFAULTS(zluxProto, this.hostName, this.port));
     Object.assign(instance, overrides);
+
     Object.assign(instance,  {
-       instanceId: `${ipv6CompatHostname}:zlux:${this.port}`,
-       hostName:  this.hostName,
-       ipAddr: this.ipAddr,
-       vipAddress: "zlux",//this.vipAddress,
-       statusPageUrl: `${zluxProto}://${ipv6CompatHostname}:${this.port}/server/eureka/info`,
-       healthCheckUrl: `${zluxProto}://${ipv6CompatHostname}:${this.port}/server/eureka/health`,
-       homePageUrl: `${zluxProto}://${ipv6CompatHostname}:${this.port}/`,
-       port: {
-         "$": protocolObject.httpPort, // This is a workaround for the mediation layer
-         "@enabled": ''+protocolObject.httpEnabled
-       },
-       securePort: {
-         "$": protocolObject.httpsPort,
-         "@enabled": ''+protocolObject.httpsEnabled
-       }
-     });
-     // TODO: replace this with a single variable for detecting AT-TLS?
-     if (this.isGatewayClientAttls) {
+      instanceId: `${ipv6CompatHostname}:zlux:${this.port}`,
+      hostName:  this.hostName,
+      ipAddr: this.ipAddr,
+      vipAddress: "zlux",//this.vipAddress,
+      statusPageUrl: `${zluxProto}://${ipv6CompatHostname}:${this.port}/server/info`,
+      healthCheckUrl: `${zluxProto}://${ipv6CompatHostname}:${this.port}/server/health`,
+      secureHealthCheckUrl: `https://${ipv6CompatHostname}:${this.port}/server/health`,
+      homePageUrl: `${zluxProto}://${ipv6CompatHostname}:${this.port}/`,
+      port: {
+        "$": protocolObject.httpPort, // This is a workaround for the mediation layer
+        "@enabled": ''+protocolObject.httpEnabled
+      },
+      securePort: {
+        "$": protocolObject.httpsPort,
+        "@enabled": ''+protocolObject.httpsEnabled
+      }
+    });
+    // TODO: replace this with a single variable for detecting AT-TLS?
+    if (this.isGatewayClientAttls) {
       let allowedOrigins = `https://${this.hostName}:${this.gatewayPort}`;
       if (this.catalogPort != null && `${this.catalogPort}`.trim().length > 0) {
         allowedOrigins = `${allowedOrigins},https://${this.hostName}:${this.catalogPort}`
@@ -277,9 +249,9 @@ class ApimlConnector {
         "apiml.corsEnabled": "true",
         "apiml.corsAllowedOrigins": allowedOrigins
       })
-     }
+    }
 
-     log.debug("ZWED0143I", JSON.stringify(instance)); //log.debug("API ML registration settings:", JSON.stringify(instance));
+    log.debug("ZWED0143I", JSON.stringify(instance)); //log.debug("API ML registration settings:", JSON.stringify(instance));
 
     return instance;
   }
@@ -302,7 +274,9 @@ class ApimlConnector {
       requestMiddleware: function (requestOpts, done) {
         done(Object.assign(requestOpts, overrideOptions));
       },
-      ssl: !this.isClientAttls
+      tlsOptions: overrideOptions,
+      ssl: !this.isClientAttls,
+      logger: log
     }
     log.debug("ZWED0144I", JSON.stringify(zluxProxyServerInstanceConfig, null, 2)); //log.debug("zluxProxyServerInstanceConfig: " 
         //+ JSON.stringify(zluxProxyServerInstanceConfig, null, 2))
@@ -310,27 +284,12 @@ class ApimlConnector {
     zluxProxyServerInstanceConfig.eureka.serviceUrls = { default: serviceUrls };
     log.info(`ZWED0020I`, serviceUrls.join(',')); //log.info(`Registering at ${url}...`);
     log.debug("ZWED0145I", JSON.stringify(zluxProxyServerInstanceConfig)); //log.debug(`zluxProxyServerInstanceConfig ${JSON.stringify(zluxProxyServerInstanceConfig)}`)
-    const eurekaClient = new eureka(zluxProxyServerInstanceConfig);
-    //this library has a very simple logger that has the same function names as ours, so why not just use ours for better formatting
-    eurekaClient.logger = log;
-    let errorHandler = log.severe;
-    let lastErrorMessage;
-    let hideTimingError = (...args) => {
-      if (args[0] == 'Problem making eureka request' || args[0] == 'Eureka request failed to endpoint') {
-        lastErrorMessage = args;
-      } else {
-        errorHandler(...args);
-      }
-    };
-    log.error = hideTimingError;
+    const eurekaClient = new EurekaClient(zluxProxyServerInstanceConfig as any);
     this.eurekaClient = eurekaClient;
     const ipAddr = this.ipAddr;
     return new BBPromise((resolve, reject) => {
       eurekaClient.start((error) => {
-        //suppress expected errors (due to timing) by substituting logger temporarily, but capture last seen error and log it after restoring error logger on connect
-        log.error = errorHandler;
         if (error) {
-          log.error(lastErrorMessage);
           log.warn('ZWED0005W', error); //log.warn(error);
           reject(error);
         } else {
@@ -341,7 +300,7 @@ class ApimlConnector {
     });
   }
 
-  getServiceUrls() {
+  getServiceUrls(): string[] {
     let urls = this.discoveryUrls.map(url => url + (url.endsWith('/') ? '' : '/') + 'apps');
     if (this.isClientAttls) {
       return urls.map(url => url.replaceAll('https', 'http'));
@@ -685,8 +644,8 @@ class ApimlConnector {
     };
   }
 
-  static getUserId(apimlTkn) {
-    let base64UrlToBase64 = (input) => {
+  static getUserId(apimlTkn: string): string {
+    let base64UrlToBase64 = (input: string): string => {
       let result = input.replace(/-/g, '+').replace(/_/g, '/');
       const padCount = result.length % 4;
       if (padCount > 0) {
@@ -698,7 +657,7 @@ class ApimlConnector {
       return result;
     }
 
-    let userid;
+    let userid: string;
     try {
       const payloadBase64Url = apimlTkn.split('.')[1];
       const payloadBase64 = base64UrlToBase64(payloadBase64Url);
