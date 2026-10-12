@@ -87,7 +87,8 @@ const SSH_MESSAGE = exports.MESSAGE = {
     SSH_MSG_CHANNEL_REQUEST             : 98,
     SSH_MSG_CHANNEL_SUCCESS             : 99,
     SSH_MSG_CHANNEL_FAILURE             : 100,
-    ERROR                               : 1000
+    ERROR                               : 1000,
+    HOST_KEY_PROMPT                     : 1001
 }
 
 const CODE_TO_NAME = {};
@@ -390,6 +391,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
   }
   
   var rawDataLength = rawData.length;
+  var hostKeyPromptSent = false;
   while (currentPosition<rawDataLength){ 
     sshLogger.log(sshLogger.FINER, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
                           + `Raw data length: ${rawDataLength}, position before read: ${currentPosition}`);
@@ -1036,6 +1038,12 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
      
         //if(traceCrypto) console.log("getting SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY");
         sessionData.expectedReplyMsgCode=SSH_MESSAGE.SSH_MSG_NEWKEYS;
+
+        // Compute SHA-256 fingerprint of the host key for user verification
+        var hostKeyHash = crypto.createHash('sha256').update(hostKeyAndCertificates).digest('hex');
+        var hostKeyFingerprint = hostKeyHash.match(/.{2}/g).join(':');
+        sshMessages.push({ type: SSH_MESSAGE.HOST_KEY_PROMPT, fingerprint: hostKeyFingerprint });
+        hostKeyPromptSent = true;
         break;
       }
       
@@ -1087,6 +1095,14 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
     }
     sshLogger.debug('rcv=%s done', CODE_TO_NAME[msgCode]);
     terminalWebsocketProxy.sshSessionData=sessionData;
+    if (hostKeyPromptSent) {
+      // Save any remaining SSH data from this TCP segment to be replayed after user approves
+      var remaining = rawData.slice(currentPosition);
+      if (remaining.length > 0) {
+        sessionData.incompletePacketBuffer = remaining;
+      }
+      break;
+    }
   }
   if (traceCrypto) console.log('Done with socket read');
 

@@ -252,6 +252,13 @@ TerminalWebsocketProxy.prototype.handleWebsocketClosed = function(code, reason) 
       this.logger.warn("ZWED0132W", his.identifierString(), e.message); //this.logger.warn(this.identifierString()+' Error when destroying host socket. e='+e.message);
     }
   }
+  // If the client closed the WebSocket while a certificate prompt was pending,
+  // treat it as an implicit rejection: discard buffered host data and reset prompt state.
+  if (this.awaitingCertificateVerification) {
+    this.bufferedHostMessages = [];
+    this.awaitingCertificateVerification = false;
+    this.outstandingCertFingerprint = undefined;
+  }
   this.hostConnected = false;
 };
 
@@ -291,25 +298,35 @@ TerminalWebsocketProxy.prototype.handleTerminalClientMessage = function(message,
     else {
       if (jsonObject.t === 'CERT_RES') {
         if (this.awaitingCertificateVerification) {
-          if (jsonObject.fp === this.outstandingCertFingerprint) {
+          // Accept a missing fp field (some clients omit it); treat as matching the outstanding fingerprint
+          var responseFp = (jsonObject.fp !== undefined) ? jsonObject.fp : this.outstandingCertFingerprint;
+          if (responseFp === this.outstandingCertFingerprint) {
             if (jsonObject.a === true) {//accepted
               this.logger.debug("ZWED0270I", this.identifierString(), this.bufferedHostMessages.length); //this.logger.debug(this.identifierString()+' Certificate accepted by client, processing buffered host data messages. Messages to process='+this.bufferedHostMessages.length);
-
+              this.awaitingCertificateVerification = false;
+              // For SSH: if KEX data was deferred within the same TCP segment, trigger its processing
+              if (this.usingSSH && this.sshSessionData &&
+                  this.sshSessionData.incompletePacketBuffer &&
+                  this.bufferedHostMessages.length === 0) {
+                this.bufferedHostMessages.push(Buffer.alloc(0));
+              }
               var hostMessage;              
               while (this.bufferedHostMessages.length > 0) {
-                hostMessage = this.bufferedHostMessages.pop();
+                hostMessage = this.bufferedHostMessages.shift(); // FIFO: process in arrival order
                 this.handleData(hostMessage, websocket);
               }
-              this.awaitingCertificateVerification = false;
             }
             else {//rejected
               for (var i = 0; i < this.bufferedHostMessages.length; i++) {
                 delete this.bufferedHostMessages[i];
               }
               this.bufferedHostMessages = [];
-              var errorMessage = {text:this.identifierString()+' Certificate rejection recieved.',
-                                  t:'CERT_REJECT'};
-              this.logger.debug("ZWED0271I", errorMessage.text); //this.logger.debug(errorMessage.text);
+              this.awaitingCertificateVerification = false;
+              var certRejectMsg = {text:this.identifierString()+' Certificate rejected by user.',
+                                   t:'CERT_REJECT'};
+              this.logger.debug("ZWED0271I", certRejectMsg.text); //this.logger.debug(certRejectMsg.text);
+              this.wsSend(websocket, JSON.stringify(certRejectMsg));
+              this.closeConnection(websocket, WEBSOCKET_REASON_TERMPROXY_GOING_AWAY, 'Certificate rejected');
             }
           } else {
             this.logger.warn("ZWED0135W", this.identifierString()); //this.logger.warn(this.identifierString()+' CERT_RES seen but fingerprint does not match outstanding certificate request.');
@@ -418,8 +435,14 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
     if (t.usingSSH){
       var sshMessages = ssh.processEncryptedData(t,data);
       if (sshMessages.length > 0) {
-        sshMessages.forEach(function(sshMessage) {
+        for (var mi = 0; mi < sshMessages.length; mi++) {
+          var sshMessage = sshMessages[mi];
           switch (sshMessage.type) {
+          case SSH_MESSAGE.HOST_KEY_PROMPT:
+            t.awaitingCertificateVerification = true;
+            t.outstandingCertFingerprint = sshMessage.fingerprint;
+            t.wsSend(ws, JSON.stringify({ t: 'CERT_PROMPT', fp: sshMessage.fingerprint, sshMode: true }));
+            break;
           case SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST:
             sshMessage.t = 'SSH_USER_AUTH_INFO_REQ';
             replies.push(sshMessage);
@@ -471,7 +494,8 @@ TerminalWebsocketProxy.prototype.handleData = function(data, ws) {
           default:
             //ignore
           }
-        });
+          if (t.awaitingCertificateVerification) { break; } // HOST_KEY_PROMPT was seen; stop dispatching
+        }
       }
     } else {
       var b64Data = utf8ArrayToB64(data);
@@ -546,6 +570,7 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security)
     t.logger.debug("ZWED0280I", t.identifierString(), fingerprint); //t.logger.debug(t.identifierString()+' Checking if certificate is OK. Fingerprint='+fingerprint);
     if (security.badCert != SECURITY_BAD_CERTIFICATE_ALLOW) {
       t.awaitingCertificateVerification = true;
+      t.outstandingCertFingerprint = fingerprint;
       ws.send(JSON.stringify({
         t: 'CERT_PROMPT',
         fp: fingerprint,
