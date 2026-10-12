@@ -50,7 +50,7 @@ const WS_CLOSE_MESSAGE_LENGTH_LIMIT = 123;
 const SECURITY_BAD_CERTIFICATE_PROMPT = 1;
 const SECURITY_BAD_CERTIFICATE_ALLOW = 0;
 
-//Ports a terminal client may reach when components.<name>.allowedPorts is not configured: SSH, telnet, telnet over TLS
+//Ports a terminal client may reach when components.<name>.allowPorts is not configured: SSH, telnet, telnet over TLS
 const DEFAULT_ALLOWED_PORTS = [22, 23, 992];
 
 /*
@@ -58,13 +58,13 @@ const DEFAULT_ALLOWED_PORTS = [22, 23, 992];
   Configured per terminal type under components.<componentName> in zowe.yaml:
     allowList                 hostnames, *.wildcards and CIDR subnets. Unset: only public addresses are reachable.
                               ["*"] lifts the restriction.
-    allowedPorts              ports or "low-high" ranges. Unset: DEFAULT_ALLOWED_PORTS.
+    allowPorts                ports or "low-high" ranges. Unset: DEFAULT_ALLOWED_PORTS.
 */
 function createDestinationPolicy(componentConfig) {
   const config = componentConfig || {};
   return {
     allowList: zluxUtil.prepareAllowList(config.allowList),
-    allowedPorts: zluxUtil.preparePortList(config.allowedPorts, DEFAULT_ALLOWED_PORTS)
+    allowPorts: zluxUtil.preparePortList(config.allowPorts, DEFAULT_ALLOWED_PORTS)
   };
 }
 
@@ -538,8 +538,8 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
 
   if (host && port) {
     var validPort = zluxUtil.normalizePort(port);
-    if (validPort === null || !zluxUtil.isPortAllowed(t.policy.allowedPorts, validPort)) {
-      t.logger.warn('ZWED0308W', port, host, t.identifierString()); //t.logger.warn('Port '+port+' on host '+host+' rejected, not in allowedPorts. '+t.identifierString());
+    if (validPort === null || !zluxUtil.isPortAllowed(t.policy.allowPorts, validPort)) {
+      t.logger.warn('ZWED0183W', port, host, t.identifierString()); //t.logger.warn('Port '+port+' on host '+host+' rejected, not in allowPorts. '+t.identifierString());
       t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden');
       return;
     }
