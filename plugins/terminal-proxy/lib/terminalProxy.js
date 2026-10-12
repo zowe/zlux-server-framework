@@ -59,14 +59,12 @@ const DEFAULT_ALLOWED_PORTS = [22, 23, 992];
     allowList                 hostnames, *.wildcards and CIDR subnets. Unset: only public addresses are reachable.
                               ["*"] lifts the restriction.
     allowedPorts              ports or "low-high" ranges. Unset: DEFAULT_ALLOWED_PORTS.
-    allowInvalidCertificates  true lets a client skip TLS certificate validation (badCert=0). Unset: never.
 */
 function createDestinationPolicy(componentConfig) {
   const config = componentConfig || {};
   return {
     allowList: zluxUtil.prepareAllowList(config.allowList),
-    allowedPorts: zluxUtil.preparePortList(config.allowedPorts, DEFAULT_ALLOWED_PORTS),
-    allowInvalidCertificates: config.allowInvalidCertificates === true
+    allowedPorts: zluxUtil.preparePortList(config.allowedPorts, DEFAULT_ALLOWED_PORTS)
   };
 }
 
@@ -577,13 +575,14 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security,
     }
     fingerprint = fingerprint.substring(0,fingerprint.length-1);
     t.logger.debug("ZWED0280I", t.identifierString(), fingerprint); //t.logger.debug(t.identifierString()+' Checking if certificate is OK. Fingerprint='+fingerprint);
-    //only installed when certificates are being validated, so the user is always asked
-    t.awaitingCertificateVerification = true;
-    ws.send(JSON.stringify({
-      t: 'CERT_PROMPT',
-      fp: fingerprint,
-      o: certificate
-    }));
+    if (security.badCert != SECURITY_BAD_CERTIFICATE_ALLOW) {
+      t.awaitingCertificateVerification = true;
+      ws.send(JSON.stringify({
+        t: 'CERT_PROMPT',
+        fp: fingerprint,
+        o: certificate
+      }));
+    }
     return undefined;
   };
 
@@ -598,12 +597,7 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security,
     else if (security && security.t === 'tls') {
       t.usingTLS = true;
       t.securitySettings = security;
-      //badCert is only a request from the client. It is honored only if the server config allows invalid certificates.
-      var clientAllowsBadCert = (typeof security.badCert == 'number') && security.badCert === SECURITY_BAD_CERTIFICATE_ALLOW;
-      if (clientAllowsBadCert && !t.policy.allowInvalidCertificates) {
-        t.logger.warn('ZWED0309W', t.identifierString()); //t.logger.warn('Client requested to skip TLS certificate validation, but allowInvalidCertificates is not enabled. '+t.identifierString());
-      }
-      var rejectUnauthorized = !(clientAllowsBadCert && t.policy.allowInvalidCertificates);
+      var rejectUnauthorized = ((typeof security.badCert == 'number') && security.badCert == SECURITY_BAD_CERTIFICATE_ALLOW) ? false : true;
       connectOptions = {
         rejectUnauthorized: rejectUnauthorized//True casues rejection of certs if the CA cannot handle them. For example, self-signed exceptions are thrown
       };
