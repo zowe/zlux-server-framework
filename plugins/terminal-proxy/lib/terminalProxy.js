@@ -50,20 +50,21 @@ const WS_CLOSE_MESSAGE_LENGTH_LIMIT = 123;
 const SECURITY_BAD_CERTIFICATE_PROMPT = 1;
 const SECURITY_BAD_CERTIFICATE_ALLOW = 0;
 
-//Ports a terminal client may reach when components.<name>.allowPorts is not configured: SSH, telnet, telnet over TLS
-const DEFAULT_ALLOWED_PORTS = [22, 23, 992];
+//Used when components.<name>.allowList / allowPorts are not configured
+const DEFAULT_ALLOWED_LIST = [ '*' ];
+const DEFAULT_ALLOWED_PORTS = [ '1-65535' ];
 
 /*
   The server-side rules for where a terminal websocket may connect to. Nothing the client sends can widen them.
   Configured per terminal type under components.<componentName> in zowe.yaml:
-    allowList                 hostnames, *.wildcards and CIDR subnets. Unset: only public addresses are reachable.
-                              ["*"] lifts the restriction.
-    allowPorts                ports or "low-high" ranges. Unset: DEFAULT_ALLOWED_PORTS.
+    allowList                 hostnames, *.wildcards and CIDR subnets. Unset: DEFAULT_ALLOWED_LIST (all addresses).
+    allowPorts                ports or "low-high" ranges. Unset: DEFAULT_ALLOWED_PORTS (all ports).
 */
 function createDestinationPolicy(componentConfig) {
   const config = componentConfig || {};
+  const rawAllowList = (config.allowList && config.allowList.length > 0) ? config.allowList : DEFAULT_ALLOWED_LIST;
   return {
-    allowList: zluxUtil.prepareAllowList(config.allowList),
+    allowList: zluxUtil.prepareAllowList(rawAllowList),
     allowPorts: zluxUtil.preparePortList(config.allowPorts, DEFAULT_ALLOWED_PORTS)
   };
 }
@@ -185,7 +186,7 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
   websocket.on('close',(code,reason)=>{this.handleWebsocketClosed(code,reason);});
 
   this.handlers = handlers;
-  //a proxy built without a policy gets the restrictive defaults, never an open one
+  //a proxy built without a policy gets the defaults (all ports, all addresses)
   this.policy = policy || createDestinationPolicy(null);
   this.host;
   this.hostPort;
