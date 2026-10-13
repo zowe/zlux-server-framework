@@ -799,6 +799,32 @@ describe('util', function () {
         assert.strictEqual((await util.checkHostAccess(list, 'fe80::1%eth0')).allowed, true);
       });
 
+      it('should skip and warn about entries with a * anywhere but a leading "*."', async function () {
+        const warnings = [];
+        const originalWarn = util.loggers.network.warn;
+        util.loggers.network.warn = function (id, entry) { warnings.push([id, entry]); };
+        let list;
+        try {
+          list = util.prepareAllowList(['host*.example.com', '*host.example.com', 'foo.*', '*.*.example.com',
+            '*.good.example.com']);
+        } finally {
+          util.loggers.network.warn = originalWarn;
+        }
+        assert.deepStrictEqual(warnings.map(w => w[1]),
+          ['host*.example.com', '*host.example.com', 'foo.*', '*.*.example.com']);
+        assert.ok(warnings.every(w => w[0] === 'ZWED0191W'));
+        assert.strictEqual(list.exact.size, 0);
+        assert.deepStrictEqual(list.wildcards, ['.good.example.com']);
+        assert.strictEqual((await util.checkHostAccess(list, 'a.good.example.com')).allowed, true);
+      });
+
+      it('should fail closed when the only entry is an invalid wildcard', async function () {
+        const list = util.prepareAllowList(['host*.example.com']);
+        assert.strictEqual(list.configured, true);
+        assert.strictEqual((await util.checkHostAccess(list, 'host1.example.com')).allowed, false);
+        assert.strictEqual((await util.checkHostAccess(list, '8.8.8.8')).allowed, false);
+      });
+
       it('should fail closed when every configured entry is invalid', async function () {
         const list = util.prepareAllowList(['10.0.0.0/99']);
         assert.strictEqual((await util.checkHostAccess(list, '8.8.8.8')).allowed, false);
