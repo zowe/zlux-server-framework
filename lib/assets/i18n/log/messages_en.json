@@ -193,7 +193,6 @@
   "ZWED0306I": "Could not resolve host %s for allowList check",
   "ZWED0307I":"Installing proxy at %s -> %s://%s:%d",
 
-  "ZWED0308W":"Discovery service credentials are not set while certificate verification is disabled. APIML registration is likely to fail. Set components.app-server.node.mediationLayer.server.userid and .password to match the discovery service",
   "ZWED0003W":"User=%s (%s): Session %s failed. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
   "ZWED0005W":"",
@@ -320,6 +319,8 @@
   "ZWED0187W":"Login rate limit write failed for key=${key}. Error=%s",
   "ZWED0188W":"Failed to record token revocation. Error=%s",
   "ZWED0189W":"Failed to check token revocation, allowing. Error=%s",
+  "ZWED0190W":"Discovery service credentials are not set while certificate verification is disabled. APIML registration is likely to fail. Set components.discovery.apiml.userid and .password",
+  
   
   "ZWED0001E":"RESERVED: Error: %s",
   "ZWED0002E":"Could not stop language manager for types=%s",
