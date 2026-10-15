@@ -109,13 +109,18 @@ class ApimlConnector {
   tlsOptions: any;
   traceTls: boolean;
   discoveryUrls: string[];
+  discoveryUserid: string;
+  discoveryPassword: string;
   eurekaClient: any;
   eurekaOverrides: Record<string, any>;
   ipAddr: string;
 
 
-  constructor({ hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
+  constructor({ hostName, port, discoveryUrls, discoveryUserid, discoveryPassword, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
     Object.assign(this, { hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
+    //APIML protects /eureka with basic auth when certificate verification is disabled, since no client certificate is sent then.
+    this.discoveryUserid = discoveryUserid || 'eureka';
+    this.discoveryPassword = discoveryPassword || 'password';
     //TODO config should never be checked through env var, but is temporarily needed to temporarily read gateway's ATTLS state to provide it with Eureka info it can work with.
     const clientGlobalAttls = process.env['ZWE_zowe_network_client_tls_attls'];
     const serverGlobalAttls = process.env['ZWE_zowe_network_server_tls_attls'] == 'true';
@@ -294,6 +299,11 @@ class ApimlConnector {
       //Keeping these certs causes an openssl error 46, unknown cert error in a dev environment
       delete overrideOptions.cert;
       delete overrideOptions.key;
+      overrideOptions.auth = {
+        user: this.discoveryUserid,
+        pass: this.discoveryPassword,
+        sendImmediately: true
+      };
     } //else, apiml expects a cert and will give a 403.
 
     const zluxProxyServerInstanceConfig = {
@@ -367,6 +377,8 @@ class ApimlConnector {
         //Keeping these certs causes an openssl error 46, unknown cert error in a dev environment
         delete options.cert;
         delete options.key;
+        options.headers.authorization = 'Basic '
+          + Buffer.from(`${this.discoveryUserid}:${this.discoveryPassword}`).toString('base64');
       } //else, apiml expects a cert and will give a 403.
       return options;
     });
