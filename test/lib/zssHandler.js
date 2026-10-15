@@ -233,3 +233,125 @@ describe('zssHandler', function () {
     });
   });
 });
+
+// The bypass list in ZssHandler.authorized() used to be matched with
+// originalUrl.startsWith(entry), so any route that merely started with a listed
+// entry (e.g. /unixfileX) was authorized without a session. The match is now
+// done on the parsed pathname: the entry itself, or the entry followed by '/'.
+describe('zssHandler bypass path matching', function () {
+  let zssHandlerFactory;
+
+  const NOOP_LOGGER = { debug() {}, info() {}, warn() {}, error() {} };
+  const SERVER_CONF = {
+    instanceID: 'TESTINSTANCE',
+    cookieIdentifier: '1',
+    agent: { https: { port: 7557 } }
+  };
+  const BYPASS_ENTRIES = [
+    '/login',
+    '/logout',
+    '/password',
+    '/unixfile',
+    '/datasetContents',
+    '/VSAMdatasetContents',
+    '/datasetMetadata',
+    '/omvs',
+    '/security-mgmt',
+    '/passticket'
+  ];
+
+  before(function () {
+    try {
+      zssHandlerFactory = require('../../plugins/sso-auth/lib/zssHandler');
+    } catch (e) {
+      console.warn('Could not load zssHandler module:', e.message);
+      this.skip();
+    }
+  });
+
+  // Returns the authorization result and the SAF stub, so tests can also assert
+  // whether the agent was queried.
+  async function authorize(originalUrl, sessionState, options) {
+    const handler = zssHandlerFactory({}, {}, SERVER_CONF, { logger: NOOP_LOGGER });
+    const saf = sinon.stub().resolves({
+      statusCode: 200,
+      body: JSON.stringify({ authorized: true })
+    });
+    const request = {
+      originalUrl,
+      method: 'GET',
+      ip: '127.0.0.1',
+      cookies: {},
+      zluxData: { webApp: { callRootService: saf } }
+    };
+    const result = await handler.authorized(request, sessionState, options || { bypassAuthorizatonCheck: false });
+    return { result, saf };
+  }
+
+  BYPASS_ENTRIES.forEach(function (entry) {
+    it(`should authorize ${entry} without a session`, async function () {
+      const { result } = await authorize(entry, { authenticated: false });
+      assert.strictEqual(result.authorized, true);
+    });
+
+    it(`should authorize a sub-path of ${entry} without a session`, async function () {
+      const { result } = await authorize(entry + '/some/sub/path', { authenticated: false });
+      assert.strictEqual(result.authorized, true);
+    });
+  });
+
+  it('should ignore the query string when matching a bypass entry', async function () {
+    const { result } = await authorize('/datasetContents?dsn=USER.DATA', { authenticated: false });
+    assert.strictEqual(result.authorized, true);
+  });
+
+  it('should not let a bypass entry in the query string authorize another route', async function () {
+    const { result, saf } = await authorize('/somethingelse?next=/unixfile', { authenticated: false });
+    assert.strictEqual(result.authorized, false);
+    assert.strictEqual(result.authenticated, false);
+    assert.strictEqual(saf.called, false);
+  });
+
+  [
+    '/unixfileX',
+    '/omvsAnything',
+    '/loginfoo',
+    '/passwordreset',
+    '/datasetContentsX/sub',
+    '/security-mgmtfoo'
+  ].forEach(function (route) {
+    it(`should not authorize ${route} without a session, since it only shares a prefix with a bypass entry`, async function () {
+      const { result, saf } = await authorize(route, { authenticated: false });
+      assert.strictEqual(result.authorized, false);
+      assert.strictEqual(result.authenticated, false);
+      assert.strictEqual(saf.called, false);
+    });
+  });
+
+  it('should not match a bypass entry that appears later in the path', async function () {
+    const { result } = await authorize('/foo/unixfile', { authenticated: false });
+    assert.strictEqual(result.authorized, false);
+  });
+
+  it('should still require a session for routes that are not in the bypass list', async function () {
+    const { result, saf } = await authorize('/jes/jobs', { authenticated: false });
+    assert.strictEqual(result.authorized, false);
+    assert.strictEqual(result.authenticated, false);
+    assert.strictEqual(saf.called, false);
+  });
+
+  it('should keep applying the SAF endpoint check to routes outside the bypass list when RBAC is on', async function () {
+    const { result, saf } = await authorize('/jes/jobs', { authenticated: true, username: 'TESTUSER' },
+                                            { bypassAuthorizatonCheck: false });
+    assert.strictEqual(saf.calledOnce, true);
+    assert.strictEqual(saf.firstCall.args[0], 'saf-auth');
+    assert.strictEqual(result.authorized, true);
+  });
+
+  it('should not run the SAF endpoint check for bypass entries, even for an authenticated user with RBAC on', async function () {
+    const { result, saf } = await authorize('/unixfile/etc/hosts', { authenticated: true, username: 'TESTUSER' },
+                                            { bypassAuthorizatonCheck: false });
+    assert.strictEqual(saf.called, false);
+    assert.strictEqual(result.authorized, true);
+  });
+});
