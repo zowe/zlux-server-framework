@@ -388,7 +388,7 @@ class ApimlConnector {
     if (this.discoveryUserid && this.discoveryPassword) {
       return {user: this.discoveryUserid, pass: this.discoveryPassword};
     }
-    log.warn('ZWED0308W');
+    log.warn('ZWED0309W');
     return undefined;
   }
 
