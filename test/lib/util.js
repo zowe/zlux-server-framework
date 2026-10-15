@@ -710,40 +710,18 @@ describe('util', function () {
 
   describe('terminal destination checks', function () {
     describe('checkHostAccess without an allowList', function () {
-      it('should reject loopback, link-local, private and other special-purpose addresses', async function () {
-        const blocked = ['127.0.0.1', '127.1.2.3', '::1', '169.254.169.254', 'fe80::1', '10.0.0.5', '172.16.0.1',
-          '192.168.1.1', '100.100.100.200', 'fd00:ec2::254', '0.0.0.0', '::', '224.0.0.1', '255.255.255.255',
-          '::ffff:127.0.0.1', '::ffff:10.0.0.1', '64:ff9b::7f00:1'];
-        for (const host of blocked) {
-          assert.strictEqual((await util.checkHostAccess(null, host)).allowed, false, host);
+      it('should deny everything, since nothing is listed', async function () {
+        const hosts = ['8.8.8.8', '127.0.0.1', '::1', 'localhost', 'zos.example.com'];
+        for (const list of [null, undefined, [], util.prepareAllowList([]), util.prepareAllowList(null)]) {
+          for (const host of hosts) {
+            assert.deepStrictEqual(await util.checkHostAccess(list, host), { allowed: false, addresses: null }, host);
+          }
         }
       });
 
-      it('should reject legacy numeric forms, which getaddrinfo may turn into loopback', async function () {
-        for (const host of ['127.1', '0x7f.1', '0177.0.0.1']) {
-          assert.strictEqual((await util.checkHostAccess(null, host)).allowed, false, host);
-        }
-      });
-
-      it('should reject names that resolve to loopback', async function () {
-        assert.strictEqual((await util.checkHostAccess(null, 'localhost')).allowed, false);
-      });
-
-      it('should reject unresolvable and non-string hosts', async function () {
-        assert.strictEqual((await util.checkHostAccess(null, 'no-such-host.invalid')).allowed, false);
-        assert.strictEqual((await util.checkHostAccess(null, '')).allowed, false);
-        assert.strictEqual((await util.checkHostAccess(null, { toLowerCase: () => '8.8.8.8' })).allowed, false);
-        assert.strictEqual((await util.checkHostAccess(null, undefined)).allowed, false);
-      });
-
-      it('should permit public addresses and return them for pinning', async function () {
-        const result = await util.checkHostAccess(null, '8.8.8.8');
-        assert.deepStrictEqual(result, { allowed: true, addresses: ['8.8.8.8'] });
-      });
-
-      it('should treat an empty allowList the same as none', async function () {
-        assert.strictEqual((await util.checkHostAccess([], '127.0.0.1')).allowed, false);
-        assert.strictEqual(await util.isHostAllowed(util.prepareAllowList([]), '127.0.0.1'), false);
+      it('should still permit everything when the caller passes ["*"] explicitly', async function () {
+        assert.deepStrictEqual(await util.checkHostAccess(['*'], '8.8.8.8'), { allowed: true, addresses: null });
+        assert.deepStrictEqual(await util.checkHostAccess(['*'], '127.0.0.1'), { allowed: true, addresses: null });
       });
     });
 
@@ -751,6 +729,13 @@ describe('util', function () {
       it('should permit anything when the list contains *', async function () {
         const result = await util.checkHostAccess(util.prepareAllowList(['*']), '127.0.0.1');
         assert.deepStrictEqual(result, { allowed: true, addresses: null });
+      });
+
+      it('should reject empty and non-string hosts, even when everything is permitted', async function () {
+        const list = util.prepareAllowList(['*']);
+        for (const host of ['', undefined, null, 42, { toLowerCase: () => '8.8.8.8' }]) {
+          assert.strictEqual((await util.checkHostAccess(list, host)).allowed, false, String(host));
+        }
       });
 
       it('should permit exact and wildcard names without pinning', async function () {
@@ -766,7 +751,14 @@ describe('util', function () {
 
       it('should reject everything not listed, including loopback and public addresses', async function () {
         const list = util.prepareAllowList(['10.1.0.0/16', 'zos.example.com']);
-        for (const host of ['127.0.0.1', '10.2.0.1', '8.8.8.8', 'localhost', '::1']) {
+        for (const host of ['127.0.0.1', '10.2.0.1', '8.8.8.8', 'localhost', '::1', 'no-such-host.invalid']) {
+          assert.strictEqual((await util.checkHostAccess(list, host)).allowed, false, host);
+        }
+      });
+
+      it('should reject legacy numeric forms, which getaddrinfo may turn into loopback', async function () {
+        const list = util.prepareAllowList(['10.1.0.0/16']);
+        for (const host of ['127.1', '0x7f.1', '0177.0.0.1']) {
           assert.strictEqual((await util.checkHostAccess(list, host)).allowed, false, host);
         }
       });
@@ -834,7 +826,7 @@ describe('util', function () {
 
     describe('makePinnedLookup', function () {
       it('should answer with only the vetted addresses', function (done) {
-        const lookup = util.makePinnedLookup(['8.8.8.8', '2001:4860:4860::8888']);
+        const lookup = util.makePinnedLookup('rebound.example.com', ['8.8.8.8', '2001:4860:4860::8888']);
         lookup('rebound.example.com', { all: true }, function (err, list) {
           assert.ifError(err);
           assert.deepStrictEqual(list, [
@@ -851,11 +843,59 @@ describe('util', function () {
       });
 
       it('should accept the (hostname, callback) signature', function (done) {
-        util.makePinnedLookup(['8.8.8.8'])('x', function (err, address, family) {
+        util.makePinnedLookup('x', ['8.8.8.8'])('x', function (err, address, family) {
           assert.ifError(err);
           assert.strictEqual(address, '8.8.8.8');
           assert.strictEqual(family, 4);
           done();
+        });
+      });
+
+      it('should match the pinned hostname case-insensitively', function (done) {
+        util.makePinnedLookup('Host.Example.com', ['8.8.8.8'])('HOST.example.COM', {}, function (err, address) {
+          assert.ifError(err);
+          assert.strictEqual(address, '8.8.8.8');
+          done();
+        });
+      });
+
+      it('should refuse to answer for a hostname other than the one it was pinned to', function (done) {
+        const lookup = util.makePinnedLookup('good.example.com', ['8.8.8.8']);
+        lookup('evil.example.com', { all: true }, function (err, list) {
+          assert.strictEqual(err.code, 'EPINNEDHOST');
+          assert.strictEqual(list, undefined);
+          lookup('evil.example.com', {}, function (err, address) {
+            assert.strictEqual(err.code, 'EPINNEDHOST');
+            assert.strictEqual(address, undefined);
+            lookup(undefined, {}, function (err) {
+              assert.strictEqual(err.code, 'EPINNEDHOST');
+              done();
+            });
+          });
+        });
+      });
+
+      it('should honor the requested address family', function (done) {
+        const lookup = util.makePinnedLookup('h.example.com', ['8.8.8.8', '2001:4860:4860::8888']);
+        lookup('h.example.com', { family: 6 }, function (err, address, family) {
+          assert.ifError(err);
+          assert.strictEqual(address, '2001:4860:4860::8888');
+          assert.strictEqual(family, 6);
+          lookup('h.example.com', { family: 'IPv4', all: true }, function (err, list) {
+            assert.ifError(err);
+            assert.deepStrictEqual(list, [{ address: '8.8.8.8', family: 4 }]);
+            done();
+          });
+        });
+      });
+
+      it('should fail with ENOTFOUND when no approved address fits', function (done) {
+        util.makePinnedLookup('h.example.com', ['8.8.8.8'])('h.example.com', { family: 6 }, function (err) {
+          assert.strictEqual(err.code, 'ENOTFOUND');
+          util.makePinnedLookup('h.example.com', [])('h.example.com', {}, function (err) {
+            assert.strictEqual(err.code, 'ENOTFOUND');
+            done();
+          });
         });
       });
     });
@@ -878,17 +918,17 @@ describe('util', function () {
       it('should accept integers, numeric strings and ranges', function () {
         const ports = util.preparePortList([23, '992', '2000-2005'], [22]);
         for (const p of [23, 992, 2000, 2003, 2005, '2001']) {
-          assert.strictEqual(util.isPortAllowed(ports, p), true, String(p));
+          assert.strictEqual(util.isPortInList(ports, p), true, String(p));
         }
         for (const p of [22, 24, 1999, 2006, 0, -1, 70000, 'abc', null]) {
-          assert.strictEqual(util.isPortAllowed(ports, p), false, String(p));
+          assert.strictEqual(util.isPortInList(ports, p), false, String(p));
         }
       });
 
       it('should deny everything, not fall back to defaults, when every configured entry is invalid', function () {
         const ports = util.preparePortList(['abc', '5-1', 0, 70000], [22, 23]);
         assert.deepStrictEqual(ports, []);
-        assert.strictEqual(util.isPortAllowed(ports, 23), false);
+        assert.strictEqual(util.isPortInList(ports, 23), false);
       });
     });
   });

@@ -539,7 +539,7 @@ TerminalWebsocketProxy.prototype.connect = function(host, port, ws, security) {
 
   if (host && port) {
     var validPort = zluxUtil.normalizePort(port);
-    if (validPort === null || !zluxUtil.isPortAllowed(t.policy.allowPorts, validPort)) {
+    if (validPort === null || !zluxUtil.isPortInList(t.policy.allowPorts, validPort)) {
       t.logger.warn('ZWED0183W', port, host, t.identifierString()); //t.logger.warn('Port '+port+' on host '+host+' rejected, not in allowPorts. '+t.identifierString());
       t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_FORBIDDEN, 'Forbidden');
       return;
@@ -618,8 +618,10 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security,
         }
       }
     }
-    //connect to the addresses that passed the host check, not to whatever the name resolves to now
-    var pinnedLookup = (addresses && addresses.length > 0) ? zluxUtil.makePinnedLookup(addresses) : undefined;
+    //addresses is only set when the host was approved by the IPs it resolved to (no allowList, CIDR entry, or
+    //IP overlap with a listed name), not by matching a listed name. In that case connect to exactly those IPs,
+    //otherwise the name could resolve to something else now (DNS rebinding). Name matches are left to DNS.
+    var pinnedLookup = (addresses && addresses.length > 0) ? zluxUtil.makePinnedLookup(host, addresses) : undefined;
     if (!t.usingTLS) {
       this.hostSocket = net.Socket();
     }
@@ -679,7 +681,7 @@ TerminalWebsocketProxy.prototype._doConnect = function(host, port, ws, security,
           this.hostSocket.connect({port: port, host: host, lookup: pinnedLookup}, connectHandler);
         }
       } catch (e) {
-        var errorMessage = 'Error durring connection='+e.message;
+        var errorMessage = 'Error during connection='+e.message;
         t.logger.warn("ZWED0141W", t.identifierString(), errorMessage); //t.logger.warn(t.identifierString()+' '+errorMessage);
         t.closeConnection(ws, WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR,errorMessage);
       }
