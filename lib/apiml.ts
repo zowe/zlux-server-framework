@@ -109,13 +109,15 @@ class ApimlConnector {
   tlsOptions: any;
   traceTls: boolean;
   discoveryUrls: string[];
+  discoveryUserid: string;
+  discoveryPassword: string;
   eurekaClient: any;
   eurekaOverrides: Record<string, any>;
   ipAddr: string;
 
 
-  constructor({ hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
-    Object.assign(this, { hostName, port, discoveryUrls, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
+  constructor({ hostName, port, discoveryUrls, discoveryUserid, discoveryPassword, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls }) {
+    Object.assign(this, { hostName, port, discoveryUrls, discoveryUserid, discoveryPassword, catalogPort, gatewayPort, tlsOptions, eurekaOverrides, isClientAttls, traceTls });
     //TODO config should never be checked through env var, but is temporarily needed to temporarily read gateway's ATTLS state to provide it with Eureka info it can work with.
     const clientGlobalAttls = process.env['ZWE_zowe_network_client_tls_attls'];
     const serverGlobalAttls = process.env['ZWE_zowe_network_server_tls_attls'] == 'true';
@@ -294,6 +296,10 @@ class ApimlConnector {
       //Keeping these certs causes an openssl error 46, unknown cert error in a dev environment
       delete overrideOptions.cert;
       delete overrideOptions.key;
+      const credentials = this.getDiscoveryCredentials();
+      if (credentials) {
+        overrideOptions.auth = Object.assign({sendImmediately: true}, credentials);
+      }
     } //else, apiml expects a cert and will give a 403.
 
     const zluxProxyServerInstanceConfig = {
@@ -351,6 +357,7 @@ class ApimlConnector {
   }
 
   getRequestOptionsArray(method, path) {
+    const credentials = this.tlsOptions.rejectUnauthorized ? undefined : this.getDiscoveryCredentials();
     return this.discoveryUrls.map((url)=>{
       //in the form of https://host:port/eureka/, trim from https:// and following slash.
       // the url may have brackets for ipv6, which must be removed.
@@ -367,9 +374,22 @@ class ApimlConnector {
         //Keeping these certs causes an openssl error 46, unknown cert error in a dev environment
         delete options.cert;
         delete options.key;
+        if (credentials) {
+          options.headers.authorization = 'Basic '
+            + Buffer.from(`${credentials.user}:${credentials.pass}`).toString('base64');
+        }
       } //else, apiml expects a cert and will give a 403.
       return options;
     });
+  }
+
+  //APIML protects /eureka with basic auth instead of client certificates when certificate verification is disabled.
+  getDiscoveryCredentials() {
+    if (this.discoveryUserid && this.discoveryPassword) {
+      return {user: this.discoveryUserid, pass: this.discoveryPassword};
+    }
+    log.warn('ZWED0190W');
+    return undefined;
   }
 
   /**
