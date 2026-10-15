@@ -192,7 +192,8 @@
   "ZWED0305I": "Using separate certificates for server TLS and client TLS connections",
   "ZWED0306I": "Could not resolve host %s for allowList check",
   "ZWED0307I":"Installing proxy at %s -> %s://%s:%d",
-  
+
+  "ZWED0308W":"Discovery service credentials are not set while certificate verification is disabled. APIML registration is likely to fail. Set components.app-server.node.mediationLayer.server.userid and .password to match the discovery service",
   "ZWED0003W":"User=%s (%s): Session %s failed. Plugin response: %s",
   "ZWED0004W":"Tomcat for ID=%s not starting, no services succeeded loading",
   "ZWED0005W":"",

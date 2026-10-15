@@ -355,7 +355,7 @@ describe('apiml', function () {
                          'Basic ' + Buffer.from('myuser:mypass').toString('base64'));
     });
 
-    it('should default basic auth credentials to eureka/password', function () {
+    it('should not use basic auth when credentials are not configured', function () {
       var connector = new apiml({
         hostName: 'localhost',
         port: 7556,
@@ -369,8 +369,7 @@ describe('apiml', function () {
         traceTls: false
       });
       var options = connector.getRequestOptionsArray('GET', '/test');
-      assert.strictEqual(options[0].headers.authorization,
-                         'Basic ' + Buffer.from('eureka:password').toString('base64'));
+      assert.strictEqual(options[0].headers.authorization, undefined);
     });
 
     it('should not use basic auth when rejectUnauthorized is true', function () {
