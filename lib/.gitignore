@@ -56,6 +56,7 @@ Thumbs.db
 # TS Output files
 apiml.js
 auth-manager.js
+encryption.js
 jarManager.js
 javaManager.js
 javaTypes.js
