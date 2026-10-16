@@ -410,7 +410,8 @@ describe('sessionStore', function () {
       var req = {};
       var sess = { cookie: { maxAge: 5000 } };
       var result = sessionStore.createSession(req, sess);
-      assert.strictEqual(result.cookie.maxAge, 5000);
+      // express-session's Cookie.maxAge is derived from expires - Date.now(), so it drifts by 1ms across a clock tick
+      assert.ok(result.cookie.maxAge <= 5000 && result.cookie.maxAge >= 4000);
     });
   });
 
