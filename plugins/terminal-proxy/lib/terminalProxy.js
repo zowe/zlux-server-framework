@@ -420,9 +420,6 @@ TerminalWebsocketProxy.prototype.wsSend = function(websocket,string) {
   websocket.send(string);
 };
 
-const WEBSOCKET_REASON_TERMPROXY_INTERNAL_ERROR = 4999;
-const WEBSOCKET_REASON_TERMPROXY_GOING_AWAY = 4000;
-
 const WEBSOCKET_REASON_TERMPROXY_GOING_AWAY                 = 4000; // normal / orderly close
 const WEBSOCKET_REASON_TERMPROXY_HOST_NOT_FOUND              = 4001; // DNS resolution failed for target host
 const WEBSOCKET_REASON_TERMPROXY_HOST_CONNECTION_FAILED      = 4002; // TCP/TLS connect() threw synchronously
