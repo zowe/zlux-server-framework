@@ -167,6 +167,42 @@ class ApimlConnector {
     }
   })
 
+  createEurekaClient(){
+    const overrideOptions = this.isClientAttls
+          ? {}
+    //Use server's own TLS options except for TLS tracing.
+          : Object.assign(Object.assign({},this.tlsOptions), {enableTrace: this.traceTls ? true : false});
+    
+    if (!this.tlsOptions.rejectUnauthorized) {
+      //Keeping these certs causes an openssl error 46, unknown cert error in a dev environment
+      delete overrideOptions.cert;
+      delete overrideOptions.key;
+      const credentials = this.getDiscoveryCredentials();
+      if (credentials) {
+        overrideOptions.auth = Object.assign({sendImmediately: true}, credentials);
+      }
+    } //else, apiml expects a cert and will give a 403.
+
+    const zluxProxyServerInstanceConfig = {
+      instance: this._makeMainInstanceProperties(),
+      eureka: Object.assign({}, MEDIATION_LAYER_EUREKA_DEFAULTS, this.eurekaOverrides),
+      requestMiddleware: function (requestOpts, done) {
+        done(Object.assign(requestOpts, overrideOptions));
+      },
+      tlsOptions: overrideOptions,
+      ssl: !this.isClientAttls,
+      logger: log
+    }
+    log.debug("ZWED0144I", JSON.stringify(zluxProxyServerInstanceConfig, null, 2)); //log.debug("zluxProxyServerInstanceConfig: " 
+        //+ JSON.stringify(zluxProxyServerInstanceConfig, null, 2))
+    const serviceUrls = this.getServiceUrls();
+    zluxProxyServerInstanceConfig.eureka.serviceUrls = { default: serviceUrls };
+    log.info(`ZWED0020I`, serviceUrls.join(',')); //log.info(`Registering at ${url}...`);
+    log.debug("ZWED0145I", JSON.stringify(zluxProxyServerInstanceConfig)); //log.debug(`zluxProxyServerInstanceConfig ${JSON.stringify(zluxProxyServerInstanceConfig)}`)
+    const eurekaClient = new EurekaClient(zluxProxyServerInstanceConfig as any);
+    return eurekaClient;
+  }
+
   checkAgent(timeout: number, serviceName: string) {
     let timer = timeout ? timeout : DEFAULT_AGENT_CHECK_TIMEOUT;
     const end = Date.now() + timer;
@@ -176,6 +212,10 @@ class ApimlConnector {
         if (Date.now() > end) {
           log.warn(`ZWED0045W`, this.hostName, this.port);
           return reject(new Error(`Call timeout when fetching agent status from APIML`));
+        }
+
+        if(this.eurekaClient === undefined || this.eurekaClient === null) {
+          this.eurekaClient = this.createEurekaClient();
         }
 
         this.eurekaClient.getInstancesByAppId(serviceName, (error, application) => {
@@ -259,39 +299,10 @@ class ApimlConnector {
   }
   
   registerMainServerInstance() {
-    const overrideOptions = this.isClientAttls
-          ? {}
-    //Use server's own TLS options except for TLS tracing.
-          : Object.assign(Object.assign({},this.tlsOptions), {enableTrace: this.traceTls ? true : false});
-    
-    if (!this.tlsOptions.rejectUnauthorized) {
-      //Keeping these certs causes an openssl error 46, unknown cert error in a dev environment
-      delete overrideOptions.cert;
-      delete overrideOptions.key;
-      const credentials = this.getDiscoveryCredentials();
-      if (credentials) {
-        overrideOptions.auth = Object.assign({sendImmediately: true}, credentials);
-      }
-    } //else, apiml expects a cert and will give a 403.
-
-    const zluxProxyServerInstanceConfig = {
-      instance: this._makeMainInstanceProperties(),
-      eureka: Object.assign({}, MEDIATION_LAYER_EUREKA_DEFAULTS, this.eurekaOverrides),
-      requestMiddleware: function (requestOpts, done) {
-        done(Object.assign(requestOpts, overrideOptions));
-      },
-      tlsOptions: overrideOptions,
-      ssl: !this.isClientAttls,
-      logger: log
+    const eurekaClient = this.createEurekaClient();
+    if(this.eurekaClient === undefined || this.eurekaClient === null) {
+      this.eurekaClient = eurekaClient;
     }
-    log.debug("ZWED0144I", JSON.stringify(zluxProxyServerInstanceConfig, null, 2)); //log.debug("zluxProxyServerInstanceConfig: " 
-        //+ JSON.stringify(zluxProxyServerInstanceConfig, null, 2))
-    const serviceUrls = this.getServiceUrls();
-    zluxProxyServerInstanceConfig.eureka.serviceUrls = { default: serviceUrls };
-    log.info(`ZWED0020I`, serviceUrls.join(',')); //log.info(`Registering at ${url}...`);
-    log.debug("ZWED0145I", JSON.stringify(zluxProxyServerInstanceConfig)); //log.debug(`zluxProxyServerInstanceConfig ${JSON.stringify(zluxProxyServerInstanceConfig)}`)
-    const eurekaClient = new EurekaClient(zluxProxyServerInstanceConfig as any);
-    this.eurekaClient = eurekaClient;
     const ipAddr = this.ipAddr;
     return new BBPromise((resolve, reject) => {
       eurekaClient.start((error) => {
