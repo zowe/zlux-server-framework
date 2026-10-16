@@ -15,7 +15,7 @@ import * as https from 'node:https';
 import * as express from 'express';
 
 // No type declarations available for this package; use require to suppress errors.
-const eureka = require('@rocketsoftware/eureka-js-client').Eureka;
+// const eureka = require('@rocketsoftware/eureka-js-client').Eureka;
 const proxy = require('./proxy');
 
 const log = zluxUtil.loggers.apiml;
