@@ -56,5 +56,8 @@
   "ZWED0145W":"Could not load a handler from file %s",
   "ZWED0181W":"Host %s rejected, not in allowList. %s",
   "ZWED0182W":"AllowList check failed for host %s, rejecting. Error=%s",
-  "ZWED0183W":"Port %s on host %s rejected, not in allowPorts. %s"
+  "ZWED0183W":"Port %s on host %s rejected, not in allowPorts. %s",
+  "ZWED0193W":"Invalid components.%s.allowList: expected a non-empty list of strings but found %s. The allowList is treated as empty, so no terminal connection will be permitted until it is corrected.",
+  "ZWED0194W":"Invalid components.%s.allowPorts: expected a non-empty list of ports or \"low-high\" ranges but found %s. The allowPorts list is treated as empty, so no terminal connection will be permitted until it is corrected.",
+  "ZWED0195W":"Invalid configuration for components.%s: the component and its parent sections must be mappings, but found %s. No terminal connection will be permitted until it is corrected."
 }

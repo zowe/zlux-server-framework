@@ -788,7 +788,45 @@ describe('util', function () {
           'x'.repeat(63) + '.corp.example.com']) {
           assert.deepStrictEqual(await util.checkHostAccess(list, host), { allowed: true, addresses: null }, host);
         }
-        assert.strictEqual((await util.checkHostAccess(list, 'fe80::1%eth0')).allowed, true);
+        assert.strictEqual((await util.checkHostAccess(list, 'fe80::1%eth0')).allowed, false);
+      });
+
+      it('should reject IPv6 zone IDs, including ones matching a hostname wildcard', async function () {
+        for (const list of [['*.corp.example.com'], ['*']]) {
+          for (const host of ['::1%x.corp.example.com', '::ffff:127.0.0.1%x.corp.example.com', 'fe80::1%eth0']) {
+            assert.strictEqual((await util.checkHostAccess(list, host)).allowed, false, host);
+          }
+        }
+      });
+
+      it('should not let a wildcard match legacy IPv4 spellings, which getaddrinfo reads as addresses', async function () {
+        const cases = [
+          ['*.1', ['127.1', '10.1', '127.1.']],
+          ['*.0.0.1', ['0x7f.0.0.1', '0177.0.0.1']],
+          ['*.0x1', ['0x7f.0x1']]
+        ];
+        for (const [entry, hosts] of cases) {
+          const list = util.prepareAllowList([entry]);
+          for (const host of hosts) {
+            assert.strictEqual((await util.checkHostAccess(list, host)).allowed, false, `${entry} vs ${host}`);
+          }
+        }
+      });
+
+      it('should treat a trailing dot as the same name, in a wildcard entry and in the host', async function () {
+        const list = util.prepareAllowList(['*.corp.invalid.']);
+        assert.deepStrictEqual(list.wildcards, ['.corp.invalid']);
+        for (const entries of [['*.corp.invalid.'], ['*.corp.invalid']]) {
+          const prepared = util.prepareAllowList(entries);
+          for (const host of ['a.corp.invalid', 'a.corp.invalid.']) {
+            assert.deepStrictEqual(await util.checkHostAccess(prepared, host), { allowed: true, addresses: null },
+              `${entries[0]} vs ${host}`);
+          }
+          //the suffix is only a match after a label boundary, and a second dot is not a valid name
+          for (const host of ['corp.invalid', 'evilcorp.invalid', 'a.corp.invalid..']) {
+            assert.strictEqual((await util.checkHostAccess(prepared, host)).allowed, false, `${entries[0]} vs ${host}`);
+          }
+        }
       });
 
       it('should skip and warn about entries with a * anywhere but a leading "*."', async function () {
@@ -815,6 +853,24 @@ describe('util', function () {
         assert.strictEqual(list.configured, true);
         assert.strictEqual((await util.checkHostAccess(list, 'host1.example.com')).allowed, false);
         assert.strictEqual((await util.checkHostAccess(list, '8.8.8.8')).allowed, false);
+      });
+
+      it('should reject empty or malformed wildcard suffixes with a warning', async function () {
+        const invalid = ['*.', '*..', '*.bad..example.com', '*.-bad.example.com', '*.bad-.example.com',
+          '*.bad name', '*.::1', '*.fe80::1%eth0', '*.' + 'x'.repeat(64) + '.example.com'];
+        const warnings = [];
+        const originalWarn = util.loggers.network.warn;
+        util.loggers.network.warn = (id, entry) => warnings.push([id, entry]);
+        let list;
+        try {
+          list = util.prepareAllowList(invalid);
+        } finally {
+          util.loggers.network.warn = originalWarn;
+        }
+        assert.deepStrictEqual(warnings, invalid.map(entry => ['ZWED0191W', entry]));
+        assert.deepStrictEqual(list.wildcards, []);
+        assert.strictEqual(list.permitAll, false);
+        assert.strictEqual((await util.checkHostAccess(list, 'localhost.')).allowed, false);
       });
 
       it('should fail closed when every configured entry is invalid', async function () {

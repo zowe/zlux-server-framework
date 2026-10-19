@@ -18,6 +18,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const pathModule = require('path');
 const zluxUtil = require('../../../lib/util.js');
+const { isConfigMapping } = require('../../../utils/mergeUtils');
 const ssh = require('./ssh');
 const SSH_MESSAGE = ssh.MESSAGE;
 
@@ -54,24 +55,74 @@ const SECURITY_BAD_CERTIFICATE_ALLOW = 0;
 const DEFAULT_ALLOWED_LIST = [ '*' ];
 const DEFAULT_ALLOWED_PORTS = [ '1-65535' ];
 
+function describeConfigValue(value) {
+  if (value === null) {
+    return 'null';
+  }
+  if (Array.isArray(value)) {
+    return 'a list';
+  }
+  return typeof value;
+}
+
+function readConfiguredList(config, key, isValidEntry, defaultList, warningId, componentName, logger) {
+  if (!Object.prototype.hasOwnProperty.call(config, key)) {
+    return defaultList;
+  }
+  const rawList = config[key];
+  if (Array.isArray(rawList) && rawList.length > 0 && rawList.every(isValidEntry)) {
+    return rawList;
+  }
+  const found = Array.isArray(rawList)
+    ? (rawList.length === 0 ? 'an empty list' : 'a list with an entry of the wrong type')
+    : describeConfigValue(rawList);
+  logger.warn(warningId, componentName, found); //logger.warn(`components.${componentName}.${key} must be a non-empty list but is ${found}. ...`);
+  return [];
+}
+
+const isString = entry => typeof entry === 'string';
+const isPortEntry = entry => typeof entry === 'number' || typeof entry === 'string';
+
+//Permits nothing. Used for a misconfigured section, and when a proxy is built without a policy.
+const denyAllPolicy = () => ({ allowList: zluxUtil.prepareAllowList([]), allowPorts: [] });
+
 /*
   The server-side rules for where a terminal websocket may connect to. Nothing the client sends can widen them.
   Configured per terminal type under components.<componentName> in zowe.yaml:
-    allowList                 hostnames, *.wildcards and CIDR subnets. Unset: DEFAULT_ALLOWED_LIST (all addresses).
-    allowPorts                ports or "low-high" ranges. Unset: DEFAULT_ALLOWED_PORTS (all ports).
+    allowList     hostnames, *.wildcards and CIDR subnets. Not set: DEFAULT_ALLOWED_LIST (all addresses).
+    allowPorts    ports or "low-high" ranges. Not set: DEFAULT_ALLOWED_PORTS (all ports).
+  Only a key that is not set falls back to a default. A key that is set to anything but a non-empty list with
+  entries of the right type (a scalar, null, [], a wrong-typed entry) logs ZWED0193W / ZWED0194W and permits
+  nothing. A component section, or the components section above it, that is not a mapping (including null)
+  logs ZWED0195W and permits nothing.
 */
-function createDestinationPolicy(componentConfig) {
-  const config = componentConfig || {};
-  const rawAllowList = (config.allowList && config.allowList.length > 0) ? config.allowList : DEFAULT_ALLOWED_LIST;
+function createDestinationPolicy(componentConfig, componentName, logger) {
+  if (!isConfigMapping(componentConfig)) {
+    logger.warn('ZWED0195W', componentName, describeConfigValue(componentConfig));
+    return denyAllPolicy();
+  }
+  const config = componentConfig;
+  const rawAllowList = readConfiguredList(config, 'allowList', isString, DEFAULT_ALLOWED_LIST, 'ZWED0193W', componentName, logger);
+  const rawAllowPorts = readConfiguredList(config, 'allowPorts', isPortEntry, DEFAULT_ALLOWED_PORTS, 'ZWED0194W', componentName, logger);
   return {
     allowList: zluxUtil.prepareAllowList(rawAllowList),
-    allowPorts: zluxUtil.preparePortList(config.allowPorts, DEFAULT_ALLOWED_PORTS)
+    allowPorts: zluxUtil.preparePortList(rawAllowPorts, [])
   };
 }
 
 function getComponentConfig(context, componentName) {
   const all = context.plugin.server.config.all;
-  return (all && all.components && all.components[componentName]) || null;
+  if (!isConfigMapping(all)) {
+    return all;
+  }
+  if (!Object.prototype.hasOwnProperty.call(all, 'components')) {
+    return {};
+  }
+  const components = all.components;
+  if (!isConfigMapping(components)) {
+    return components;
+  }
+  return Object.prototype.hasOwnProperty.call(components, componentName) ? components[componentName] : {};
 }
 
 var utf8ArrayToB64 = function(data) {
@@ -186,8 +237,8 @@ function TerminalWebsocketProxy(messageConfig, clientIP, context, websocket, han
   websocket.on('close',(code,reason)=>{this.handleWebsocketClosed(code,reason);});
 
   this.handlers = handlers;
-  //a proxy built without a policy gets the defaults (all ports, all addresses)
-  this.policy = policy || createDestinationPolicy(null);
+  // A missing policy must not bypass configuration validation.
+  this.policy = policy || denyAllPolicy();
   this.host;
   this.hostPort;
   this.hostSocket;
@@ -819,7 +870,7 @@ exports.tn3270WebsocketRouter = function(context) {
       context.logger.info('ZWED0106I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);      
       next();
     });
-    const tn3270Policy = createDestinationPolicy(getComponentConfig(context, 'tn3270-ng2'));
+    const tn3270Policy = createDestinationPolicy(getComponentConfig(context, 'tn3270-ng2'), 'tn3270-ng2', context.logger);
     router.ws('/',function(ws,req) {
       new TerminalWebsocketProxy(tn3270MessageConfig,req.ip,context,ws,handlers,tn3270Policy);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
@@ -844,7 +895,7 @@ exports.tn5250WebsocketRouter = function(context) {
       context.logger.info('ZWED0107I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
     });
-    const tn5250Policy = createDestinationPolicy(getComponentConfig(context, 'tn5250-ng2'));
+    const tn5250Policy = createDestinationPolicy(getComponentConfig(context, 'tn5250-ng2'), 'tn5250-ng2', context.logger);
     router.ws('/',function(ws,req) {
       new TerminalWebsocketProxy(tn5250MessageConfig,req.ip,context,ws,handlers,tn5250Policy);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
@@ -870,7 +921,7 @@ exports.vtWebsocketRouter = function(context) {
       context.logger.info('ZWED0108I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
     });
-    const vtPolicy = createDestinationPolicy(getComponentConfig(context, 'vt-ng2'));
+    const vtPolicy = createDestinationPolicy(getComponentConfig(context, 'vt-ng2'), 'vt-ng2', context.logger);
     router.ws('/',function(ws,req) {
       new TerminalWebsocketProxy(vtMessageConfig,req.ip,context,ws,handlers,vtPolicy);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
