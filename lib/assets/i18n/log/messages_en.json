@@ -406,5 +406,6 @@
   "ZWED0168E":"Token invalid",
   "ZWED0169E":"Token invalid",
   "ZWED0170E":"Cannot handle message",
-  "ZWED0171E":"TLS key/certificate not available. JWTs cannot be generated, shutting down."
+  "ZWED0171E":"TLS key/certificate not available. JWTs cannot be generated, shutting down.",
+  "ZWED0315E":"Denied request because the service requires RBAC and RBAC is disabled. User=%s, Service=%s::%s, Method=%s, URL=%s"
 }
