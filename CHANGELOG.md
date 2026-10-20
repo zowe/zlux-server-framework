@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
+- Security: The tn5250 terminal websocket now honors `components['tn5250-ng2'].allowList` to restrict destination hosts, the same way as `tn3270-ng2` and `vt-ng2`. When no allowList is configured, all hosts remain allowed.
 - Enhancement: A dataservice can declare `"requiresRbac": true` in its pluginDefinition.json. While `components.app-server.dataserviceAuthentication.rbac` is disabled, requests to that service are rejected with 403 (ZWED0315E) instead of being allowed for every authenticated user. Services that do not declare it are not affected. [(#741)](https://github.com/zowe/zlux-server-framework/pull/741)
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#718)](https://github.com/zowe/zlux-server-framework/pull/718)
 - Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
