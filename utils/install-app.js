@@ -103,7 +103,7 @@ function cleanup() {
 //This must reject path separators and '..' so that an identifier read from an
 //untrusted pluginDefinition.json cannot be used to write files outside of the
 //intended plugins/config directories.
-const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z]{2,6}(\\.[A-Za-z0-9-]{1,62}[A-Za-z0-9])+$/;
+const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z]{2,6}(\.[A-Za-z0-9-]{1,62}[A-Za-z0-9])+$/;
 
 function isSafeIdentifier(identifier) {
   return typeof identifier === 'string'
@@ -134,8 +134,7 @@ function addToServer(appDir, installDir) {
       return {success: false, message: errMsg};
     }
     logger.info(`ZWED0109I`, pluginDefinition.identifier); //logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
-    let locatorJSONString =
-        `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir.replace(/\\/g,'\\\\')}"\n}`;
+    let locatorJSONString = JSON.stringify({identifier: pluginDefinition.identifier, pluginLocation: appDir}, null, 2);
     let destination;
     if(calledViaCLI){
       destination = resolveWithinDir(pluginsDir, pluginDefinition.identifier+'.json');
