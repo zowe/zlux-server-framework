@@ -4,6 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 3.6.0
+- Bugfix: `install-app` again accepts valid reverse-domain plugin identifiers such as `org.zowe.configjs`. The identifier check added in 3.6.0 used a malformed pattern that rejected every valid identifier and accepted some identifiers containing a backslash. The plugin locator file is now also written with proper JSON escaping.
 - Enhancement: A dataservice can declare `"requiresRbac": true` in its pluginDefinition.json. While `components.app-server.dataserviceAuthentication.rbac` is disabled, requests to that service are rejected with 403 (ZWED0315E) instead of being allowed for every authenticated user. Services that do not declare it are not affected. [(#741)](https://github.com/zowe/zlux-server-framework/pull/741)
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#718)](https://github.com/zowe/zlux-server-framework/pull/718)
 - Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
