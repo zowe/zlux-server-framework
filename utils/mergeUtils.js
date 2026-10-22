@@ -7,6 +7,7 @@
  
  Copyright Contributors to the Zowe Project.
 */
+
 function deepAssign(target, source) {
   var retVal = {}
   if (Array.isArray(target)) {
@@ -17,7 +18,6 @@ function deepAssign(target, source) {
     })
   } 
   Object.keys(source).forEach(function (key) {
-    const childPath = propertyPath.concat(key);
     if (typeof source[key] !== 'object' || !target[key]) {
       if (typeof target == 'string') {
         retVal = source;
