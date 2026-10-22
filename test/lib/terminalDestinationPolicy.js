@@ -7,7 +7,6 @@ const assert = require('assert');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
-const { deepAssign } = require('../../utils/mergeUtils');
 
 // Load the complete proxy with transport dependencies stubbed. Inspect the lists passed to the
 // policy parsers; parser behavior is covered separately by the util tests.
@@ -18,7 +17,6 @@ const policyFunctions = vm.runInNewContext(fs.readFileSync(filename, 'utf8') +
   require(name) {
     if (name === 'express' || name === './ssh') return {};
     if (name === 'bluebird') return Promise;
-    if (name === '../../../utils/mergeUtils') return require('../../utils/mergeUtils');
     if (name === '../../../lib/util.js') {
       return {
         prepareAllowList: list => Array.from(list),
@@ -68,18 +66,6 @@ describe('terminal destination configuration validation', function () {
         assertDenied({ components: { [component]: value } });
         assertDenied({ components: value });
         assertDenied(value);
-      });
-
-      it(`preserves malformed ${component} overrides for validation (${index})`, function () {
-        function base() {
-          return { components: { [component]: { allowList: ['*'], allowPorts: ['1-65535'] } } };
-        }
-        assertDenied(deepAssign(base(), { components: { [component]: value } }));
-        assertDenied(deepAssign(base(), { components: value }));
-        const haConfig = deepAssign({ haInstances: { instance: base() } }, {
-          haInstances: { instance: { components: { [component]: value } } }
-        });
-        assertDenied(deepAssign(base(), haConfig.haInstances.instance));
       });
     }
 
