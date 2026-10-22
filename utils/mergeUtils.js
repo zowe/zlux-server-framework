@@ -21,7 +21,6 @@ function isTerminalConfigSectionPath(propertyPath) {
     (componentPath.length === 2 && ['tn3270-ng2', 'tn5250-ng2', 'vt-ng2'].includes(componentPath[1])));
 }
 
-const isConfigMapping = value => value !== null && typeof value === 'object' && !Array.isArray(value);
 
 function deepAssign(target, source, propertyPath = []) {
   var retVal = {}
@@ -51,4 +50,3 @@ function deepAssign(target, source, propertyPath = []) {
   return retVal;
 }
 exports.deepAssign = deepAssign;
-exports.isConfigMapping = isConfigMapping;

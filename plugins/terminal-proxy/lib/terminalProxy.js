@@ -18,7 +18,6 @@ const crypto = require('crypto');
 const fs = require('fs');
 const pathModule = require('path');
 const zluxUtil = require('../../../lib/util.js');
-const { isConfigMapping } = require('../../../utils/mergeUtils');
 const ssh = require('./ssh');
 const SSH_MESSAGE = ssh.MESSAGE;
 
@@ -82,6 +81,7 @@ function readConfiguredList(config, key, isValidEntry, defaultList, warningId, c
 
 const isString = entry => typeof entry === 'string';
 const isPortEntry = entry => typeof entry === 'number' || typeof entry === 'string';
+function isObject(value) { return value !== null && typeof value === 'object' && !Array.isArray(value) }
 
 //Permits nothing. Used for a misconfigured section, and when a proxy is built without a policy.
 const denyAllPolicy = () => ({ allowList: zluxUtil.prepareAllowList([]), allowPorts: [] });
@@ -97,7 +97,7 @@ const denyAllPolicy = () => ({ allowList: zluxUtil.prepareAllowList([]), allowPo
   logs ZWED0195W and permits nothing.
 */
 function createDestinationPolicy(componentConfig, componentName, logger) {
-  if (!isConfigMapping(componentConfig)) {
+  if (!isObject(componentConfig)) {
     logger.warn('ZWED0195W', componentName, describeConfigValue(componentConfig));
     return denyAllPolicy();
   }
@@ -112,14 +112,14 @@ function createDestinationPolicy(componentConfig, componentName, logger) {
 
 function getComponentConfig(context, componentName) {
   const all = context.plugin.server.config.all;
-  if (!isConfigMapping(all)) {
+  if (!isObject(all)) {
     return all;
   }
   if (!Object.prototype.hasOwnProperty.call(all, 'components')) {
     return {};
   }
   const components = all.components;
-  if (!isConfigMapping(components)) {
+  if (!isObject(components)) {
     return components;
   }
   return Object.prototype.hasOwnProperty.call(components, componentName) ? components[componentName] : {};
