@@ -810,8 +810,11 @@ exports.tn5250WebsocketRouter = function(context) {
       context.logger.info('ZWED0107I', req.method); //context.logger.info('Saw Websocket request, method='+req.method);
       next();
     });
+    const tn5250RawAllowList = (context.plugin.server.config.all && context.plugin.server.config.all.components && context.plugin.server.config.all.components['tn5250-ng2'])
+      ? context.plugin.server.config.all.components['tn5250-ng2'].allowList || null : null;
+    const tn5250AllowList = zluxUtil.prepareAllowList(tn5250RawAllowList);
     router.ws('/',function(ws,req) {
-      new TerminalWebsocketProxy(tn5250MessageConfig,req.ip,context,ws,handlers);
+      new TerminalWebsocketProxy(tn5250MessageConfig,req.ip,context,ws,handlers,tn5250AllowList);
       //this is a new connection, this must make a BRAND NEW INSTANCE!!!
     });
     resolve(router);
