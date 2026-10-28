@@ -38,13 +38,13 @@
     "test:all": "mocha --recursive --timeout 10000 --exit \"test/**/*.js\"",
     "test:unit": "mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
     "test:storage": "mocha --timeout 10000 --exit ./test/storage/*.js",
+    "test:eureka": "mocha --timeout 30000 --exit ./test/eureka/*.js",
     "test:translation": "mocha ./test/translation/*.js",
     "test:coverage": "c8 mocha --recursive --timeout 10000 --exit \"test/lib/**/*.js\"",
     "test:coverage:report": "c8 report --reporter=html"
   },
   "dependencies": {
     "@apidevtools/swagger-parser": "13.0.0",
-    "@rocketsoftware/eureka-js-client": "4.5.9",
     "@rocketsoftware/express-ws": "5.0.1",
     "bluebird": "3.7.2",
     "body-parser": "1.20.8",
@@ -79,10 +79,6 @@
     "keyring_js": "1.1.0"
   },
   "overrides": {
-    "@rocketsoftware/eureka-js-client": {
-      "js-yaml": "4.3.2",
-      "@cypress/request": "^3.0.9"
-    },
     "express": {
       "path-to-regexp": "0.1.13"
     },
