@@ -988,4 +988,39 @@ describe('util', function () {
       });
     });
   });
+
+  describe('request body inflate setting', function () {
+    const configWith = (inflate) => ({ components: { 'app-server': { node: { inflate } } } });
+
+    it('should default to disabled when not configured', function () {
+      assert.strictEqual(util.isRequestInflateEnabled(undefined), false);
+      assert.strictEqual(util.isRequestInflateEnabled({}), false);
+      assert.strictEqual(util.isRequestInflateEnabled({ components: { 'app-server': { node: {} } } }), false);
+    });
+
+    it('should be disabled when inflate is false', function () {
+      assert.strictEqual(util.isRequestInflateEnabled(configWith(false)), false);
+    });
+
+    it('should be enabled only when inflate is true', function () {
+      assert.strictEqual(util.isRequestInflateEnabled(configWith(true)), true);
+      assert.strictEqual(util.isRequestInflateEnabled(configWith('true')), true);
+      assert.strictEqual(util.isRequestInflateEnabled(configWith('yes')), false);
+      assert.strictEqual(util.isRequestInflateEnabled(configWith(1)), false);
+    });
+
+    it('getBodyParserOptions should merge inflate with the given options', function () {
+      assert.deepStrictEqual(util.getBodyParserOptions(configWith(false), { type: 'text/plain' }),
+        { type: 'text/plain', inflate: false });
+      assert.deepStrictEqual(util.getBodyParserOptions(configWith(true), { limit: 10 }),
+        { limit: 10, inflate: true });
+      assert.deepStrictEqual(util.getBodyParserOptions(undefined), { inflate: false });
+    });
+
+    it('getBodyParserOptions should not mutate the given options', function () {
+      const options = { type: 'text/plain' };
+      util.getBodyParserOptions(configWith(true), options);
+      assert.deepStrictEqual(options, { type: 'text/plain' });
+    });
+  });
 });

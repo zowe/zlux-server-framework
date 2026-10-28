@@ -407,5 +407,7 @@
   "ZWED0169E":"Token invalid",
   "ZWED0170E":"Cannot handle message",
   "ZWED0171E":"TLS key/certificate not available. JWTs cannot be generated, shutting down.",
-  "ZWED0315E":"Denied request because the service requires RBAC and RBAC is disabled. User=%s, Service=%s::%s, Method=%s, URL=%s"
+  "ZWED0315E":"Denied request because the service requires RBAC and RBAC is disabled. User=%s, Service=%s::%s, Method=%s, URL=%s",
+  "ZWED0316W":"Request body decompression is enabled by components.app-server.node.inflate. Compressed request bodies will be decompressed before parsing.",
+  "ZWED0317W":"Rejected request body with unsupported content encoding. Method=%s, URL=%s"
 }
