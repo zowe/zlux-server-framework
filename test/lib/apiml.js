@@ -148,6 +148,11 @@ describe('apiml', function () {
       assert.ok(instance.statusPageUrl.includes('[::1]'));
     });
 
+    it('should request per-user sticky load balancing from the gateway', function () {
+      var instance = connector._makeMainInstanceProperties();
+      assert.strictEqual(instance.metadata['apiml.lb.type'], 'authentication');
+    });
+
     it('should set CORS metadata when gateway client ATTLS is enabled', function () {
       var attlsConnector = new apiml({
         hostName: 'myhost.com',
