@@ -90,10 +90,8 @@
       "ws": "7.5.13"
     },
     "qs": "6.16.0",
-    "@apidevtools/swagger-parser": {
-      "@apidevtools/json-schema-ref-parser": "15.5.2"
-    },
     "@apidevtools/json-schema-ref-parser": {
+      ".": "15.5.2",
       "js-yaml": "5.4.3",
       "undici": "6.29.1"
     }
