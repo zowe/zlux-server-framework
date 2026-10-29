@@ -185,6 +185,11 @@ function percentEncode(value){
         buffer+= '2';
         buffer+= 'C';
         break;
+      case '/':
+        buffer+= '%';
+        buffer+= '2';
+        buffer+= 'F';
+        break;
       case ':':
         buffer+= '%';
         buffer+= '3';
@@ -585,10 +590,10 @@ function getResourceDefinitionJsonOrFailInner(parentJson, resourceName,errorCall
     if (errorCallback) {errorCallback(1);}
     return null;
   }
-  if (resourceName.startsWith('.')) {
+  if (resourceName.startsWith('.') || resourceName.includes('/')) {
     if (errorCallback) {errorCallback(5);}
     return null;
-  }  
+  }
 
   resourceDefinition = jsonObjectGetObject(parentJson, resourceName);
   if (!resourceDefinition) {//if we dont find it, the first child better be variable. check below.
