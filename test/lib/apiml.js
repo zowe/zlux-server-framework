@@ -335,6 +335,60 @@ describe('apiml', function () {
       assert.strictEqual(options[0].key, undefined);
     });
 
+    it('should use basic auth when rejectUnauthorized is false', function () {
+      var connector = new apiml({
+        hostName: 'localhost',
+        port: 7556,
+        discoveryUrls: ['https://host1.com:7553/eureka/'],
+        discoveryUserid: 'myuser',
+        discoveryPassword: 'mypass',
+        discoveryPort: 7553,
+        catalogPort: 7552,
+        gatewayPort: 7554,
+        tlsOptions: { rejectUnauthorized: false },
+        eurekaOverrides: {},
+        isClientAttls: false,
+        traceTls: false
+      });
+      var options = connector.getRequestOptionsArray('GET', '/test');
+      assert.strictEqual(options[0].headers.authorization,
+                         'Basic ' + Buffer.from('myuser:mypass').toString('base64'));
+    });
+
+    it('should not use basic auth when credentials are not configured', function () {
+      var connector = new apiml({
+        hostName: 'localhost',
+        port: 7556,
+        discoveryUrls: ['https://host1.com:7553/eureka/'],
+        discoveryPort: 7553,
+        catalogPort: 7552,
+        gatewayPort: 7554,
+        tlsOptions: { rejectUnauthorized: false },
+        eurekaOverrides: {},
+        isClientAttls: false,
+        traceTls: false
+      });
+      var options = connector.getRequestOptionsArray('GET', '/test');
+      assert.strictEqual(options[0].headers.authorization, undefined);
+    });
+
+    it('should not use basic auth when rejectUnauthorized is true', function () {
+      var connector = new apiml({
+        hostName: 'localhost',
+        port: 7556,
+        discoveryUrls: ['https://host1.com:7553/eureka/'],
+        discoveryPort: 7553,
+        catalogPort: 7552,
+        gatewayPort: 7554,
+        tlsOptions: { rejectUnauthorized: true },
+        eurekaOverrides: {},
+        isClientAttls: false,
+        traceTls: false
+      });
+      var options = connector.getRequestOptionsArray('GET', '/test');
+      assert.strictEqual(options[0].headers.authorization, undefined);
+    });
+
     it('should set accept header to application/json', function () {
       var connector = new apiml({
         hostName: 'localhost',
