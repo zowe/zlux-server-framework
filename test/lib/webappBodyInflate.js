@@ -51,17 +51,25 @@ describe('webapp request body inflate setting', function () {
       isHttps: false,
       proxiedHost: 'localhost',
       proxiedPort: 1,
-      auth: {}
+      auth: {
+        doLogin() {}, doPasswordReset() {}, doPassTicket() {}, getStatus() {}, doLogout() {}, refreshStatus() {},
+        semiAuthenticatedMiddleware(req, res, next) { next(); },
+        addProxyAuthorizations() {},
+        processProxiedHeaders(req, headers) { return headers; },
+        middleware(req, res, next) { next(); }
+      }
     });
     // the shared module-level express app is not used, so that routes do not leak between tests
     webApp.expressApp = express();
+    webApp.installCommonMiddleware();
     webApp._installRootService('/echo', 'post', (req, res) => res.status(200).json(req.body),
       { needJson: true, needAuth: false });
+    webApp.installRootServices();
     return webApp.expressApp;
   }
 
   // Sends the raw bytes with fetch: superagent would JSON-encode a Buffer for this content type.
-  const post = async (app, encoding, body) => {
+  const post = async (app, encoding, body, path = '/echo') => {
     const server = http.createServer(app);
     await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
     try {
@@ -69,7 +77,7 @@ describe('webapp request body inflate setting', function () {
       if (encoding) {
         headers['Content-Encoding'] = encoding;
       }
-      const response = await fetch(`http://127.0.0.1:${server.address().port}/echo`, { method: 'POST', headers, body });
+      const response = await fetch(`http://127.0.0.1:${server.address().port}${path}`, { method: 'POST', headers, body });
       return { status: response.status, text: await response.text() };
     } finally {
       server.closeAllConnections();
@@ -108,5 +116,32 @@ describe('webapp request body inflate setting', function () {
   it('rejects a br body with 415 even when inflate is true', async function () {
     const res = await post(makeApp({ inflate: true }), 'br', Buffer.from('{"a":1}'));
     assert.strictEqual(res.status, 415);
+  });
+
+  // The /server router parses JSON itself and reports parse failures as 400.
+  // A content encoding that is not decoded is not a JSON problem, so it answers 415.
+  describe('/server router', function () {
+    it('answers 415 for a gzip body by default', async function () {
+      const res = await post(makeApp(), 'gzip', gzipped, '/server/environment');
+      assert.strictEqual(res.status, 415);
+      assert.ok(res.text.includes('Unsupported content encoding'), res.text);
+    });
+
+    it('answers 415 for a br body even when inflate is true', async function () {
+      const res = await post(makeApp({ inflate: true }), 'br', Buffer.from('{"a":1}'), '/server/environment');
+      assert.strictEqual(res.status, 415);
+    });
+
+    it('does not answer 415 for a gzip body when inflate is true', async function () {
+      const res = await post(makeApp({ inflate: true }), 'gzip', gzipped, '/server/environment');
+      assert.notStrictEqual(res.status, 415);
+      assert.notStrictEqual(res.status, 400);
+    });
+
+    it('still answers 400 for an invalid JSON body', async function () {
+      const res = await post(makeApp(), undefined, '{not json', '/server/environment');
+      assert.strictEqual(res.status, 400);
+      assert.ok(res.text.includes('Invalid JSON'), res.text);
+    });
   });
 });
