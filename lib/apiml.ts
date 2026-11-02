@@ -92,7 +92,10 @@ const MEDIATION_LAYER_INSTANCE_DEFAULTS = (zluxProto, zluxHostname, zluxPort) =>
 
     "apiml.authentication.sso": "true",
 
-    'apiml.authentication.scheme': 'zoweJwt'
+    'apiml.authentication.scheme': 'zoweJwt',
+
+    // Gateway keeps each user on one instance; session stores and cookie secrets are per instance in HA.
+    'apiml.lb.type': 'authentication'
   }
 }};
 
