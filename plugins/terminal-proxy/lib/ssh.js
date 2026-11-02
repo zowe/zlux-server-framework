@@ -1368,14 +1368,12 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition,clientIP){
     var receivedMac = Buffer.alloc(sessionData.readingMACLength);
     rawData.copy(receivedMac,0,currentPosition);
     currentPosition+=receivedMac.length;
-    if (receivedMac.toString('hex')!=computedMac.toString('hex')){
-      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - MAC verification failed!`); 
-      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - received MAC: ${receivedMac.toString('hex')}`); 
-      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - computed MAC: ${computedMac.toString('hex')}`); 
-    }
     if(traceCrypto) console.log("received mac: "+receivedMac.toString('hex'));
-    if(traceCrypto) console.log("computed mac: "+computedMac.toString('hex'));
-      //should disconnect if not matching.
+    if(traceCrypto && computedMac) console.log("computed mac: "+computedMac.toString('hex'));
+    if (!computedMac || computedMac.length != receivedMac.length || !crypto.timingSafeEqual(receivedMac, computedMac)){
+      sshLogger.warn(`[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - MAC verification failed!`);
+      return;
+    }
   }
   sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - PDU read complete`); 
   return  {readLength: currentPosition, sshv2PDU: new SSHv2PDU(0,payload)};
