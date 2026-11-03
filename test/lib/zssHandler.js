@@ -181,6 +181,52 @@ describe('zssHandler', function () {
     assert.strictEqual(wsResource, restResource);
   });
 
+  describe('SAF profile name length', function () {
+    const SERVICE_URL = '/ZLUX/plugins/org.zowe.foo/services/baz/_current';
+    // 'ZLUX.TESTINSTANCE.SVC.ORG_ZOWE_FOO.BAZ.GET'
+    const PREFIX_LENGTH = 42;
+
+    async function authorize(subUrl) {
+      const handler = makeHandler();
+      const saf = sinon.stub().resolves({
+        statusCode: 200,
+        body: JSON.stringify({ authorized: true })
+      });
+      const request = makeRequest(saf, `${SERVICE_URL}/${subUrl}`);
+      const result = await handler.authorized(request, { authenticated: true, username: 'TESTUSER' }, {
+        syncOnly: false,
+        bypassAuthorizatonCheck: false
+      });
+      return { result, saf };
+    }
+
+    it('checks the full profile name when it fits in 246 characters', async function () {
+      const segment = 'A'.repeat(246 - PREFIX_LENGTH - 1);
+      const { result, saf } = await authorize(segment);
+      assert.strictEqual(saf.firstCall.args[1], `ZLUX.TESTINSTANCE.SVC.ORG_ZOWE_FOO.BAZ.GET.${segment}/READ`);
+      assert.strictEqual(result.authorized, true);
+    });
+
+    it('denies a request whose profile name would exceed 246 characters', async function () {
+      const { result, saf } = await authorize('users/' + 'x'.repeat(240) + '/admin');
+      assert.strictEqual(saf.called, false, 'a shorter profile must not be checked in place of the full name');
+      assert.strictEqual(result.authorized, false);
+    });
+
+    it('denies a request whose profile name only exceeds 246 characters once encoded', async function () {
+      // each space is sent to ZSS as ':20'
+      const { result, saf } = await authorize(encodeURIComponent(' '.repeat(100)));
+      assert.strictEqual(saf.called, false);
+      assert.strictEqual(result.authorized, false);
+    });
+
+    it('denies a request when only its last segment does not fit', async function () {
+      const { result, saf } = await authorize('A'.repeat(246 - PREFIX_LENGTH - 1) + '/B');
+      assert.strictEqual(saf.called, false);
+      assert.strictEqual(result.authorized, false);
+    });
+  });
+
   // Regression tests: addProxyAuthorizations must forward only cookies ZSS itself
   // recognizes, never the client's raw Cookie header (see apiml.ts's ZSS fallback proxy).
   describe('addProxyAuthorizations', function () {

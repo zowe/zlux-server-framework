@@ -12,7 +12,7 @@ const Promise = require('bluebird');
 const ipaddr = require('ipaddr.js');
 const url = require('url');
 const zluxUtil = require('../../../lib/util.js');
-const makeProfileNameForRequest = require('./safprofile').makeProfileNameForRequest;
+const { makeProfileNameForRequest, ZOWE_PROFILE_NAME_LEN } = require('./safprofile');
 const { TOKEN_NAME } = require('./localJwt');
 const DEFAULT_CLASS = "ZOWE";
 const ZSS_SESSION_TIMEOUT_HEADER = "session-expires-seconds";
@@ -318,6 +318,9 @@ class ZssHandler {
     userName = encodeURIComponent(userName);
     resourceName = encodeURI(resourceName);
     resourceName = resourceName.replace(/%/g,':');
+    if (resourceName.length > ZOWE_PROFILE_NAME_LEN) {
+      throw new Error("SAF resource name too long");
+    }
     const path = `${resourceName}/READ`;
     //console.log('trying path ', path);
     //console.log(new Error("stack trace before calling root serivce"))
