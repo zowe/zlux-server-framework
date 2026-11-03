@@ -11,21 +11,6 @@
 const ZOWE_PROFILE_NAME_LEN = 246;
 const DEFAULT_INSTANCE_ID = "0";
 
-function partsUpToTotalLength(parts, maxLen) {
-  let curLen = 0;
-  const outParts = [];
-  
-  for (let p of parts) {
-    curLen += p.length;
-    if (curLen > maxLen) {
-      break;
-    }
-    curLen++;  //account for the separator
-    outParts.push(p);
-  }
-  return outParts;
-}
-
 function rootServiceProfileName(parms){
   if (parms.productCode == null) {
     throw new Error("productCode missing");
@@ -97,15 +82,11 @@ function makeProfileName(type, parms) {
       break;
   }
   let profileName = makeProfileName(parms);
+  if (parms.subUrl.length > 0) {
+    profileName += '.' + parms.subUrl.join('.');
+  }
   if (profileName.length > ZOWE_PROFILE_NAME_LEN) {
     throw new Error("SAF resource name too long");
-  }
-  if (parms.subUrl.length > 0) {
-    const usableParts = partsUpToTotalLength(parms.subUrl,
-          ZOWE_PROFILE_NAME_LEN - profileName.length - 1);
-    if (usableParts.length > 0) {
-      profileName += '.' + usableParts.join('.');
-    }
   }
   return profileName;
 }
