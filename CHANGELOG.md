@@ -4,7 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.18.6
-- Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#715)](https://github.com/zowe/zlux-server-framework/pull/715)
+- Bugfix: The Referer-based proxy fallback in the catch-all error handler now enforces authentication before forwarding a request to an external-type plugin proxy. [(#756)](https://github.com/zowe/zlux-server-framework/pull/756)
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#706)](https://github.com/zowe/zlux-server-framework/pull/706)
 
