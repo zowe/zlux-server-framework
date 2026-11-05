@@ -35,6 +35,7 @@ const AGGREGATION_POLICY_OVERRIDE = 1;
 const AGGREGATION_POLICY_MERGE = 2;
 const HTTP_STATUS_BAD_REQUEST = 400;
 const HTTP_STATUS_NO_CONTENT = 204;
+const HTTP_STATUS_FORBIDDEN = 403;
 const HTTP_STATUS_NOT_FOUND = 404;
 const HTTP_STATUS_INTERNAL_SERVER_ERROR = 500;
 const HTTP_STATUS_METHOD_NOT_FOUND = 405;
@@ -2405,6 +2406,13 @@ function ConfigService(context) {
   this.pluginDefs = context.plugin.server.state.pluginMap;
   const nonuserDirectories = makeConfigurationDirectoriesStruct(this.directoryConfig,this.productConfig.productCode,null);
 
+  /* Writes to the site and instance scopes affect every user of the server, so they are only
+     permitted when RBAC is on to authorize them. Without RBAC the auth middleware passes
+     bypassAuthorizatonCheck to the auth handler, which authorizes any authenticated user - that
+     would let a low privilege user overwrite server wide configuration for any plugin. */
+  const rbacEnabled = !!(this.directoryConfig.dataserviceAuthentication
+                         && this.directoryConfig.dataserviceAuthentication.rbac);
+
   //req.session should contain authData???
   //const authPluginSession = getAuthPluginSession(req, authPluginID);
   //const result = yield handler.authorized(req, authPluginSession);
@@ -2547,6 +2555,21 @@ function ConfigService(context) {
     request.resourceURL+='/'+scope;
     if (request.scope == CONFIG_SCOPE_USER && !request.username) {
       respondWithJsonError(response,"ZWED0089E - Requested user scope without providing username",HTTP_STATUS_BAD_REQUEST);
+      return;
+    }
+    /* GET and HEAD are served by the route above and should never arrive here, but the check is
+       stated rather than inferred from route order so that reads keep working if these routes are
+       ever reordered. Note this is a list of the read methods, not of the write methods: anything
+       dispatchByMethod might gain later counts as a write until it is named here. */
+    const isReadMethod = (request.method === 'GET') || (request.method === 'HEAD');
+    if (!isReadMethod && !rbacEnabled
+        && (request.scope == CONFIG_SCOPE_SITE || request.scope == CONFIG_SCOPE_INSTANCE)) {
+      logger.warn(`ZWED0181W`, request.username, request.method, request.resourceURL); //logger.warn(`Denied write to a shared configuration scope because RBAC is disabled. `
+                  //+`User=${request.username}, Method=${request.method}, Resource=${request.resourceURL}`);
+      respondWithJsonError(response,
+                           "ZWED0160E - Modifying site or instance scope requires "
+                           + "components.app-server.dataserviceAuthentication.rbac to be enabled",
+                           HTTP_STATUS_FORBIDDEN,request.resourceURL);
       return;
     }
 
