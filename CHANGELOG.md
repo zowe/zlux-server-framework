@@ -4,7 +4,7 @@ All notable changes to the Zlux Server Framework package will be documented in t
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
 ## 2.18.7
-- Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#7??)](https://github.com/zowe/zlux-server-framework/pull/7??)
+- Enhancement: RBAC is can now be used on for WebSocket dataservices, which will use the 'GET' method for SAF profiles. [(#758)](https://github.com/zowe/zlux-server-framework/pull/758)
 
 ## 2.18.6
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
