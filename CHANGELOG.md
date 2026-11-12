@@ -3,11 +3,12 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.18.7
+- Enhancement: Terminal proxy now supports per-component `allowList` and `allowPorts` configuration under `components.tn3270-ng2`, `components.vt-ng2` and `components.tn5250-ng2` in `zowe.yaml`. When defined, only connections to listed hostnames and ports are permitted. All hostnames and ports are still allowed when the lists are not defined [(#759)](https://github.com/zowe/zlux-server-framework/pull/759)
+
 ## 2.18.6
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#706)](https://github.com/zowe/zlux-server-framework/pull/706)
-- Enhancement: Terminal proxy now supports per-component `allowList` configuration under `components.tn3270-ng2.allowList` and `components.vt-ng2.allowList` and `components.tn5250-ng2` in `zowe.yaml`. When defined, only connections to listed hostnames are permitted; connections to unlisted hosts are rejected with websocket close code 4003 (Forbidden). [(#702)](https://github.com/zowe/zlux-server-framework/pull/702) [(#743)](https://github.com/zowe/zlux-server-framework/pull/743)
-- Security: The terminal proxy (`tn3270data`, `tn5250data`, `vtdata`) now restricts where a client may connect, regardless of what the client requests. When `allowList` and `allowPorts` are not set, all addresses and all ports (1-65535) are reachable, as before. Set `components.<tn3270-ng2|tn5250-ng2|vt-ng2>.allowList` (hostnames, `*.domain` wildcards, CIDR subnets, or `*` for no host restriction) and `.allowPorts` (ports or `low-high` ranges) in `zowe.yaml` to restrict where the terminal proxy may connect. When a host is admitted because of the addresses it resolves to (a CIDR subnet, or an address shared with a listed hostname), the connection is made to exactly those addresses, so a DNS change between the check and the connect cannot redirect it; a host admitted by name (an exact or `*.domain` entry, or `*`) is resolved by DNS when the connection is made. [(#732)](https://github.com/zowe/zlux-server-framework/pull/732)
 
 ## 2.18.5
 - Bugfix: Improved SSH connection performance restoring use of Node.js built-in diffie-hellman logic. [(#673)](https://github.com/zowe/zlux-server-framework/pull/673) 
