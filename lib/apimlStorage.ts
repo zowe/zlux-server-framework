@@ -14,10 +14,14 @@ import * as http from 'http';
 let apimlAgent: https.Agent;
 let apimlHost: string;
 let apimlPort: number;
+let apimlAuthHeader: string | undefined;
 
 export function configure(settings: ApimlStorageSettings) {
   apimlHost = settings.host;
   apimlPort = settings.port;
+  apimlAuthHeader = settings.basicAuth
+    ? 'Basic ' + Buffer.from(`${settings.basicAuth.userid}:${settings.basicAuth.password}`).toString('base64')
+    : undefined;
   if (settings.isHttps) {
     apimlAgent = new https.Agent(Object.assign({}, settings.tlsOptions, { keepAlive: true }));
   } else {
@@ -34,6 +38,8 @@ export interface ApimlStorageSettings {
   port: number;
   tlsOptions: https.AgentOptions;
   isHttps?: boolean;
+  // Used instead of client certificates when zowe.verifyCertificates is DISABLED
+  basicAuth?: { userid: string; password: string };
 }
 
 
@@ -169,6 +175,9 @@ async function apimlDoRequest(req: ApimlRequest): Promise<ApimlResponse> {
   }
   let bodyBuf: Buffer | undefined;
   const headers: { [key: string]: string } = Object.assign({}, req.headers);
+  if (apimlAuthHeader) {
+    headers['Authorization'] = apimlAuthHeader;
+  }
   if (req.body != null) {
     const bodyStr = typeof req.body === 'string' ? req.body : JSON.stringify(req.body);
     bodyBuf = Buffer.from(bodyStr);

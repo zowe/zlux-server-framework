@@ -13,11 +13,8 @@
 const assert = require('assert');
 const { EventEmitter } = require('events');
 
-// Tests for ZosmfClient.verifyToken(), the server-to-server round-trip check
-// added to mirror APIML's AuthenticatedEndpointStrategy (see
-// TokenValidationConfigRsu2012 in api-layer, which registers exactly this kind
-// of two-endpoint fallback list). This is the mechanism that replaced trusting
-// a client-supplied JWT's decoded claims without verifying them.
+// Token validation must fail closed when the authentication endpoint cannot
+// verify a token. The public /zosmf/info endpoint must never be consulted.
 describe('ZosmfClient', function () {
   let ZosmfClient;
   const NOOP_LOGGER = { debug() {}, info() {}, warn() {}, error() {} };
@@ -64,6 +61,14 @@ describe('ZosmfClient', function () {
           res.headers = responseSpec.headers || {};
           callback(res);
           process.nextTick(() => {
+            if (responseSpec.responseError) {
+              res.emit('error', new Error(responseSpec.responseError));
+              return;
+            }
+            if (responseSpec.aborted) {
+              res.emit('aborted');
+              return;
+            }
             res.emit('data', Buffer.from(responseSpec.body || ''));
             res.emit('end');
           });
@@ -116,43 +121,53 @@ describe('ZosmfClient', function () {
     assert.strictEqual(logs.includes('application/json'), true);
   });
 
-  it('resolves valid when the first endpoint answers 200', async function () {
+  it('resolves valid when the authentication endpoint answers 200', async function () {
     const { client, requestedOptions } = makeClient([{ statusCode: 200 }]);
     const result = await client.verifyToken('sometoken');
     assert.deepStrictEqual(result, { valid: true });
-    assert.strictEqual(requestedOptions.length, 1, 'the second endpoint must not be tried');
+    assert.strictEqual(requestedOptions.length, 1);
+    assert.strictEqual(requestedOptions[0].path, '/zosmf/services/authenticate');
+    assert.strictEqual(requestedOptions[0].method, 'POST');
   });
 
-  it('resolves invalid when the first endpoint answers 401 (no fallback needed)', async function () {
-    const { client, requestedOptions } = makeClient([{ statusCode: 401 }]);
-    const result = await client.verifyToken('forgedtoken');
-    assert.deepStrictEqual(result, { valid: false, reason: 'invalid' });
-    assert.strictEqual(requestedOptions.length, 1, 'a definitive 401 must not trigger a fallback attempt');
-  });
+  for (const statusCode of [401, 403]) {
+    it(`resolves invalid when the authentication endpoint answers ${statusCode}`, async function () {
+      const { client, requestedOptions } = makeClient([{ statusCode }, { statusCode: 200 }]);
+      const result = await client.verifyToken('forgedtoken');
+      assert.deepStrictEqual(result, { valid: false, reason: 'invalid' });
+      assert.strictEqual(requestedOptions.length, 1, 'rejection must not trigger a fallback attempt');
+    });
+  }
 
-  it('falls back to the second endpoint when the first is unreachable', async function () {
-    const { client, requestedOptions } = makeClient([
-      { networkError: 'ECONNREFUSED' },
-      { statusCode: 200 }
-    ]);
-    const result = await client.verifyToken('sometoken');
-    assert.deepStrictEqual(result, { valid: true });
-    assert.strictEqual(requestedOptions.length, 2);
-  });
+  for (const statusCode of [201, 204, 301, 302, 307, 400, 404, 405, 429, 500, 502, 503]) {
+    it(`fails closed on HTTP ${statusCode} even if a public fallback would answer 200`, async function () {
+      const { client, requestedOptions } = makeClient([{ statusCode }, { statusCode: 200 }]);
+      const result = await client.verifyToken('forgedtoken');
+      assert.deepStrictEqual(result, { valid: false, reason: 'unreachable' });
+      assert.strictEqual(requestedOptions.length, 1, '/zosmf/info must never validate a token');
+      assert.strictEqual(requestedOptions[0].path, '/zosmf/services/authenticate');
+    });
+  }
 
-  it('resolves unreachable (fails closed) when every endpoint is inconclusive', async function () {
-    const { client } = makeClient([
-      { statusCode: 500 },
-      { networkError: 'ETIMEDOUT' }
-    ]);
-    const result = await client.verifyToken('sometoken');
-    assert.deepStrictEqual(result, { valid: false, reason: 'unreachable' });
-  });
+  for (const failure of [
+    { name: 'connection error', response: { networkError: 'ECONNREFUSED' } },
+    { name: 'timeout', response: { timeout: true } },
+    { name: 'response error', response: { statusCode: 200, responseError: 'ECONNRESET' } },
+    { name: 'aborted response', response: { statusCode: 200, aborted: true } }
+  ]) {
+    it(`fails closed on ${failure.name} without falling back to a public endpoint`, async function () {
+      const { client, requestedOptions } = makeClient([failure.response, { statusCode: 200 }]);
+      const result = await client.verifyToken('forgedtoken');
+      assert.deepStrictEqual(result, { valid: false, reason: 'unreachable' });
+      assert.strictEqual(requestedOptions.length, 1);
+    });
+  }
 
   it('sends the token as its own jwtToken cookie, not trusted as-is', async function () {
     const { client, requestedOptions } = makeClient([{ statusCode: 200 }]);
     await client.verifyToken('the-token-value');
     assert.strictEqual(requestedOptions[0].headers['Cookie'], 'jwtToken=the-token-value');
+    assert.strictEqual(requestedOptions[0].headers['Authorization'], undefined);
   });
 
   describe('invalidateToken', function () {

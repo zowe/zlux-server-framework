@@ -103,6 +103,12 @@ TrivialAuthenticator.prototype = {
 };
 
 module.exports = function(pluginDef, pluginConf, serverConf) {
+  //This authenticator accepts any username without a password, so it must be enabled explicitly
+  const enabled = serverConf?.node?.development === true;
+  if (!enabled) {
+    return Promise.reject(new Error('trivial-auth is disabled. Set components.app-server.node.development to true '
+        + 'to use it. It authenticates any user without a password and must not be used in production.'));
+  }
   return Promise.resolve(new TrivialAuthenticator(pluginDef, pluginConf, 
       serverConf));
 }
