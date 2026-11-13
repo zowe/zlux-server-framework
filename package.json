@@ -47,7 +47,7 @@
     "@rocketsoftware/eureka-js-client": "4.5.9",
     "@rocketsoftware/express-ws": "5.0.1",
     "bluebird": "3.7.2",
-    "body-parser": "1.20.8",
+    "body-parser": "1.20.9",
     "cookie-parser": "1.4.7",
     "express": "4.21.2",
     "express-session": "1.18.2",
@@ -90,11 +90,10 @@
       "ws": "7.5.13"
     },
     "qs": "6.16.0",
-    "@apidevtools/swagger-parser": {
-      "@apidevtools/json-schema-ref-parser": "15.5.2"
-    },
     "@apidevtools/json-schema-ref-parser": {
-      "js-yaml": "5.4.3"
+      ".": "15.5.2",
+      "js-yaml": "5.4.3",
+      "undici": "6.29.1"
     }
   }
 }
