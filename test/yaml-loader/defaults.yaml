@@ -109,6 +109,8 @@ components:
         method: '*'      
       - url: '/saf-auth'
         method: '*'
+      - url: '/passticket'
+        method: 'POST'
       - url: '/password'
         method: '*'
         requiresAuth: false

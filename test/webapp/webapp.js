@@ -11,10 +11,6 @@
 const assert = require('assert')
 const path = require('path');
 const http = require('http');
-const chai = require('chai');
-const chaiHttp = require('chai-http');
-chai.use(chaiHttp);
-const should = chai.should();
 const PluginLoader = require('../../lib/plugin-loader')
 const makePlugin = PluginLoader.makePlugin
 const makeWebApp = require('../../lib/webapp').makeWebApp;
@@ -85,18 +81,23 @@ describe('WebApp', function() {
         done(e);
       }
     })
+
+    afterEach(function(done) {
+      server.close(done);
+    })
     
     describe('versioning', function() {
       it('should install test-service v1.3.0', function()  {
         const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/test-service/1.3.0'
-        return chai.request(server)
-          .get(url)
+        return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
           .then(function (res) {
             //console.log(res)
-            res.should.have.status(200);
-            res.body.should.be.a('object');
-            res.body.should.deep.equal(
+            assert.strictEqual(res.status, 200);
+            return res.json();
+          })
+          .then(function (body) {
+            assert.deepStrictEqual(body,
               {
                 "plugin": "org.zowe.testplugin",
                 "service": "test-service",
@@ -108,13 +109,14 @@ describe('WebApp', function() {
      it('should install test-service v2.1.0', function()  {
         const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/test-service/2.1.0'
-        return chai.request(server)
-          .get(url)
+        return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
           .then(function (res) {
-            res.should.have.status(200);
-            res.body.should.be.a('object');
-            console.log(res.body)
-            res.body.should.deep.equal(
+            assert.strictEqual(res.status, 200);
+            return res.json();
+          })
+          .then(function (body) {
+            console.log(body)
+            assert.deepStrictEqual(body,
               {
                 "plugin": "org.zowe.testplugin",
                 "service": "test-service",
@@ -126,13 +128,14 @@ describe('WebApp', function() {
       it('should point the _current version of test-service to v2.1.0', function()  {
         const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/test-service/_current'
-        return chai.request(server)
-          .get(url)
+        return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
           .then(function (res) {
-            res.should.have.status(200);
-            res.body.should.be.a('object');
-            console.log(res.body)
-            res.body.should.deep.equal(
+            assert.strictEqual(res.status, 200);
+            return res.json();
+          })
+          .then(function (body) {
+            console.log(body)
+            assert.deepStrictEqual(body,
               {
                 "plugin": "org.zowe.testplugin",
                 "service": "test-service",
@@ -144,12 +147,14 @@ describe('WebApp', function() {
       it('should call the highest version by default', function()  {
         const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/caller/_current'
-        const req = chai.request(server).get(url)
-        return req.then(function (res) {
-            res.should.have.status(200);
-            res.body.should.be.a('object');
-            console.log(res.body)
-            res.body.should.deep.equal({
+        return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
+          .then(function (res) {
+            assert.strictEqual(res.status, 200);
+            return res.json();
+          })
+          .then(function (body) {
+            console.log(body)
+            assert.deepStrictEqual(body, {
                 "plugin": "org.zowe.testplugin",
                 "service": "caller",
                 "test-service response": {
@@ -158,19 +163,21 @@ describe('WebApp', function() {
                   "version": "2.1.0"
                 }
               });
-          })//.catch(e => console.log(e))
+          })
       })
       
       it('should respect local service version requirements', function()  {
         const url = '/XXX/plugins/org.zowe.testplugin'
             + '/services/caller-with-requirements/_current'
-        const req = chai.request(server).get(url)
-        //console.log(req)
-        return req.then(function (res) {
-            res.should.have.status(200);
-            res.body.should.be.a('object');
-            console.log(res.body)
-            res.body.should.deep.equal({
+        //console.log(url)
+        return fetch(`http://localhost:${webAppOptions.httpPort}${url}`)
+          .then(function (res) {
+            assert.strictEqual(res.status, 200);
+            return res.json();
+          })
+          .then(function (body) {
+            console.log(body)
+            assert.deepStrictEqual(body, {
                 "plugin": "org.zowe.testplugin",
                 "service": "caller",
                 "test-service response": {

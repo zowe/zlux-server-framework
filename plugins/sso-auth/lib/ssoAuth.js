@@ -14,6 +14,8 @@ const ipaddr = require('ipaddr.js');
 const url = require('url');
 const zssHandlerFactory = require('./zssHandler');
 const apimlHandlerFactory = require('./apimlHandler');
+const gatewayApiHandlerFactory = require('./gatewayApiHandler');
+const localJwt = require('./localJwt');
 
 function doesApimlExist(serverConf) {
   return ((serverConf.node.mediationLayer !== undefined)
@@ -22,6 +24,10 @@ function doesApimlExist(serverConf) {
     && (serverConf.node.mediationLayer.server.gatewayPort !== undefined)
     && (serverConf.node.mediationLayer.server.port !== undefined)
     && (serverConf.node.mediationLayer.enabled == true))
+}
+
+function doesZosmfExist(zoweConf) {
+  return !!(zoweConf && zoweConf.zOSMF && zoweConf.zOSMF.host && zoweConf.zOSMF.port);
 }
 
 /*
@@ -50,6 +56,8 @@ function cleanupSessionGeneric(sessionState) {
   sessionState.authenticated = false;
   delete sessionState.username;
   delete sessionState.sessionExpTime;
+  delete sessionState.localJwtToken;
+  delete sessionState.localJwtExpMs;
 }
 
 function SsoAuthenticator(pluginDef, pluginConf, serverConf, context, zoweConf) {
@@ -74,6 +82,19 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context, zoweConf) 
     this.categories.push('zss');
   }
 
+  this.usingZosmf = !this.usingApiml && doesZosmfExist(zoweConf);
+  if (this.usingZosmf) {
+    this.gatewayApiHandler = gatewayApiHandlerFactory(pluginDef, pluginConf, serverConf, context, zoweConf);
+    this.categories.push('zosmf');
+  }
+
+  /*
+   * Used for JWT generation in the circumstance that both APIML and zOSMF are unavailable.
+   */
+  this.keyMaterial = (!this.usingApiml && !this.usingZosmf && this.usingZss)
+    ? localJwt.extractTlsKeyMaterial(this.logger, context.tlsOptions)
+    : null;
+
   this.capabilities = {
     "canGetStatus": true,
     "canGetCategories": true,
@@ -87,6 +108,9 @@ function SsoAuthenticator(pluginDef, pluginConf, serverConf, context, zoweConf) 
     "processesProxyHeaders": false,
     "haCompatible": this.usingSso,
     "canGenerateHaSessionId": this.usingSso,
+    "canIssueJWT": !this.usingApiml && (this.usingZosmf || this.usingZss),
+    "canIssuePasstickets": this.usingZss,
+    "jwtCookieName": "apimlAuthenticationToken",
   };
 
   this.logger.info(`SSO=${this.usingSso ? 'enabled' : 'disabled'}, APIML=${this.usingApiml}, ZSS=${this.usingZss}`);
@@ -123,7 +147,24 @@ SsoAuthenticator.prototype = {
 
   logout(request, sessionState) {
     return new Promise((resolve, reject)=> {
-      if (this.usingSso || !this.usingZss) {
+      if (this.usingZosmf) {
+        this.gatewayApiHandler.logout(request, sessionState).then((result)=> {
+          this.gatewayApiHandler.cleanupSession(sessionState);
+          if (this.usingZss) {
+            this.zssHandler.logout(request, sessionState).then((zssResult)=> {
+              this.zssHandler.cleanupSession(sessionState);
+              const cookies = this._mergeCookies(zssResult, result);
+              resolve(this._insertHandlerStatus({ success: result.success, cookies }));
+            }).catch(() => {
+              resolve(this._insertHandlerStatus(result));
+            });
+          } else {
+            resolve(this._insertHandlerStatus(result));
+          }
+        }).catch((e) => {
+          resolve(this._insertHandlerStatus({ success: false, reason: e.message }));
+        });
+      } else if (this.usingSso || !this.usingZss) {
         this.apimlHandler.logout(request, sessionState).then((result)=> {
           this.apimlHandler.cleanupSession(sessionState);
           resolve(this._insertHandlerStatus(result));
@@ -132,19 +173,28 @@ SsoAuthenticator.prototype = {
         });
       } else {
         this.zssHandler.logout(request, sessionState).then((zssResult)=> {
-          this.zssHandler.cleanupSession(sessionState);
-          if (this.usingApiml) {
-            this.apimlHandler.logout(request, sessionState).then((apimlResult)=> {
-              this.apimlHandler.cleanupSession(sessionState);
-              const cookies = this._mergeCookies(zssResult, apimlResult);
-              resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success),
-                                                 cookies: cookies}));
-            }).catch((e) => {
-              resolve(this._insertHandlerStatus({success: false, reason: e.message}));
-            });
-          } else { //only zss?
-            resolve(this._insertHandlerStatus({success: (zssResult.success), cookies: zssResult.cookies}));
-          }
+          // Revoke the locally-issued JWT before clearing the session
+          // since that's the only place it was tracked.
+          const localToken = sessionState.localJwtToken;
+          const localExpMs = sessionState.localJwtExpMs || (Date.now() + localJwt.DEFAULT_EXPIRATION_MS);
+          const revoked = localToken
+            ? localJwt.revokeToken(localToken, localExpMs, this.logger)
+            : Promise.resolve();
+          revoked.then(() => {
+            this.zssHandler.cleanupSession(sessionState);
+            if (this.usingApiml) {
+              this.apimlHandler.logout(request, sessionState).then((apimlResult)=> {
+                this.apimlHandler.cleanupSession(sessionState);
+                const cookies = this._mergeCookies(zssResult, apimlResult);
+                resolve(this._insertHandlerStatus({success: (zssResult.success && apimlResult.success),
+                                                   cookies: cookies}));
+              }).catch((e) => {
+                resolve(this._insertHandlerStatus({success: false, reason: e.message}));
+              });
+            } else { //only zss?
+              resolve(this._insertHandlerStatus({success: (zssResult.success), cookies: zssResult.cookies}));
+            }
+          });
         }).catch((e) => {
           resolve(this._insertHandlerStatus({success: false, reason: e.message}));
         });
@@ -156,6 +206,7 @@ SsoAuthenticator.prototype = {
     response.apiml = this.usingApiml;
     response.zss = this.usingZss;
     response.sso = this.usingSso;
+    response.zosmf = this.usingZosmf;
     response.canChangePassword = this.usingZss;
     return response;
   },
@@ -166,7 +217,35 @@ SsoAuthenticator.prototype = {
   */
   authenticate(request, sessionState) {
     return new Promise((resolve, reject)=> {
-      if (this.usingSso || !this.usingZss) {
+      if (this.usingZosmf) {
+        // case 0: APIML unavailable but z/OSMF is configured; authenticate
+        // directly against z/OSMF and issue a locally-managed JWT.
+        this.gatewayApiHandler.authenticate(request, sessionState).then((zosmfResult)=> {
+          if (zosmfResult.success) {
+            sessionState.sessionExpTime = Date.now() + zosmfResult.expms;
+          } else {
+            this.gatewayApiHandler.cleanupSession(sessionState);
+            cleanupSessionGeneric(sessionState);
+          }
+          sessionState.authenticated = zosmfResult.success;
+          if (this.usingZss && zosmfResult.success) {
+            // Also authenticate to ZSS for RBAC authorization support.
+            this.zssHandler.authenticate(request, sessionState).then((zssResult)=> {
+              // _mergeAuthenticate already calls _insertHandlerStatus internally.
+              resolve(this._mergeAuthenticate(zssResult, zosmfResult, sessionState));
+            }).catch(()=> {
+              // ZSS failure is non-fatal when z/OSMF already succeeded.
+              resolve(this._insertHandlerStatus(zosmfResult));
+            });
+          } else {
+            resolve(this._insertHandlerStatus(zosmfResult));
+          }
+        }).catch((e)=> {
+          this.gatewayApiHandler.cleanupSession(sessionState);
+          cleanupSessionGeneric(sessionState);
+          reject(e);
+        });
+      } else if (this.usingSso || !this.usingZss) {
         //case 1: apiml present and with sso that zss can understand, if present too
         //case 2: zss not present, therefore apiml must be
         this.apimlHandler.authenticate(request, sessionState).then((apimlResult)=> {
@@ -199,6 +278,29 @@ SsoAuthenticator.prototype = {
             if (zssResult.success) {
               sessionState.sessionExpTime = Date.now() + zssResult.expms;
               sessionState.authenticated = true;
+              /*
+               * ZSS-only path: issue a local RS256 JWT so ZSS can work with it.
+               * The JWT is returned as an additional cookie alongside the ZSS session
+               * cookie already in zssResult.cookies.
+               */
+              const jwt = localJwt.createLocalJwt(
+                sessionState.username,
+                zssResult.expms || localJwt.DEFAULT_EXPIRATION_MS,
+                this.keyMaterial
+              );
+              sessionState.localJwtToken = jwt;
+              sessionState.localJwtExpMs = Date.now() + (zssResult.expms || localJwt.DEFAULT_EXPIRATION_MS);
+              const jwtCookie = {
+                name: localJwt.TOKEN_NAME,
+                value: jwt,
+                options: localJwt.TOKEN_COOKIE_OPTIONS
+              };
+              const merged = Object.assign({}, zssResult, {
+                cookies: (zssResult.cookies || []).concat([jwtCookie])
+              });
+              this.logger.debug('Issued local JWT for ZSS-authenticated user %s', sessionState.username);
+              resolve(this._insertHandlerStatus(merged));
+              return;
             }
             resolve(this._insertHandlerStatus(zssResult));
           }
@@ -294,6 +396,9 @@ SsoAuthenticator.prototype = {
   authorized(request, sessionState, options) {
     //prefer ZSS here because it can do RBAC the way the app fw expects
     if (!this.usingZss) {
+      if (this.usingZosmf) {
+        return this.gatewayApiHandler.authorized(request, sessionState, options);
+      }
       return this.apimlHandler.authorized(request, sessionState, options);
     } else {
       return this.zssHandler.authorized(request, sessionState, options);
@@ -304,14 +409,24 @@ SsoAuthenticator.prototype = {
     if (this.usingApiml) {
       this.apimlHandler.addProxyAuthorizations(req1, req2Options, sessionState, this.usingSso);
     }
+    // zssHandler must run before gatewayApiHandler: zssHandler seeds the cookie header
+    // with req1.headers['cookie'] via assignment; gatewayApiHandler then *appends* the
+    // z/OSMF native cookie to whatever is already there.  Running gatewayApiHandler
+    // first and zssHandler second would overwrite the appended cookie.
     if (this.usingZss && !this.usingSso) {
       this.zssHandler.addProxyAuthorizations(req1, req2Options, sessionState);
+    }
+    if (this.usingZosmf) {
+      this.gatewayApiHandler.addProxyAuthorizations(req1, req2Options, sessionState);
     }
   },
 
   restoreSessionState(request, sessionState) {
     if (this.usingSso) {
       return this.apimlHandler.restoreSessionState(request, sessionState);
+    }
+    if (this.usingZosmf) {
+      return this.gatewayApiHandler.restoreSessionState(request, sessionState);
     }
     return Promise.resolve();
   },
@@ -322,6 +437,62 @@ SsoAuthenticator.prototype = {
       return request.cookies[TOKEN_NAME];
     }
     return;
+  },
+
+  /*
+   * Validates an apimlAuthenticationToken JWT and returns its claims.
+   *
+   * @param {string} token - the raw JWT string
+   * @returns {Promise<{userId: string, creation: number, expiration: number}>}
+   */
+  queryJWT(token) {
+    if (this.usingZosmf && this.gatewayApiHandler) {
+      return this.gatewayApiHandler.queryToken(token);
+    }
+    if (this.keyMaterial) {
+      return new Promise((resolve, reject) => {
+        const payload = localJwt.verifyLocalJwt(token, this.keyMaterial);
+        if (!payload || !payload.sub) {
+          reject(new Error('Invalid or tampered zlux-local JWT'));
+          return;
+        }
+        localJwt.isTokenRevoked(token, this.logger).then((revoked) => {
+          if (revoked) {
+            reject(new Error('Token has been revoked'));
+            return;
+          }
+          const now = Date.now();
+          const creation   = payload.iat ? payload.iat * 1000 : now;
+          const expiration = payload.exp * 1000;
+          if (expiration <= now) {
+            reject(new Error('Token has expired'));
+            return;
+          }
+          resolve({ userId: payload.sub, creation, expiration });
+        });
+      });
+    }
+    return Promise.reject(new Error('No JWT-capable handler available in this configuration'));
+  },
+
+  /*
+   * Returns a JWK Set ({ keys: [...] }) containing the RSA public key(s)
+   */
+  getJwkSet() {
+    if (this.usingZosmf && this.gatewayApiHandler) {
+      return this.gatewayApiHandler.getJwkSet();
+    }
+    if (this.keyMaterial) {
+      return Promise.resolve({ keys: [localJwt.derivePublicJwk(this.keyMaterial)] });
+    }
+    return Promise.reject(new Error('No JWK-capable handler available in this configuration'));
+  },
+
+  generatePassTicket(request, sessionState, applicationName) {
+    if (!this.usingZss) {
+      return Promise.reject(new Error('ZWED0210E - No PassTicket-capable handler available'));
+    }
+    return this.zssHandler.requestPassTicket(request, sessionState, applicationName);
   }
 };
 

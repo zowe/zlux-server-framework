@@ -427,6 +427,11 @@ paths:
                       type: string
                     directory:
                       type: boolean
+                    symlink:
+                      type: boolean
+                    symlinkTarget:
+                      type: string
+                      description: The target path of the symbolic link. Only present when symlink is true.
                     size:
                       type: integer
                     ccsid:

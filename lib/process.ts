@@ -10,38 +10,41 @@
 */
 
 'use strict';
-const spawn = require('child_process').spawn;
-const util = require('./util');
-const constants = require('./unp-constants');
+
+import { spawn } from 'node:child_process';
+import * as util from './util';
+import * as constants from './unp-constants';
 const bootstrapLogger = util.loggers.bootstrapLogger;
 const childLogger = util.loggers.childLogger;
 const langLogger = util.loggers.langManager;
 
 
-function ProcessManager(exitOnException, langManagers) {
-  this.childProcesses = [];
-  this.exitOnException = exitOnException;
-  this.cleanupFunctions = [];
-  process.on('SIGTERM', () => this.endServer('SIGTERM', langManagers));
-  process.on('SIGINT', () => this.endServer('SIGINT', langManagers));
-  process.on('SIGHUP', () => this.endServer('SIGHUP', langManagers));
-  const uncaughtHandler = (err)=> {
-    bootstrapLogger.warn('ZWED0036W', err.stack); //bootstrapLogger.warn('Uncaught exception found. Error:\n'+err.stack);  
-    if (this.exitOnException) {
-      bootstrapLogger.warn('ZWED0037W'); //bootstrapLogger.warn('Ending server process due to uncaught exception.');
-      process.removeListener('uncaughtException', uncaughtHandler);      
-      this.endServer('SIGQUIT', langManagers);    
-    }
-  };
-  process.on('uncaughtException', uncaughtHandler);
-  process.on('unhandledRejection', (err) => {
-    console.log('ZWED0151W - unhandledRejection', err);
-    bootstrapLogger.warn('ZWED0151W', err);
-  });
-}
-ProcessManager.prototype = {
-  constructor: ProcessManager,
-  childProcesses: null,
+class ProcessManager {
+  childProcesses = [];
+  exitOnException: boolean;
+  cleanupFunctions: any[] = [];
+
+  constructor(exitOnException:boolean, langManagers) {
+    this.exitOnException = exitOnException;
+  
+    process.on('SIGTERM', () => this.endServer('SIGTERM', langManagers));
+    process.on('SIGINT', () => this.endServer('SIGINT', langManagers));
+    process.on('SIGHUP', () => this.endServer('SIGHUP', langManagers));
+    const uncaughtHandler = (err)=> {
+      bootstrapLogger.warn('ZWED0036W', err.stack); //bootstrapLogger.warn('Uncaught exception found. Error:\n'+err.stack);  
+      if (this.exitOnException) {
+        bootstrapLogger.warn('ZWED0037W'); //bootstrapLogger.warn('Ending server process due to uncaught exception.');
+        process.removeListener('uncaughtException', uncaughtHandler);      
+        this.endServer('SIGQUIT', langManagers);    
+      }
+    };
+    process.on('uncaughtException', uncaughtHandler);
+    process.on('unhandledRejection', (err) => {
+      console.log('ZWED0151W - unhandledRejection', err);
+      bootstrapLogger.warn('ZWED0151W', err);
+    });
+  }
+    
   
   spawn(childProcessConfig) {
     const args = childProcessConfig.args ? childProcessConfig.args : [];
@@ -56,19 +59,19 @@ ProcessManager.prototype = {
     childProcess.on('close', function(code) {
       childLogger.info('ZWED0048I', childProcessConfig.path, code); //childLogger.info('[Path=' + childProcessConfig.path + '] exited, code: ' + code);
     });
-  },
+  }
 
-   endChildren(signal) {
+   endChildren(signal: number|string): void {
      for (const childProcess of this.childProcesses) {
        if (childProcess.pid) { //nothing to kill if no pid
          childProcess.kill(signal);
        }
      }
-   },
+   }
 
    addCleanupFunction(func) {
      this.cleanupFunctions.push(func);
-   },
+   }
 
    performCleanup() {
      for (const cleanupFunction of this.cleanupFunctions) {
@@ -78,13 +81,13 @@ ProcessManager.prototype = {
         bootstrapLogger.warn('ZWED0039W', err.stack); //bootstrapLogger.warn('Exception at server cleanup function:\n'+err.stack); 
        }
      }
-   },
+   }
 
-  endServer(signal, langManagers) {
+  endServer(signal: number|string, langManagers) {
     langLogger.info(`ZWED0049I`); //langLogger.info(`Stopping managers`);
     let i = 0;
     let t = this;
-    function stopManager(i) {
+    function stopManager(i: number) {
       if (i == langManagers.length) {
         bootstrapLogger.info('ZWED0050I', signal); //bootstrapLogger.info('Server shutting down, received signal='+signal);
         t.endChildren(signal);
@@ -104,7 +107,7 @@ ProcessManager.prototype = {
   }
 };
 
-module.exports = ProcessManager;
+export = ProcessManager;
 
 /*
   This program and the accompanying materials are

@@ -99,17 +99,58 @@ function cleanup() {
   logger.warn(`ZWED0147W`); //logger.warn(`Cleanup not yet implemented`);
 }
 
+//Plugin identifiers are reverse-DNS-style names (e.g. "org.zowe.configjs").
+//This must reject path separators and '..' so that an identifier read from an
+//untrusted pluginDefinition.json cannot be used to write files outside of the
+//intended plugins/config directories.
+//Same rule as reverseDomainNotation in plugindefinition-schema.json, where the
+//JSON string "\\." is the regex \. used here.
+const SAFE_IDENTIFIER_PATTERN = /^[A-Za-z]{2,6}(\.[A-Za-z0-9-]{1,62}[A-Za-z0-9])+$/;
+
+function isSafeIdentifier(identifier) {
+  return typeof identifier === 'string'
+    && SAFE_IDENTIFIER_PATTERN.test(identifier)
+    && !identifier.includes('..');
+}
+
+//Resolves `segments` under `baseDir` and verifies the result is still within
+//`baseDir`, refusing to return a path that a crafted segment escaped to.
+function resolveWithinDir(baseDir, ...segments) {
+  const base = path.resolve(baseDir);
+  const target = path.resolve(base, ...segments);
+  if (target !== base && !target.startsWith(base + path.sep)) {
+    return null;
+  }
+  return target;
+}
+
 function addToServer(appDir, installDir) {
   try {
     let pluginDefinition = JSON.parse(fs.readFileSync(path.join(appDir,'pluginDefinition.json')));
+    if (!isSafeIdentifier(pluginDefinition.identifier)) {
+      const errMsg = `Could not register App (dir=${appDir}): plugin identifier is missing or invalid`;
+      if(calledViaCLI){
+        packagingUtils.endWithMessage(errMsg);
+      }
+      logger.warn(`ZWED0149W`, appDir, 'invalid plugin identifier');
+      return {success: false, message: errMsg};
+    }
     logger.info(`ZWED0109I`, pluginDefinition.identifier); //logger.info(`Registering App (ID=${pluginDefinition.identifier}) with App Server`);
-    let locatorJSONString =
-        `{\n"identifier": "${pluginDefinition.identifier}",\n"pluginLocation": "${appDir.replace(/\\/g,'\\\\')}"\n}`;
+    let locatorJSONString = JSON.stringify(
+        {identifier: pluginDefinition.identifier, pluginLocation: appDir}, null, 2);
     let destination;
     if(calledViaCLI){
-      destination = path.join(pluginsDir, pluginDefinition.identifier+'.json');
+      destination = resolveWithinDir(pluginsDir, pluginDefinition.identifier+'.json');
     } else {
-      destination = path.join(installDir, pluginDefinition.identifier+'.json');
+      destination = resolveWithinDir(installDir, pluginDefinition.identifier+'.json');
+    }
+    if (!destination) {
+      const errMsg = `Could not register App (dir=${appDir}): plugin identifier resolves outside of the plugins directory`;
+      if(calledViaCLI){
+        packagingUtils.endWithMessage(errMsg);
+      }
+      logger.warn(`ZWED0149W`, appDir, 'plugin identifier resolves outside plugins directory');
+      return {success: false, message: errMsg};
     }
     logger.debug('ZWED0286I', destination, locatorJSONString); //logger.debug(`Writing plugin locator file to ${destination}, contents=\n${locatorJSONString}`);
     fs.writeFile(destination, locatorJSONString, {mode: FILE_WRITE_MODE}, (err)=> {
@@ -144,20 +185,22 @@ function copyRecognizers(appDir, appId, appVers) {
   let recognizers;
   let recognizersKeys;
   let configRecognizers;
-  let configLocation;
+  let configLocations = [];
+  let desktopPlugins = ['ng2desktop', 'ivydesktop'];
 
   if (process.env.ZWED_instanceDir) {
-    configLocation = path.join(process.env.ZWED_instanceDir, "ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    configLocations = desktopPlugins.map(plugin => path.join(process.env.ZWED_instanceDir, `ZLUX/pluginStorage/org.zowe.zlux.${plugin}/`));
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
-      configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+      configLocations = desktopPlugins.map(plugin => path.join(instanceDir, `/ZLUX/pluginStorage/org.zowe.zlux.${plugin}/`));
     } catch (e) {
       logger.severe('ZWED0152E'); //logger.error('Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.')
     }
   }
 
   try { // Get recognizers in a plugin's appDir/config/xxx location
+    configLocations.forEach((configLocation) => {
     fs.readdirSync(path.join(appDir, "config/recognizers")).forEach(filename => {
       const filepath = path.resolve(path.join(appDir, "config/recognizers"), filename);
       const filepathConfig = path.resolve(path.join(configLocation, "recognizers", filename));
@@ -197,6 +240,7 @@ function copyRecognizers(appDir, appId, appVers) {
         }
       }
     });
+    });
     logger.debug("Found recognizers inside '" + appId + "'");
   } catch (e) {
     logger.debug("Could not find recognizers in '" + (path.join(appDir, "config/recognizers")) + "'");
@@ -206,8 +250,9 @@ function copyRecognizers(appDir, appId, appVers) {
 function copyActions(appDir, appId, appVers) {
   let actions;
   let actionsKeys;
-  let configLocation;
-
+  let configLocations = [];
+  let desktopPlugins = ['ng2desktop', 'ivydesktop'];
+  
   try { // Get actions in a plugin's appDir/config/xxx location
     actions = JSON.parse(fs.readFileSync(path.join(appDir, "config/actions", appId))).actions;
     actionsKeys = Object.keys(actions)
@@ -221,11 +266,11 @@ function copyActions(appDir, appId, appVers) {
   }
 
   if (process.env.ZWED_instanceDir) {
-    configLocation = path.join(process.env.ZWED_instanceDir, "ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+    configLocations = desktopPlugins.map(plugin => path.join(process.env.ZWED_instanceDir, `ZLUX/pluginStorage/org.zowe.zlux.${plugin}/`));
   } else {
     try {
       let instanceDir = JSON.parse(fs.readFileSync(userInput.zluxConfig)).instanceDir;
-      configLocation = path.join(instanceDir, "/ZLUX/pluginStorage/org.zowe.zlux.ng2desktop/");
+      configLocations = desktopPlugins.map(plugin => path.join(instanceDir, `/ZLUX/pluginStorage/org.zowe.zlux.${plugin}/`));
     } catch (e) {
       logger.severe('ZWED0152E'); //logger.error("Unable to locate server config instance location and INSTANCE_DIR environment variable does not exist.")"
     }
@@ -233,8 +278,10 @@ function copyActions(appDir, appId, appVers) {
 
   if (actions) { // Attempt to copy actions over to config location for Desktop access later
     try { //TODO: Doing actions.actions is redundant. We may want to consider refactoring in the future
-      fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
-      logger.info('ZWED0295I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
+      configLocations.forEach((configLocation) => {
+        fs.writeFileSync(path.join(configLocation, "actions", appId), '{ "actions":' + JSON.stringify(actions) + '}');
+        logger.info('ZWED0295I', actions.length, appId); //logger.info("Successfully loaded " + actions.length + " actions for '" + appId + "' into config");
+      });
     } catch (e) {
       logger.warn('ZWED0177W', 'actions', appId);
     }
