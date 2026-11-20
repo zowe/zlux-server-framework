@@ -1,4 +1,4 @@
-name: Build Core
+name: Build Core (v2)
 on:
   push:
     branches:
