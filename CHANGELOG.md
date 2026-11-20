@@ -3,6 +3,9 @@
 All notable changes to the Zlux Server Framework package will be documented in this file..
 This repo is part of the app-server Zowe Component, and the change logs here may appear on Zowe.org in that section.
 
+## 2.18.7
+- Enhancement: Terminal proxy now supports per-component `allowList` and `allowPorts` configuration under `components.tn3270-ng2`, `components.vt-ng2` and `components.tn5250-ng2` in `zowe.yaml`. When defined, only connections to listed hostnames and ports are permitted. All hostnames and ports are still allowed when the lists are not defined [(#759)](https://github.com/zowe/zlux-server-framework/pull/759)
+
 ## 2.18.6
 - Security: Improved how the server derives its internal secrets, so that unpredictable values are always used. [(#719)](https://github.com/zowe/zlux-server-framework/pull/719)
 - Security: Remove obsolete 'encryption.js' file which was a thin wrapper for `node:crypto` functions, some of which have already been removed from node starting version 22. Users of this api should migrate to using `node:crypto` directly. [(#706)](https://github.com/zowe/zlux-server-framework/pull/706)
