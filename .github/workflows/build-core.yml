@@ -1,4 +1,4 @@
-name: build-core
+name: build-Core
 on:
   push:
     branches:
