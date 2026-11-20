@@ -305,7 +305,7 @@ class ZssHandler {
   }
   
   _makeProfileName(reqUrl, method) {
-    let path = url.parse(reqUrl).pathname;
+    let path = new URL(reqUrl).pathname;
     if (path.endsWith('/.websocket')) {
       path = path.slice(0, -'/.websocket'.length);
     }
