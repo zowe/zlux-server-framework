@@ -1,4 +1,4 @@
-name: Build Core (v2)
+name: Build Core
 on:
   push:
     branches:
@@ -130,6 +130,7 @@ jobs:
 
 
   build:
+    name: build-core / build
     runs-on: ubuntu-latest
     needs: check-permission
     steps:
