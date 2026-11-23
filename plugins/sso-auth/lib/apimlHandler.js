@@ -62,7 +62,11 @@ class ApimlHandler {
     this.gatewayUrl = `https://${this.apimlConf.gatewayHostname}:${this.apimlConf.gatewayPort}`;
     this.isHttps = !zluxUtil.isClientAttls(zoweConf);
     if (this.isHttps) {
-      this.httpsAgent = new https.Agent(context.tlsOptions);
+      // Do not present the app-server certificate for user authentication with API ML.
+      const agentTlsOptions = Object.assign({}, context.tlsOptions || {});
+      delete agentTlsOptions.key;
+      delete agentTlsOptions.cert;
+      this.httpsAgent = new https.Agent(agentTlsOptions);
       this.httpModule = https;
     } else {
       this.httpAgent = new http.Agent();
