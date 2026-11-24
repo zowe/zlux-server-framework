@@ -95,6 +95,8 @@ components:
         method: '*'
       - url: '/datasetContents'
         method: '*'
+      - url: '/datasetCopy'
+        method: '*'
       - url: '/jes'
         method: '*'
       - url: '/VSAMdatasetContents'
