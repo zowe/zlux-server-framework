@@ -2494,9 +2494,10 @@ function ConfigService(context) {
 
   
   //default limit was '100kb' at time of writing this comment
-  router.use(bodyParser.raw({type: binaryTypeCheck, limit:BINARY_BODY_SIZE_LIMIT}));
-  router.use(bodyParser.text({type:'application/json'}));
-  router.use(bodyParser.text({type:'text/html'}));
+  const zoweConfig = context.plugin?.server?.config?.all;
+  router.use(bodyParser.raw(proxyUtils.getBodyParserOptions(zoweConfig, {type: binaryTypeCheck, limit:BINARY_BODY_SIZE_LIMIT})));
+  router.use(bodyParser.text(proxyUtils.getBodyParserOptions(zoweConfig, {type:'application/json'})));
+  router.use(bodyParser.text(proxyUtils.getBodyParserOptions(zoweConfig, {type:'text/html'})));
   
   context.addBodyParseMiddleware(router);
   

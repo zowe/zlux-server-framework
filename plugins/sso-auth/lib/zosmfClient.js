@@ -16,7 +16,6 @@ const loggingUtils = require('../../../lib/loggingUtils');
 
 const ZOSMF_AUTHENTICATE_PATH = '/zosmf/services/authenticate';
 const ZOSMF_CSRF_HEADER = 'X-CSRF-ZOSMF-HEADER';
-const ZOSMF_INFO_PATH = '/zosmf/info';
 const ZOSMF_JWK_PATH = '/jwt/ibm/api/zOSMFBuilder/jwk';
 
 const ZOSMF_JWK_CACHE_TTL_MS = 60 * 60 * 1000; // 1 hour
@@ -155,53 +154,49 @@ class ZosmfClient {
   /*
    * Confirms token authenticity via z/OSMF query as the sole authority.
    *
-   * Tries ZOSMF_AUTHENTICATE_PATH first, then ZOSMF_INFO_PATH.
-   * The first endpoint to answer definitively (200 or 401) wins; if every
-   * endpoint is inconclusive (network error, unexpected status), the token is
-   * treated as unverifiable rather than trusted.
+   * Only the authentication endpoint can confirm validity. /zosmf/info is
+   * public, so a successful response there is not evidence of authentication.
+   * Any unexpected status or transport failure leaves the token unverified.
    *
    * @param {string} token
    * @returns {Promise<{valid: boolean, reason?: 'invalid'|'unreachable'}>}
    */
   verifyToken(token) {
-    const cookieHeader = { 'Cookie': `${ZOSMF_JWT_COOKIE_NAME}=${token}` };
-    const attempts = [
-      { path: ZOSMF_AUTHENTICATE_PATH, method: 'POST' },
-      { path: ZOSMF_INFO_PATH, method: 'GET' }
-    ];
+    const options = this._makeRequestOptions(ZOSMF_AUTHENTICATE_PATH, 'POST', {
+      'Cookie': `${ZOSMF_JWT_COOKIE_NAME}=${token}`
+    });
 
-    const tryAt = (index) => {
-      if (index >= attempts.length) {
-        return Promise.resolve({ valid: false, reason: 'unreachable' });
-      }
-      const { path, method } = attempts[index];
-      const options = this._makeRequestOptions(path, method, cookieHeader);
-
-      return new Promise((resolve) => {
-        const req = this.httpModule.request(options, (res) => {
-          res.on('data', () => {});
-          res.on('end', () => {
-            if (res.statusCode === 200) {
-              resolve({ valid: true });
-            } else if (res.statusCode === 401) {
-              resolve({ valid: false, reason: 'invalid' });
-            } else {
-              this.logger.debug(
-                'ZosmfClient: verifyToken at %s returned inconclusive HTTP %d', path, res.statusCode
-              );
-              resolve(null);
-            }
-          });
+    return new Promise((resolve) => {
+      const unverifiable = () => resolve({ valid: false, reason: 'unreachable' });
+      const req = this.httpModule.request(options, (res) => {
+        res.on('data', () => {});
+        res.on('error', unverifiable);
+        res.on('aborted', unverifiable);
+        res.on('end', () => {
+          if (res.statusCode === 200) {
+            resolve({ valid: true });
+          } else if (res.statusCode === 401 || res.statusCode === 403) {
+            resolve({ valid: false, reason: 'invalid' });
+          } else {
+            this.logger.debug(
+              'ZosmfClient: verifyToken at %s returned inconclusive HTTP %d',
+              ZOSMF_AUTHENTICATE_PATH, res.statusCode
+            );
+            unverifiable();
+          }
         });
-        req.on('error', (error) => {
-          this.logger.debug('ZosmfClient: verifyToken at %s failed: %s', path, error.message);
-          resolve(null);
-        });
-        req.end();
-      }).then((result) => result || tryAt(index + 1));
-    };
-
-    return tryAt(0);
+      });
+      req.on('error', (error) => {
+        this.logger.debug('ZosmfClient: verifyToken request failed (code=%s).', error.code || 'n/a');
+        unverifiable();
+      });
+      req.setTimeout(ZOSMF_REQUEST_TIMEOUT_MS, () => {
+        this.logger.debug('ZosmfClient: verifyToken request timed out.');
+        unverifiable();
+        req.destroy();
+      });
+      req.end();
+    });
   }
 
   /*
