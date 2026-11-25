@@ -11,10 +11,10 @@
 */
 
 const crypto = require("crypto");
+const zlib = require('zlib');
 
-var clientVersion = 'SSH-2.0-UNP_1.1';
+var clientVersion = 'SSH-2.0-UNP_1.2';
 var traceCrypto = false;
-var traceSSHMessage = false;
 var MAX_SEQNO = 4294967295;
 var sshLogger;
 
@@ -44,8 +44,9 @@ var hexDump = function(a, offset, length){
 
 const SSH_MESSAGE = exports.MESSAGE = {
     SSH_MSG_DISCONNECT                  : 1,  // followed by a String with caose of disconnection
-    SSH_MSG_IGNORE                      : 2,  // 
- 
+    SSH_MSG_IGNORE                      : 2,  //
+    SSH_MSG_UNIMPLEMENTED               : 3,  // sent to reject unrecognised packet types (RFC 4253 s11.4)
+
     SSH_MSG_SERVICE_REQUEST             : 5,
     SSH_MSG_SERVICE_ACCEPT              : 6,
 
@@ -115,9 +116,6 @@ var Min_N_Max =[ new Number(1024),new Number(4096),new Number(8192) ];
 
 
 var SSH_TO_OPENSSL_TABLE = {
-  'ecdh-sha2-nistp256': 'prime256v1',  
-  'ecdh-sha2-nistp384': 'secp384r1',
-  'ecdh-sha2-nistp521': 'secp521r1',
   'aes128-gcm': 'aes-128-gcm',
   'aes256-gcm': 'aes-256-gcm',
   'aes128-gcm@openssh.com': 'aes-128-gcm',
@@ -166,6 +164,9 @@ var SSH_TO_OPENSSL_TABLE = {
 
 // order matters,
 var SUPPORTED_KEX = [
+'diffie-hellman-group18-sha512',
+'diffie-hellman-group16-sha512',
+'diffie-hellman-group14-sha256',
 'diffie-hellman-group-exchange-sha256',
 'diffie-hellman-group-exchange-sha1',
 'diffie-hellman-group14-sha1',
@@ -174,7 +175,10 @@ var SUPPORTED_KEX = [
   
 var SUPPORTED_SERVER_HOST_KEY = [
 'ssh-rsa',
-'ssh-dss'
+'ssh-dss',
+'rsa-sha2-256',
+'rsa-sha2-512',
+'ssh-ed25519'
 ];
 
 var SUPPORTED_CIPHER = [
@@ -215,6 +219,27 @@ function ssh(){
 exports.setLogger = function(logger) {
   sshLogger = logger;
 }
+
+// These are exposed as live getter functions so callers always see the current (possibly
+// vtConfig-narrowed) list rather than a snapshot captured at require() time.
+exports.getDefaultCiphers = function() { return SUPPORTED_CIPHER.slice(); };
+exports.getDefaultHmac    = function() { return SUPPORTED_HMAC.slice(); };
+
+exports.setSupportedCiphers = function(ciphers) {
+  SUPPORTED_CIPHER = ciphers;
+};
+
+exports.setSupportedHmac = function(hmacs) {
+  SUPPORTED_HMAC = hmacs;
+};
+
+exports.enableCompression = function(enabled) {
+  if (enabled) {
+    SUPPORTED_COMPRESS = ['zlib', 'none'];
+  } else {
+    SUPPORTED_COMPRESS = ['none'];
+  }
+};
 
 exports.processEncryptedData = function(terminalWebsocketProxy,data) {
   return ssh.processEncryptedData(terminalWebsocketProxy,data);
@@ -280,7 +305,6 @@ ssh.sendSSHData = function (terminalWebsocketProxy,jsonData){
          var msgCodeBuffer = Buffer.alloc(1);
          msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_DATA);
          var shellData = [msgCodeBuffer,new Number(channel.serverChannelNumber), new VarData(dataBuffer)];
-         if(traceSSHMessage) console.log("sending SSH_MSG_CHANNEL_DATA:\n"+ dataBuffer.toString('hex') +" to channel "+channel.serverChannelNumber);
          sshLogger.log(sshLogger.FINER, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
                                 + "sending SSH_MSG_CHANNEL_DATA  to channel " + channel.serverChannelNumber + ': \n' + hexDump(dataBuffer));
           pdu = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_CHANNEL_DATA,generateSSHv2PDUBytes(shellData));
@@ -370,7 +394,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       msgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_WINDOW_ADJUST);
 
       const windowAdjustData = [msgCodeBuffer, new Number(channel.recipientChannel), new Number (bytesToBeAdded) ];
-      if(traceSSHMessage) console.log("channelNumber " + channelNumber + "   windowAdjustData" + bytesToBeAdded);
+      sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                          + `channelNumber ${channelNumber}   windowAdjustData ${bytesToBeAdded}`);
 
       const windowAdjustPDU = new SSHv2PDU( SSH_MESSAGE.SSH_MSG_CHANNEL_WINDOW_ADJUST, generateSSHv2PDUBytes(windowAdjustData));
       writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);},sessionData,windowAdjustPDU);
@@ -435,28 +460,28 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       }
       case SSH_MESSAGE.SSH_MSG_PK_OK: {
-        if(traceSSHMessage) console.log("SSH_MESSAGE.SSH_MSG_PK_OK ");
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - SSH_MESSAGE.SSH_MSG_PK_OK`);
         sshMessage.algorithm=sshv2PDU.readSizedData();
         sshMessage.blob=sshv2PDU.readSizedData();
         sshMessages.push(sshMessage);        
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER : {
-        if(traceSSHMessage) console.log("SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER ");
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - SSH_MESSAGE.SSH_MSG_USERAUTH_BANNER`);
         sshMessage.message=sshv2PDU.readSizedData();
         sshMessage.language=sshv2PDU.readSizedData();        
         sshMessages.push(sshMessage);
         break;
       } 
       case SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE:{
-        if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE ');
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - SSH_MESSAGE.SSH_MSG_USERAUTH_FAILURE`);
         sshMessages.push(sshMessage);
        // processData = Buffer.alloc(sshv2PDU.data.length);
        // sshv2PDU.data.copy(processData,0);
         break;
       }
       case SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST:{
-        if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST ');
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - SSH_MESSAGE.SSH_MSG_USERAUTH_INFO_REQUEST`);
         sshMessage.name = sshv2PDU.readSizedData();
         sshMessage.inst = sshv2PDU.readSizedData();
         sshMessage.lang = sshv2PDU.readSizedData();
@@ -479,7 +504,6 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         
         // open a channel here. 
      
-        if(traceSSHMessage) console.log('openning new channel, channelNumber: '+channelNumber);
         sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - ` 
                               + 'openning new channel, channelNumber: '+channelNumber);
 
@@ -506,8 +530,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         sshMessages.push(sshMessage);
         break;
       }
-      case SSH_MESSAGE.SSH_MSG_GLOBAL_REQUEST : { 
-        if(traceSSHMessage) console.log('SSH_MESSAGE.SSH_MSG_GLOBAL_REQUEST');
+      case SSH_MESSAGE.SSH_MSG_GLOBAL_REQUEST : {
+        sshLogger.log(sshLogger.FINE, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - SSH_MESSAGE.SSH_MSG_GLOBAL_REQUEST`);
         sshMessages.push(sshMessage);
         break;
       }
@@ -518,7 +542,6 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
             return returnError('Unexpected reply message code SSH_MSG_CHANNEL_OPEN_CONFIRMATION ('+msgCode+'). Expected='+sessionData.expectedReplyMsgCode);
           }
         }
-        if(traceSSHMessage) console.log('SSH_MSG_CHANNEL_OPEN_CONFIRMATION received');
         sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
                                 + 'SSH_MSG_CHANNEL_OPEN_CONFIRMATION received');
 
@@ -583,7 +606,49 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
                                 + 'SSH_MSG_CHANNEL_FAILURE ');
         break;
-      } 
+      }
+      case SSH_MESSAGE.SSH_MSG_REQUEST_FAILURE: {
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + 'SSH_MSG_REQUEST_FAILURE received');
+        sshMessages.push(sshMessage);
+        break;
+      }
+      case SSH_MESSAGE.SSH_MSG_CHANNEL_OPEN_FAILURE: {
+        sshMessage.recipientChannel = sshv2PDU.readInt();
+        sshMessage.reasonCode = sshv2PDU.readInt();
+        sshMessage.description = sshv2PDU.readSizedData();
+        sshMessage.languageTag = sshv2PDU.readSizedData();
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + `SSH_MSG_CHANNEL_OPEN_FAILURE received. Channel=${sshMessage.recipientChannel}, reason=${sshMessage.reasonCode}`);
+        sshMessages.push(sshMessage);
+        break;
+      }
+      case SSH_MESSAGE.SSH_MSG_CHANNEL_EOF: {
+        var eofChannelNumber = sshv2PDU.readInt();
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + `SSH_MSG_CHANNEL_EOF received on channel ${eofChannelNumber}`);
+        sshMessage.channelNumber = eofChannelNumber;
+        sshMessages.push(sshMessage);
+        break;
+      }
+      case SSH_MESSAGE.SSH_MSG_CHANNEL_CLOSE: {
+        var closeChannelNumber = sshv2PDU.readInt();
+        sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
+                                + `SSH_MSG_CHANNEL_CLOSE received on channel ${closeChannelNumber}`);
+        // RFC 4254 s6.9: echo CHANNEL_CLOSE back to the server before considering the channel closed
+        var closedChannel = sessionData.channels[closeChannelNumber];
+        if (closedChannel) {
+          var closeMsgCodeBuffer = Buffer.alloc(1);
+          closeMsgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_CHANNEL_CLOSE);
+          var closePDU = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_CHANNEL_CLOSE,
+              generateSSHv2PDUBytes([closeMsgCodeBuffer, new Number(closedChannel.serverChannelNumber)]));
+          writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);}, sessionData, closePDU);
+          delete sessionData.channels[closeChannelNumber];
+        }
+        sshMessage.channelNumber = closeChannelNumber;
+        sshMessages.push(sshMessage);
+        break;
+      }
       case SSH_MESSAGE.SSH_MSG_CHANNEL_DATA : {
         sessionData.sshMessageCode = SSH_MESSAGE.SSH_MSG_CHANNEL_DATA;
         var recipientChannel = sshv2PDU.readInt();
@@ -633,13 +698,11 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         break;
       }
       case SSH_MESSAGE.SSH_MSG_CHANNEL_WINDOW_ADJUST:{
-        if(traceSSHMessage) console.log('SSH_MSG_CHANNEL_WINDOW_ADJUST received');
         sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
                                 + 'SSH_MSG_CHANNEL_WINDOW_ADJUST received');
         if(sessionData.channels[channelNumber]){
           var currentChannel = sessionData.channels[channelNumber];
           var recipientChannel = sshv2PDU.readInt();
-          if(traceSSHMessage) console.log("adjusting SSH_MSG_CHANNEL_WINDOW_ADJUST, channel number "+recipientChannel);
           sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
                                   + 'adjusting SSH_MSG_CHANNEL_WINDOW_ADJUST, channel number '+recipientChannel);
           currentChannel.serverWindowSize += sshv2PDU.readInt();
@@ -686,7 +749,8 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
                    clientToServerMACAlgorithms,
                    serverToClientMACAlgorithms,
                    clientToServerCompressionAlgorithms,
-                   serverToClientCompressionAlgorithms);
+                   serverToClientCompressionAlgorithms,
+                   terminalWebsocketProxy.sshPrefs);
 
         if (!sessionData.isKeyExchangingInitSent){
           sessionData.clientKexPayload = clientKexPDU.data;
@@ -697,6 +761,24 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
         var msgCodeBuffer = Buffer.alloc(1);
         var hashAlgorithem = 'sha1';
         switch (sessionData.keyExchangeAlgorithms[0]) {
+          case 'diffie-hellman-group18-sha512':
+            hashAlgorithem = 'sha512';
+            dh = crypto.getDiffieHellman('modp18');
+            sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_GROUP;
+            sessionData.sentMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REQUEST_OLD;
+            break;
+          case 'diffie-hellman-group16-sha512':
+            hashAlgorithem = 'sha512';
+            dh = crypto.getDiffieHellman('modp16');
+            sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_GROUP;
+            sessionData.sentMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REQUEST_OLD;
+            break;
+          case 'diffie-hellman-group14-sha256':
+            hashAlgorithem = 'sha256';
+            dh = crypto.getDiffieHellman('modp14');
+            sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_GROUP;
+            sessionData.sentMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REQUEST_OLD;
+            break;
           case 'diffie-hellman-group1-sha1':  
             dh=crypto.getDiffieHellman('modp2');
            
@@ -779,7 +861,7 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
           sessionData.prime =  sshv2PDU.readSizedData();
           sessionData.generator = sshv2PDU.readSizedData();     
           sshLogger.debug('sessionData.generator');
-          var dh = crypto.createDiffieHellman(sessionData.prime,sessionData.generator);
+          var dh = crypto.createDiffieHellman(sessionData.prime, sessionData.generator);
           sshLogger.debug('made dh');
           sessionData.expectedReplyMsgCode = SSH_MESSAGE.SSH_MSG_KEX_DH_GEX_REPLY;
           var msgCodeBuffer = Buffer.alloc(1);
@@ -1078,9 +1160,16 @@ ssh.processEncryptedData = function (terminalWebsocketProxy,rawData){
       
         break;
       }
-      default :{
+      default: {
         sshLogger.log(sshLogger.INFO, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - `
                                 + 'unknown msgCode, something unimplemented '+ msgCode);
+        // RFC 4253 s11.4: reply with SSH_MSG_UNIMPLEMENTED containing the rejected packet's sequence number
+        var rejectedSeqNo = (sessionData.messagesReceived === 0) ? MAX_SEQNO : sessionData.messagesReceived - 1;
+        var unimplMsgCodeBuffer = Buffer.alloc(1);
+        unimplMsgCodeBuffer.writeUInt8(SSH_MESSAGE.SSH_MSG_UNIMPLEMENTED);
+        var unimplPDU = new SSHv2PDU(SSH_MESSAGE.SSH_MSG_UNIMPLEMENTED,
+            generateSSHv2PDUBytes([unimplMsgCodeBuffer, new Number(rejectedSeqNo)]));
+        writeSSHv2PDU(function(buffer) {terminalWebsocketProxy.netSend(buffer);}, sessionData, unimplPDU);
         break;
       }
      
@@ -1359,8 +1448,15 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition,clientIP){
   var payload = Buffer.alloc(payloadLength);
      
   decryptedData.copy(payload,0,currentPosition);
+  if (sessionData.compressRead === 'zlib' && sessionData.zlibInflate) {
+    sessionData.zlibInflate.write(payload);
+    const zlibChunks = [];
+    let zlibChunk;
+    while ((zlibChunk = sessionData.zlibInflate.read()) !== null) zlibChunks.push(zlibChunk);
+    if (zlibChunks.length > 0) payload = Buffer.concat(zlibChunks);
+  }
   
-  sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - Decrypted payload: \n${hexDump(payload)}`); 
+  sshLogger.log(sshLogger.FINEST, `[SSH, ClientIP=${clientIP}, MsgSeq: ${sessionData.messagesReceived}] - Decrypted payload: \n${hexDump(payload)}`);  
 
   currentPosition+=payloadLength+paddingLength;
   if (sessionData.readingMACAlgorithm) {
@@ -1385,6 +1481,14 @@ function readSSHv2PDUData(sessionData,rawData,currentPosition,clientIP){
 function writeSSHv2PDU(socketWriteFunction,sessionData, pdu) {
     
   var payload = pdu.data;
+  if (sessionData.compressWrite === 'zlib' && sessionData.zlibDeflate) {
+    sessionData.zlibDeflate.write(payload);
+    sessionData.zlibDeflate.flush(zlib.constants.Z_SYNC_FLUSH, () => {});
+    const zlibChunks = [];
+    let zlibChunk;
+    while ((zlibChunk = sessionData.zlibDeflate.read()) !== null) zlibChunks.push(zlibChunk);
+    if (zlibChunks.length > 0) payload = Buffer.concat(zlibChunks);
+  }
 
   var messageSequenceNumber = sessionData.messagesSent; // needed for MAC computation
   
@@ -1699,6 +1803,20 @@ function initializeCrypto(sessionData)  {
     
     console.log( sessionData.readingMACKey.toString('hex')+"\n");
   }
+  const clientToServerCompressAlg = sessionData.clientToServerCompressionAlgorithms
+    ? sessionData.clientToServerCompressionAlgorithms[0] : 'none';
+  const serverToClientCompressAlg = sessionData.serverToClientCompressionAlgorithms
+    ? sessionData.serverToClientCompressionAlgorithms[0] : 'none';
+  sessionData.compressWrite = clientToServerCompressAlg;
+  sessionData.compressRead = serverToClientCompressAlg;
+  if (clientToServerCompressAlg === 'zlib') {
+    sessionData.zlibDeflate = zlib.createDeflate({ level: zlib.constants.Z_DEFAULT_COMPRESSION });
+    sessionData.zlibDeflate.pause();
+  }
+  if (serverToClientCompressAlg === 'zlib') {
+    sessionData.zlibInflate = zlib.createInflate();
+    sessionData.zlibInflate.pause();
+  }
   releaseImtermediateSessionData(sessionData);
 }
 
@@ -1764,8 +1882,16 @@ function makeKeyExchangeResponse (sessionData,keyExchangeAlgorithms,
 							   clientToServerMACAlgorithms,
 							   serverToClientMACAlgorithms,
 							   clientToServerCompressionAlgorithms,
-							   serverToClientCompressionAlgorithms)
+							   serverToClientCompressionAlgorithms,
+							   prefs)
 {
+  // Per-connection preferences (from CONFIG message) narrow the module-level defaults.
+  const effectiveCiphers  = (prefs && prefs.ciphers)  || SUPPORTED_CIPHER;
+  const effectiveHmac     = (prefs && prefs.hmac)     || SUPPORTED_HMAC;
+  const effectiveCompress = (prefs && prefs.compression !== undefined)
+    ? (prefs.compression ? ['zlib', 'none'] : ['none'])
+    : SUPPORTED_COMPRESS;
+
   var agreeableKeyExchangeAlgorithms = getAgreeableAlgorithms(SUPPORTED_KEX,keyExchangeAlgorithms);
   if (!agreeableKeyExchangeAlgorithms){
     return undefined;
@@ -1780,14 +1906,14 @@ function makeKeyExchangeResponse (sessionData,keyExchangeAlgorithms,
   sessionData.serverHostKeyAlgorithms=agreeableServerHostKeyAlgorithms;
   if(traceCrypto) console.log("agreeableServerHostKeyAlgorithms " + agreeableServerHostKeyAlgorithms);
 
-  var agreeableClientToServerEncryptionAlgorithms = getAgreeableAlgorithms(SUPPORTED_CIPHER,clientToServerEncryptionAlgorithms);
+  var agreeableClientToServerEncryptionAlgorithms = getAgreeableAlgorithms(effectiveCiphers,clientToServerEncryptionAlgorithms);
   if (!agreeableClientToServerEncryptionAlgorithms){
     return undefined;
   }
   sessionData.clientToServerEncryptionAlgorithms=agreeableClientToServerEncryptionAlgorithms;
   if(traceCrypto) console.log("agreeableClientToServerEncryptionAlgorithms " + agreeableClientToServerEncryptionAlgorithms);
 
-  var agreeableServerToClientEncryptionAlgorithms = getAgreeableAlgorithms(SUPPORTED_CIPHER,serverToClientEncryptionAlgorithms);
+  var agreeableServerToClientEncryptionAlgorithms = getAgreeableAlgorithms(effectiveCiphers,serverToClientEncryptionAlgorithms);
   if (!agreeableServerToClientEncryptionAlgorithms){
     return undefined;
   }
@@ -1795,27 +1921,27 @@ function makeKeyExchangeResponse (sessionData,keyExchangeAlgorithms,
   sessionData.serverToClientEncryptionAlgorithms=agreeableServerToClientEncryptionAlgorithms;
   if(traceCrypto) console.log("agreeableServerToClientEncryptionAlgorithms " + agreeableServerToClientEncryptionAlgorithms);
 
-  var agreeableClientToServerMACAlgorithms = getAgreeableAlgorithms(SUPPORTED_HMAC,clientToServerMACAlgorithms);
+  var agreeableClientToServerMACAlgorithms = getAgreeableAlgorithms(effectiveHmac,clientToServerMACAlgorithms);
   if (!agreeableClientToServerMACAlgorithms){
     return undefined;
   }
   sessionData.clientToServerMACAlgorithms=agreeableClientToServerMACAlgorithms;
   if(traceCrypto) console.log("agreeableClientToServerMACAlgorithms " + agreeableClientToServerMACAlgorithms);
 
-  var agreeableServerToClientMACAlgorithms = getAgreeableAlgorithms(SUPPORTED_HMAC,serverToClientMACAlgorithms);
+  var agreeableServerToClientMACAlgorithms = getAgreeableAlgorithms(effectiveHmac,serverToClientMACAlgorithms);
   if (!agreeableServerToClientMACAlgorithms){
     return undefined;
   }
   sessionData.serverToClientMACAlgorithms=agreeableServerToClientMACAlgorithms;
   if(traceCrypto) console.log("agreeableServerToClientMACAlgorithms " + agreeableServerToClientMACAlgorithms);
 
-  var agreeableClientToServerCompressionAlgorithms = getAgreeableAlgorithms(SUPPORTED_COMPRESS,clientToServerCompressionAlgorithms);
+  var agreeableClientToServerCompressionAlgorithms = getAgreeableAlgorithms(effectiveCompress,clientToServerCompressionAlgorithms);
   if (!agreeableClientToServerCompressionAlgorithms){
     return undefined;
   }
   sessionData.clientToServerCompressionAlgorithms=agreeableClientToServerCompressionAlgorithms;
   
-  var agreeableServerToClientCompressionAlgorithms = getAgreeableAlgorithms(SUPPORTED_COMPRESS,serverToClientCompressionAlgorithms);
+  var agreeableServerToClientCompressionAlgorithms = getAgreeableAlgorithms(effectiveCompress,serverToClientCompressionAlgorithms);
   if (!agreeableServerToClientCompressionAlgorithms){
     return undefined;
   }
